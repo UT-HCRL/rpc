@@ -98,9 +98,10 @@ def main():
     icp_des_scene = create_sphere_scene("icp_des", [0.0, 1.0, 0.0, 0.5])
 
     # send data to mcap file
-    with open(cwd + "/experiment_data/draco3_foxglove.mcap", "wb") as f, Writer(
-        f
-    ) as mcap_writer:
+    with (
+        open(cwd + "/experiment_data/draco3_foxglove.mcap", "wb") as f,
+        Writer(f) as mcap_writer,
+    ):
         for i in range(len(time)):
             # Update all transforms (to visualize URDF)
             vis_q[0:3] = np.array(base_pos[i])
