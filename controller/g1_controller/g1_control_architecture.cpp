@@ -10,6 +10,7 @@
 #include "controller/g1_controller/g1_state_machines/double_support_swaying.hpp"
 #include "controller/g1_controller/g1_state_machines/initialize.hpp"
 #include "controller/g1_controller/g1_state_machines/single_support_swing.hpp"
+#include "controller/g1_controller/g1_state_machines/track_plan.hpp"
 #include "controller/g1_controller/g1_state_provider.hpp"
 #include "controller/g1_controller/g1_tci_container.hpp"
 #include "controller/whole_body_controller/managers/dcm_trajectory_manager.hpp"
@@ -255,6 +256,11 @@ G1ControlArchitecture::G1ControlArchitecture(PinocchioRobotSystem *robot,
   locomotion_state_machine_container_[g1_states::kRFSingleSupportSwing]
       ->SetParameters(cfg);
 
+  locomotion_state_machine_container_[g1_states::kTrackPlan] =
+      new TrackPlan(g1_states::kTrackPlan, robot_, this);
+  locomotion_state_machine_container_[g1_states::kTrackPlan]
+      ->SetParameters(cfg);
+
 #if B_USE_TELEOP
   // Manipulation
   manipulation_state_machine_container_[g1_states::kTeleopManipulation] =
@@ -306,6 +312,8 @@ G1ControlArchitecture::~G1ControlArchitecture() {
       [g1_states::kLFSingleSupportSwing];
   delete locomotion_state_machine_container_
       [g1_states::kRFSingleSupportSwing];
+  delete locomotion_state_machine_container_
+  [g1_states::kTrackPlan];
 #if B_USE_TELEOP
   delete manipulation_state_machine_container_
       [g1_states::kTeleopManipulation];

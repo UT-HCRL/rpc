@@ -2,6 +2,7 @@
 #include "controller/g1_controller/g1_control_architecture.hpp"
 #include "controller/g1_controller/g1_control_architecture_wbic.hpp"
 #include "controller/g1_controller/g1_state_machines/double_support_balance.hpp"
+#include "controller/g1_controller/g1_state_machines/track_plan.hpp"
 #include "controller/g1_controller/g1_state_machines_wbic/double_support_balance.hpp"
 #include "controller/whole_body_controller/managers/dcm_trajectory_manager.hpp"
 
@@ -144,6 +145,27 @@ void G1InterruptHandler::Process() {
             ->DoDcmWalking();
       } else
         std::cout << "Wait Until Balance State" << std::endl;
+    }
+
+    if (b_button_p) {
+      std::cout << "-----------------------------------" << std::endl;
+      std::cout << "button P pressed: Track Trajectory " << std::endl;
+      std::cout << "-----------------------------------" << std::endl;
+      if(ctrl_arch_->locostate() == g1_states::kDoubleSupportBalance){
+        static_cast<TrackPlan *>(
+            ctrl_arch_->locomotion_state_machine_container()
+                [g1_states::kTrackPlan])->DoTrackPlan();
+      } else
+        std::cout << "Wait Until Balance State" << std::endl;
+      
+    //   if (ctrl_arch_->locostate() == g1_states::kDoubleSupportBalance) {
+    //     ctrl_arch_->dcm_tm_->RightTurnWalkMode();
+    //     static_cast<DoubleSupportBalance *>(
+    //         ctrl_arch_->locomotion_state_machine_container()
+    //             [g1_states::kDoubleSupportBalance])
+    //         ->DoDcmWalking();
+    //   } else
+    //     std::cout << "Wait Until Balance State" << std::endl;
     }
   } else if (ctrl_arch_wbic_) {
     //======================================================================

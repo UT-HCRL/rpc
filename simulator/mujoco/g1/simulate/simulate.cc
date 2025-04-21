@@ -1516,9 +1516,18 @@ void UiEvent(mjuiState* state) {
       }
       return;
 
+      case mjKEY_P:
+        if (sim->interrupt_handler_) {
+          sim->interrupt_handler_->PressP(); // TODO: MPC walking -> Call to Track Plan | To be implemented
+        } else {
+          std::cout << "[Mujoco Sim] Interrupt Handler Error!" << '\n';
+        }
+        return;
+
       // default:
       // break;
     }
+    
   }
 
   // call UI 0 if event is directed to it
@@ -2349,8 +2358,6 @@ void Simulate::LoadMessageClear(void) {
   }
 }
 
-
-
 //------------------------------------- load mjb or xml model --------------------------------------
 void Simulate::LoadOnRenderThread() {
   this->m_ = this->mnew_;
@@ -2532,7 +2539,6 @@ void Simulate::LoadOnRenderThread() {
   this->mnew_ = nullptr;
   this->dnew_ = nullptr;
 }
-
 
 //------------------------------------------- rendering --------------------------------------------
 
@@ -2794,8 +2800,6 @@ void Simulate::Render() {
   // finalize
   this->platform_ui->SwapBuffers();
 }
-
-
 
 void Simulate::RenderLoop() {
   // Set timer callback (milliseconds)

@@ -74,6 +74,7 @@
 #define mjKEY_7 55
 #define mjKEY_8 56
 #define mjKEY_9 57
+#define mjKEY_P 80
 //**********************************************************
 
 

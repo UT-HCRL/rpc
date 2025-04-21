@@ -23,6 +23,7 @@ target_link_libraries(rpc-g1-controller PUBLIC rpc-pin-robot-system
                                            PUBLIC rpc-filter
                                            PUBLIC rpc-state-estimator
                                            PUBLIC rpc-model
+                                           PUBLIC pkl_reader::pkl_reader
                                            )
 
 if(BUILD_WITH_ZMQ_PROTOBUF)

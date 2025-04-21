@@ -332,6 +332,7 @@ class Simulate {
   int texture_upload_ = -1;
   int mesh_upload_ = -1;
   int hfield_upload_ = -1;
+
 };
 }  // namespace mujoco
 

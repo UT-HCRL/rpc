@@ -17,6 +17,7 @@ constexpr int kLFSingleSupportSwing = 7;
 constexpr int kRFContactTransitionStart = 8;
 constexpr int kRFContactTransitionEnd = 9;
 constexpr int kRFSingleSupportSwing = 10;
+constexpr int kTrackPlan = 12;
 // constexpr int kMPCLocomotion = 11;
 constexpr int kTeleopManipulation = 20;
 } // namespace g1_states

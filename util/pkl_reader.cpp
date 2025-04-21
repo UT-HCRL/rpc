@@ -26,7 +26,7 @@ public:
             py::object open_func = py::module_::import("builtins").attr("open");
             py::object file = open_func(filePath, "rb");
 
-            std::cout << "[PKL_READER] - Pickle type is: " << (pkl_type == PickleType::DICT ? "DICT" : (pkl_type == PickleType::LIST ? "LIST" : "BEZIER")) << std::endl;
+            // std::cout << "[PKL_READER] - Pickle type is: " << (pkl_type == PickleType::DICT ? "DICT" : (pkl_type == PickleType::LIST ? "LIST" : "BEZIER")) << std::endl;
             
             if(pkl_type == PickleType::LIST) {
                 py::list loaded_data;
@@ -65,7 +65,7 @@ public:
             file.attr("close")();
             
             is_ready_ = true;
-            std::cout << "[PKL_READER] - File opened successfully: " << filePath << std::endl;
+            // std::cout << "[PKL_READER] - File opened successfully: " << filePath << std::endl;
 
         } catch (const std::exception& e) {
             std::cerr << "[PKL_READER] - Error loading pickle file: " << e.what() << std::endl;
@@ -84,13 +84,13 @@ public:
 
         try {
             if (py::isinstance<py::list>(data_) && pkl_type_ == PickleType::LIST) {
-                std::cout << "[PKL_READER] - Parsing list..." << std::endl;
+                // std::cout << "[PKL_READER] - Parsing list..." << std::endl;
                 parseList();
             } else if (py::isinstance<py::dict>(data_) && pkl_type_ == PickleType::DICT) {
-                std::cout << "[PKL_READER] - Parsing dictionary..." << std::endl;
+                // std::cout << "[PKL_READER] - Parsing dictionary..." << std::endl;
                 parseDict();
             } else if (py::isinstance<py::list>(data_) && pkl_type_ == PickleType::BEZIER) {
-                std::cout << "[PKL_READER] - Parsing Bezier curve..." << std::endl;
+                // std::cout << "[PKL_READER] - Parsing Bezier curve..." << std::endl;
                 parseBezier();
             } 
             else {
@@ -112,7 +112,7 @@ public:
         try {
             if (py::isinstance<py::list>(data_)) {
                 py::list obj_list = data_;
-                std::cout << "[PKL_READER] - Loaded " << py::len(obj_list) << " object(s) from pickle file.\n";
+                // std::cout << "[PKL_READER] - Loaded " << py::len(obj_list) << " object(s) from pickle file.\n";
                 
                 for(size_t i=0; i<py::len(obj_list); i++){
                     py::object obj = obj_list[i];
@@ -125,32 +125,32 @@ public:
                         for (auto item : robot_data) {
                             std::string key = py::str(item.first);
                             py::object value = py::reinterpret_steal<py::object>(item.second);
-                            std::cout <<"[PKL_READER] - " <<key << ": ";
+                            // std::cout <<"[PKL_READER] - " <<key << ": ";
 
                             if (py::isinstance<py::float_>(value)) {
-                                std::cout << value.cast<float>() << std::endl;
+                                // std::cout << value.cast<float>() << std::endl;
                             } else if (py::isinstance<py::list>(value)) {
                                 py::list pylist = value;
-                                std::cout << "[ ";
+                                // std::cout << "[ ";
                                 for (auto elem : pylist) {
                                     if (py::isinstance<py::float_>(elem)) {
-                                        std::cout << elem.cast<float>() << " ";
+                                        // std::cout << elem.cast<float>() << " ";
                                     } else {
-                                        std::cout << py::str(elem) << " ";
+                                        // std::cout << py::str(elem) << " ";
                                     }
                                 }
-                                std::cout << "]\n";
+                                // std::cout << "]\n";
                             } else if (py::isinstance<py::int_>(value)){
-                                std::cout << value.cast<int>() << std::endl;
+                                // std::cout << value.cast<int>() << std::endl;
                             } else {
-                                std::cout << py::str(value) << " (unhandled type)\n";
+                                // std::cout << py::str(value) << " (unhandled type)\n";
                             }
                         }
                     } else {
                         std::cerr << "[PKL_READER] - Object " << i << " is not a dictionary!" << std::endl;
                     }
 
-                    std::cout << "\n\n\n";
+                    // std::cout << "\n\n\n";
                 }
 
             }
@@ -168,27 +168,27 @@ public:
             if (py::isinstance<py::dict>(data_)) {
                 py::dict robot_data = data_;
                 
-                std::cout << "[PKL_READER] - Parsed dictionary:\n";
+                // std::cout << "[PKL_READER] - Parsed dictionary:\n";
                 for (auto item : robot_data) {
                     std::string key = py::str(item.first);
                     py::object value = py::reinterpret_steal<py::object>(item.second);
-                    std::cout << "[PKL_READER] - " << key << ": ";
+                    // std::cout << "[PKL_READER] - " << key << ": ";
 
                     if (py::isinstance<py::float_>(value)) {
-                        std::cout << value.cast<float>() << std::endl;
+                        // std::cout << value.cast<float>() << std::endl;
                     } else if (py::isinstance<py::list>(value)) {
                         py::list pylist = value;
-                        std::cout << "[ ";
+                        // std::cout << "[ ";
                         for (auto elem : pylist) {
                             if (py::isinstance<py::float_>(elem)) {
-                                std::cout << elem.cast<float>() << " ";
+                                // std::cout << elem.cast<float>() << " ";
                             } else {
-                                std::cout << py::str(elem) << " ";
+                                // std::cout << py::str(elem) << " ";
                             }
                         }
-                        std::cout << "]\n";
+                        // std::cout << "]\n";
                     } else {
-                        std::cout << py::str(value) << " (unhandled type)\n";
+                        // std::cout << py::str(value) << " (unhandled type)\n";
                     }
                 }
 
@@ -210,8 +210,8 @@ public:
         for (size_t i = 0; i < composite_bez_list.size(); ++i) {
             py::object obj = composite_bez_list[i];
 
-            std::cout << "[PKL_READER] - Object " << i << ": "
-                    << std::string(py::str(obj.get_type())) << std::endl;
+            // std::cout << "[PKL_READER] - Object " << i << ": "
+            //        << std::string(py::str(obj.get_type())) << std::endl;
             
             // py::object N = obj.attr("N");
             // py::object d = obj.attr("d");
@@ -238,7 +238,7 @@ public:
 
             for(size_t j = 0; j < py::len(obj.attr("beziers")); j++) {
                 py::object bezier = obj.attr("beziers")[py::int_(j)];
-                std::cout << "[PKL_READER] - Bezier " << j << ": " << std::string(py::str(bezier)) << std::endl;
+                // std::cout << "[PKL_READER] - Bezier " << j << ": " << std::string(py::str(bezier)) << std::endl;
                 py::object points = bezier.attr("points");
                 // std::cout << "points type: " << std::string(py::str(points.get_type())) << std::endl; <- sono numpy array!
 
