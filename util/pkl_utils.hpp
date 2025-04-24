@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <boost/math/special_functions/binomial.hpp>
 using namespace Eigen;
 
 namespace pkl_utils {
@@ -13,14 +14,26 @@ namespace pkl_utils {
 
     class BezierCurve {
     public:
-        BezierCurve(const std::vector<Eigen::Vector3d>& points, double a = 0, double b = 1)
-            : points_(points), a_(a), b_(b), h_(points.size() - 1), d_(points.empty() ? 0 : points[0].size()), duration_(b - a) {
+        BezierCurve(const Matrix<double, 8, 3>& points, double a = 0, double b = 1)
+            : points_(points), a_(a), b_(b), h_(points.rows() - 1), d_(3), duration_(b - a) {
             if (b <= a) {
                 throw std::invalid_argument("b must be greater than a");
             }
         }
 
-        const std::vector<Eigen::Vector3d>& getPoints() const { return points_; }
+        const Vector3d eval(const double t) const {
+            if (t < a_ || t > b_) {
+                throw std::out_of_range("t is out of range");
+            }
+            Matrix<double, 8, 1> coeffs;
+            coeffs.setZero();
+            for (size_t i = 0; i <= h_; ++i) {
+                coeffs(i) = _bernstein(t, i);
+            }
+            return coeffs.transpose() * points_;
+        }
+
+        const Matrix<double, 8, 3>& getPoints() const { return points_; }
         int getH() const { return h_; }
         int getD() const { return d_; }
         double getA() const { return a_; }
@@ -28,7 +41,15 @@ namespace pkl_utils {
         double getDuration() const { return duration_; }
 
     private:
-        std::vector<Eigen::Vector3d> points_;
+        const double _bernstein(double t, int n) const {
+            double c1 = boost::math::binomial_coefficient<double>(h_, n);
+            double c2 = (t - a_) / duration_;
+            double c3 = (b_ - t) / duration_;
+            return c1 * std::pow(c2,n) * std::pow(c3, (h_ - n));
+        }
+
+        // std::vector<Eigen::Vector3d> points_;
+        Matrix<double, 8, 3> points_;
         int h_;
         int d_;
         double a_;
@@ -65,9 +86,10 @@ namespace pkl_utils {
                 transition_times_.push_back(bez.getB());
             }
             
-            beziers_.reserve(N_);
+            unsigned int i = 0;
             for(const auto&bez : beziers){
-                beziers_.emplace_back(bez.getPoints(), bez.getA(), bez.getB());
+                beziers_[i] = BezierCurve(bez.getPoints(), bez.getA(), bez.getB());
+                i++;
             }
         }
 

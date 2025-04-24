@@ -242,7 +242,9 @@ public:
                 py::object points = bezier.attr("points");
                 // std::cout << "points type: " << std::string(py::str(points.get_type())) << std::endl; <- sono numpy array!
 
-                std::vector<Eigen::Vector3d> points_vec = numpy2eigen(points);
+                Matrix<double, 8, 3> points_mat;
+                points_mat.setZero();
+                points_mat = numpy2eigen(points);
                 // for(size_t k = 0; k < points_vec.size(); k++) {
                 //     std::cout << "Point " << k << ": " << points_vec[k].transpose() << std::endl;
                 // }
@@ -261,12 +263,12 @@ public:
 
                 double a_bez = bezier.attr("a").cast<double>();
                 double b_bez = bezier.attr("b").cast<double>();
-                BezierCurve bezier_curve(points_vec, a_bez, b_bez);
                 // std::cout << "Bezier h: " << bezier_curve.getH() << std::endl;
                 // std::cout << "Bezier d: " << bezier_curve.getD() << std::endl;
                 // std::cout << "Bezier a: " << bezier_curve.getA() << std::endl;
                 // std::cout << "Bezier b: " << bezier_curve.getB() << std::endl;
                 // std::cout << "Bezier duration: " << bezier_curve.getDuration() << std::endl;
+                BezierCurve bezier_curve(points_mat, a_bez, b_bez);
 
                 beziers.emplace_back(bezier_curve);
             
@@ -282,16 +284,18 @@ public:
         return pkl_type_;
     }
 
-    std::vector<Eigen::Vector3d> numpy2eigen(py::array_t<double> input_array) {
+    Matrix<double, 8, 3> numpy2eigen(py::array_t<double> input_array) {
         py::buffer_info buf = input_array.request();
         if (buf.ndim != 2 || buf.shape[1] != 3)
             throw std::runtime_error("Expected shape (N, 3)");
 
         auto ptr = static_cast<double*>(buf.ptr);
-        std::vector<Eigen::Vector3d> result(buf.shape[0]);
+        Matrix<double, 8, 3> result;
 
-        for (ssize_t i = 0; i < buf.shape[0]; ++i) {
-            result[i] = Eigen::Vector3d(ptr[i * 3], ptr[i * 3 + 1], ptr[i * 3 + 2]);
+        for (ssize_t i = 0; i < buf.shape[1]; ++i) {
+            for (ssize_t j = 0; j < buf.shape[0]; ++j) {
+                result(j, i) = ptr[i * buf.shape[0] + j];
+            }
         }
         return result;
     }
