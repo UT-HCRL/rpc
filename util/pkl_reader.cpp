@@ -116,30 +116,66 @@ public:
                 
                 for(size_t i=0; i<py::len(obj_list); i++){
                     py::object obj = obj_list[i];
-                    // int temp=0;
-                    // std::cout<<"Enter a number: ";
-                    // std::cin>>temp;
 
                     if (py::isinstance<py::dict>(obj)) {
                         py::dict robot_data = obj;
                         for (auto item : robot_data) {
                             std::string key = py::str(item.first);
                             py::object value = py::reinterpret_steal<py::object>(item.second);
-                            std::cout <<"[PKL_READER] - " <<key << ": ";
+                            // std::cout <<"[PKL_READER] - " <<key << ": ";
 
                             if (py::isinstance<py::float_>(value)) {
-                                std::cout << value.cast<float>() << std::endl;
                             } else if (py::isinstance<py::list>(value)) {
+                                Vector<double, 44> tmp_pos_vec;
+                                Vector<double, 43> tmp_vel_vec;
+                                Vector<double, 37> tmp_tau_vec;
                                 py::list pylist = value;
-                                std::cout << "[ ";
+                                // std::cout << "[ ";
                                 for (auto elem : pylist) {
                                     if (py::isinstance<py::float_>(elem)) {
-                                        std::cout << elem.cast<float>() << " ";
+                                        if (key == "time") {
+                                            time_vec_.emplace_back(elem.cast<double>());
+                                            // std::cout << " LOGGED " << std::endl;
+                                        }
                                     } else {
-                                        std::cout << py::str(elem) << " ";
+                                        size_t vec_idx = 0;
+                                        if (key == "joint_pos"){
+                                            for (auto el : elem) {
+                                                tmp_pos_vec(vec_idx) = el.cast<double>();
+                                                vec_idx++;
+                                                // std::cout << " LOGGED " << std::endl;
+                                            }
+                                            // store current vector and clear for next iteration
+                                            joint_pos_des_.emplace_back(tmp_pos_vec);
+                                            tmp_pos_vec.setZero();
+                                        } else if (key == "joint_vel") {
+                                            for (auto el : elem) {
+                                                tmp_vel_vec(vec_idx) = el.cast<double>();
+                                                vec_idx++;
+                                                // std::cout << " LOGGED " << std::endl;
+                                            }
+                                            // store current vector and clear for next iteration
+                                            joint_vel_des_.emplace_back(tmp_vel_vec);
+                                            tmp_vel_vec.setZero();
+                                        } else if (key == "joint_torque") {
+                                            for (auto el : elem) {
+                                                tmp_tau_vec(vec_idx) = el.cast<double>();
+                                                vec_idx++;
+                                                // std::cout << " LOGGED " << std::endl;
+                                            }
+                                            // store current vector and clear for next iteration
+                                            joint_tau_des_.emplace_back(tmp_tau_vec);
+                                            tmp_tau_vec.setZero();
+                                        } else if (key == "grf_lfoot") {
+                                        } else if (key == "grf_rfoot") {
+                                        } else if (key == "grf_lhand") {
+                                        } else if (key == "grf_rhand") {
+                                        } else {
+                                            std::cerr << "[PKL_READER] - Unknown format for variable: " << key << std::endl;
+                                        }
                                     }
                                 }
-                                std::cout << "]\n";
+                                // std::cout << "]\n";
                             } else if (py::isinstance<py::int_>(value)){
                                 std::cout << value.cast<int>() << std::endl;
                             } else {
@@ -149,8 +185,6 @@ public:
                     } else {
                         std::cerr << "[PKL_READER] - Object " << i << " is not a dictionary!" << std::endl;
                     }
-
-                    std::cout << "\n\n\n";
                 }
 
             }
@@ -212,25 +246,6 @@ public:
 
             std::cout << "[PKL_READER] - Object " << i << ": "
                     << std::string(py::str(obj.get_type())) << std::endl;
-            
-            // py::object N = obj.attr("N");
-            // py::object d = obj.attr("d");
-            // py::object a = obj.attr("a");
-            // py::object b = obj.attr("b");
-            // py::object duration = obj.attr("duration");
-            // py::object transition_times = obj.attr("transition_times");
-            // std::cout << "N: " << std::string(py::str(N)) << std::endl;
-            // std::cout << "d: " << std::string(py::str(d)) << std::endl;
-            // std::cout << "a: " << std::string(py::str(a)) << std::endl;
-            // std::cout << "b: " << std::string(py::str(b)) << std::endl;
-            // std::cout << "duration: " << std::string(py::str(duration)) << std::endl;
-            // std::cout << "transition_times: " << std::string(py::str(transition_times)) << std::endl;
-            
-            // py::object beziers = obj.attr("beziers");
-            // py::object points = bez_i.attr("points");
-            // py::object bez_i = beziers[py::int_(i)];
-            // std::cout << "Bezier points: " << std::string(py::str(points)) << std::endl;
-            // std::cout << "Object: " << std::string(py::str(obj)) << std::endl;
 
             // for all the beziers inside the object:
             std::vector<BezierCurve> beziers;
@@ -254,20 +269,9 @@ public:
                 py::object a = bezier.attr("a");
                 py::object b = bezier.attr("b");
                 py::object duration = bezier.attr("duration");
-                // std::cout << "h: " << std::string(py::str(h)) << std::endl;
-                // std::cout << "d: " << std::string(py::str(d)) << std::endl;
-                // std::cout << "a: " << std::string(py::str(a)) << std::endl;
-                // std::cout << "b: " << std::string(py::str(b)) << std::endl;
-                // std::cout << "duration: " << std::string(py::str(duration)) << std::endl;
-                // std::cout << "points: " << std::string(py::str(points)) << std::endl;
 
                 double a_bez = bezier.attr("a").cast<double>();
                 double b_bez = bezier.attr("b").cast<double>();
-                // std::cout << "Bezier h: " << bezier_curve.getH() << std::endl;
-                // std::cout << "Bezier d: " << bezier_curve.getD() << std::endl;
-                // std::cout << "Bezier a: " << bezier_curve.getA() << std::endl;
-                // std::cout << "Bezier b: " << bezier_curve.getB() << std::endl;
-                // std::cout << "Bezier duration: " << bezier_curve.getDuration() << std::endl;
                 BezierCurve bezier_curve(points_mat, a_bez, b_bez);
 
                 beziers.emplace_back(bezier_curve);
@@ -304,6 +308,22 @@ public:
         return composite_bezier_curves_;
     }
 
+    std::vector<Matrix<double, 44, 1>> getJointPosDes() const {
+        return joint_pos_des_;
+    }
+
+    std::vector<Matrix<double, 43, 1>> getJointVelDes() const {
+        return joint_vel_des_;
+    }
+
+    std::vector<Matrix<double, 37, 1>> getJointTauDes() const {
+        return joint_tau_des_;
+    }
+
+    std::vector<double> getTimeVec() const {
+        return time_vec_;
+    }
+
 private:
     py::scoped_interpreter guard_;  
     std::string filename_;
@@ -312,6 +332,10 @@ private:
     PickleType pkl_type_;
 
     std::vector<CompositeBezierCurve> composite_bezier_curves_;
+    std::vector<Matrix<double, 44, 1>> joint_pos_des_;
+    std::vector<Matrix<double, 43, 1>> joint_vel_des_;
+    std::vector<Matrix<double, 37, 1>> joint_tau_des_;
+    std::vector<double> time_vec_;
     std::function<void(const std::string&)> log_;
 
 };
@@ -335,6 +359,22 @@ const PickleType& PickleReader::getPickleType() const {
 
 std::vector<CompositeBezierCurve> PickleReader::getCompositeBezierCurves() const {
     return impl_->getCompositeBezierCurves();
+}
+
+std::vector<Matrix<double, 44, 1>> PickleReader::getJointPosDes() const {
+    return impl_->getJointPosDes();
+}
+
+std::vector<Matrix<double, 43, 1>> PickleReader::getJointVelDes() const {
+    return impl_->getJointVelDes();
+}
+
+std::vector<Matrix<double, 37, 1>> PickleReader::getJointTauDes() const {
+    return impl_->getJointTauDes();
+}
+
+std::vector<double> PickleReader::getTimeVec() const {
+    return impl_->getTimeVec();
 }
 
 } // namespace pkl_utils

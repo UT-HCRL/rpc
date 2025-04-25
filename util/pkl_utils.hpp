@@ -48,7 +48,6 @@ namespace pkl_utils {
             return c1 * std::pow(c2,n) * std::pow(c3, (h_ - n));
         }
 
-        // std::vector<Eigen::Vector3d> points_;
         Matrix<double, 8, 3> points_;
         int h_;
         int d_;

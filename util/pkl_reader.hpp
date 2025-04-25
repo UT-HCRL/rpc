@@ -41,6 +41,14 @@ namespace pkl_utils{
          */
         std::vector<CompositeBezierCurve> getCompositeBezierCurves() const;
 
+        std::vector<Matrix<double, 44, 1>> getJointPosDes() const;
+
+        std::vector<Matrix<double, 43, 1>> getJointVelDes() const;
+
+        std::vector<Matrix<double, 37, 1>> getJointTauDes() const;
+
+        std::vector<double> getTimeVec() const;
+
         const PickleType& getPickleType() const;
 
     private:
