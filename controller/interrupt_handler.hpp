@@ -68,6 +68,10 @@ public:
     b_signal_received_ = true;
     b_button_d = true;
   }
+  void PressO() {
+    b_signal_received_ = true;
+    b_button_o = true;
+  }
 
 protected:
   void _ResetFlags() {
@@ -86,6 +90,7 @@ protected:
     b_button_y = false;
     b_button_z = false;
     b_button_d = false;
+    b_button_o = false;
   }
 
   bool b_signal_received_;
@@ -103,4 +108,5 @@ protected:
   bool b_button_y;
   bool b_button_z;
   bool b_button_d;
+  bool b_button_o;
 };

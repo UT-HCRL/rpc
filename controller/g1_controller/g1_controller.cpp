@@ -147,121 +147,130 @@ void G1Controller::GetCommand(void *command) {
     joint_vel_cmd_ = tci_container_->task_map_["joint_task"]->DesiredVel();
     joint_trq_cmd_ = Eigen::VectorXd::Zero(g1::n_adof);
   } else {
-    // first visit for feedforward torque command
-    if (b_first_visit_wbc_ctrl_) {
-      // initial joint pos
-      init_joint_pos_ = robot_->GetJointPos();
+      // first visit for feedforward torque command
+      if (b_first_visit_wbc_ctrl_) {
+          // initial joint pos
+          init_joint_pos_ = robot_->GetJointPos();
 
-      //===========================================
-      // TODO:ihwbc joint integrator
-      //===========================================
-      if (ihwbc_ != nullptr) {
-        joint_integrator_->Initialize(init_joint_pos_,
-                                      Eigen::VectorXd::Zero(g1::n_adof));
-        // erase jpos task
-        tci_container_->task_map_.erase("joint_task");
+          //===========================================
+          // TODO:ihwbc joint integrator
+          //===========================================
+          if (ihwbc_ != nullptr) {
+              joint_integrator_->Initialize(init_joint_pos_,
+                                            Eigen::VectorXd::Zero(g1::n_adof));
+              // erase jpos task
+              tci_container_->task_map_.erase("joint_task");
+          }
+
+          // for smoothing command
+          smoothing_command_start_time_ = sp_->current_time_;
+          b_smoothing_command_ = true;
+
+          // change flag for finishing first visit
+          b_first_visit_wbc_ctrl_ = false;
       }
 
-      // for smoothing command
-      smoothing_command_start_time_ = sp_->current_time_;
-      b_smoothing_command_ = true;
+      if (sp_->state_ == g1_states::kReplayRecordedPlan) {
+          joint_pos_cmd_ = tci_container_->robot_commands_->DesiredPos();
+          joint_vel_cmd_ = tci_container_->robot_commands_->DesiredVel();
+          joint_trq_cmd_ = tci_container_->robot_commands_->DesiredTrq();
+      } else {
 
-      // change flag for finishing first visit
-      b_first_visit_wbc_ctrl_ = false;
-    }
-    // whole body controller (feedforward torque computation) with contact
-    // task, contact, internal constraints update
-    for (const auto &[task_name, task_ptr] : tci_container_->task_map_) {
-      task_ptr->UpdateJacobian();
-      task_ptr->UpdateJacobianDotQdot();
-      task_ptr->UpdateOpCommand();
-      // task_ptr->UpdateOpCommand(sp_->rot_world_local_); // for ihwbc
+          // whole body controller (feedforward torque computation) with contact
+          // task, contact, internal constraints update
+          for (const auto &[task_name, task_ptr] : tci_container_->task_map_) {
+              task_ptr->UpdateJacobian();
+              task_ptr->UpdateJacobianDotQdot();
+              task_ptr->UpdateOpCommand();
+              // task_ptr->UpdateOpCommand(sp_->rot_world_local_); // for ihwbc
 
-      // if (task_name == "torso_ori_task" || task_name == "lf_ori_task" ||
-      // task_name == "rf_ori_task")
-      // task_ptr->UpdateOpCommand();
-      // else
-      // task_ptr->UpdateOpCommand(sp_->rot_world_local_);
-    }
+              // if (task_name == "torso_ori_task" || task_name == "lf_ori_task" ||
+              // task_name == "rf_ori_task")
+              // task_ptr->UpdateOpCommand();
+              // else
+              // task_ptr->UpdateOpCommand(sp_->rot_world_local_);
+          }
 
-    // modified jacobian for swing legs
-    if (b_use_modified_swing_foot_jac_ && !sp_->b_lf_contact_) {
-      tci_container_->task_map_["lf_pos_task"]->ModifyJacobian(
-          sp_->floating_base_jidx_);
-      tci_container_->task_map_["lf_ori_task"]->ModifyJacobian(
-          sp_->floating_base_jidx_);
-    }
+          // modified jacobian for swing legs
+          if (b_use_modified_swing_foot_jac_ && !sp_->b_lf_contact_) {
+              tci_container_->task_map_["lf_pos_task"]->ModifyJacobian(
+                  sp_->floating_base_jidx_);
+              tci_container_->task_map_["lf_ori_task"]->ModifyJacobian(
+                  sp_->floating_base_jidx_);
+          }
 
-    if (b_use_modified_swing_foot_jac_ && !sp_->b_rf_contact_) {
-      tci_container_->task_map_["rf_pos_task"]->ModifyJacobian(
-          sp_->floating_base_jidx_);
-      tci_container_->task_map_["rf_ori_task"]->ModifyJacobian(
-          sp_->floating_base_jidx_);
-    }
+          if (b_use_modified_swing_foot_jac_ && !sp_->b_rf_contact_) {
+              tci_container_->task_map_["rf_pos_task"]->ModifyJacobian(
+                  sp_->floating_base_jidx_);
+              tci_container_->task_map_["rf_ori_task"]->ModifyJacobian(
+                  sp_->floating_base_jidx_);
+          }
 
-    // modified jacobian for hands
-    if (b_use_modified_hand_jac_) {
-      tci_container_->task_map_["lh_pos_task"]->ModifyJacobian(
-          sp_->floating_base_jidx_);
-      tci_container_->task_map_["rh_pos_task"]->ModifyJacobian(
-          sp_->floating_base_jidx_);
-      tci_container_->task_map_["lh_ori_task"]->ModifyJacobian(
-          sp_->floating_base_jidx_);
-      tci_container_->task_map_["rh_ori_task"]->ModifyJacobian(
-          sp_->floating_base_jidx_);
-    }
+          // modified jacobian for hands
+          if (b_use_modified_hand_jac_) {
+              tci_container_->task_map_["lh_pos_task"]->ModifyJacobian(
+                  sp_->floating_base_jidx_);
+              tci_container_->task_map_["rh_pos_task"]->ModifyJacobian(
+                  sp_->floating_base_jidx_);
+              tci_container_->task_map_["lh_ori_task"]->ModifyJacobian(
+                  sp_->floating_base_jidx_);
+              tci_container_->task_map_["rh_ori_task"]->ModifyJacobian(
+                  sp_->floating_base_jidx_);
+          }
 
-    for (const auto &[contact_str, contact_ptr] :
-         tci_container_->contact_map_) {
-      contact_ptr->UpdateJacobian();
-      contact_ptr->UpdateJacobianDotQdot();
-      contact_ptr->UpdateConeConstraint();
-      contact_ptr->UpdateOpCommand(); // update desired contact acc
-    }
+          for (const auto &[contact_str, contact_ptr] :
+               tci_container_->contact_map_) {
+              contact_ptr->UpdateJacobian();
+              contact_ptr->UpdateJacobianDotQdot();
+              contact_ptr->UpdateConeConstraint();
+              contact_ptr->UpdateOpCommand(); // update desired contact acc
+               }
 
-    // force task not iterated b/c not depending on q or qdot
+          // force task not iterated b/c not depending on q or qdot
 
-    // mass, cori, grav update
-    Eigen::MatrixXd M = robot_->GetMassMatrix();
-    Eigen::MatrixXd Minv = robot_->GetMassMatrixInverse();
-    Eigen::VectorXd cori = robot_->GetCoriolis();
-    Eigen::VectorXd grav = robot_->GetGravity();
+          // mass, cori, grav update
+          Eigen::MatrixXd M = robot_->GetMassMatrix();
+          Eigen::MatrixXd Minv = robot_->GetMassMatrixInverse();
+          Eigen::VectorXd cori = robot_->GetCoriolis();
+          Eigen::VectorXd grav = robot_->GetGravity();
 
-    // TODO: clean up this
-    if (ihwbc_ != nullptr) {
-      ihwbc_->UpdateSetting(M, Minv, cori, grav);
+          // TODO: clean up this
+          if (ihwbc_ != nullptr) {
+              ihwbc_->UpdateSetting(M, Minv, cori, grav);
 
-      static_cast<IHWBC *>(ihwbc_)->Solve(
-          tci_container_->task_map_, tci_container_->contact_map_,
-          tci_container_->internal_constraint_map_,
-          tci_container_->force_task_map_, wbc_qddot_cmd_,
-          joint_trq_cmd_); // joint_trq_cmd_ size: 37
+              static_cast<IHWBC *>(ihwbc_)->Solve(
+                  tci_container_->task_map_, tci_container_->contact_map_,
+                  tci_container_->internal_constraint_map_,
+                  tci_container_->force_task_map_, wbc_qddot_cmd_,
+                  joint_trq_cmd_); // joint_trq_cmd_ size: 37
 
-      // joint integrator for real experiment
-      Eigen::VectorXd joint_acc_cmd =
-          wbc_qddot_cmd_.tail(robot_->NumActiveDof());
-      joint_integrator_->Integrate(joint_acc_cmd, robot_->GetJointPos(),
-                                   robot_->GetJointVel(), joint_pos_cmd_,
-                                   joint_vel_cmd_);
-    } else if (wbic_ != nullptr) {
-      wbic_->UpdateSetting(M, Minv, cori, grav);
+              // joint integrator for real experiment
+              Eigen::VectorXd joint_acc_cmd =
+                  wbc_qddot_cmd_.tail(robot_->NumActiveDof());
+              joint_integrator_->Integrate(joint_acc_cmd, robot_->GetJointPos(),
+                                           robot_->GetJointVel(), joint_pos_cmd_,
+                                           joint_vel_cmd_);
+          } else if (wbic_ != nullptr) {
+              wbic_->UpdateSetting(M, Minv, cori, grav);
 
-      // size of joint_pos_cmd_, joint_vel_cmd_, joint_trq_cmd_ =  37
-      // size of wbc_qddot_cmd_ = 43
-      static_cast<WBIC *>(wbic_)->FindConfiguration(
-          robot_->GetJointPos(), tci_container_->task_vector_,
-          tci_container_->contact_vector_,
-          tci_container_->internal_constraint_vector_, joint_pos_cmd_,
-          joint_vel_cmd_, wbc_qddot_cmd_);
-      // Clock clock;
-      // clock.Start();
-      static_cast<WBIC *>(wbic_)->MakeTorque(
-          wbc_qddot_cmd_, tci_container_->force_task_vector_,
-          tci_container_->contact_map_, joint_trq_cmd_);
-      // clock.Stop();
-      // std::cout << "QP computation time: " << clock.duration() << std::endl;
-    }
+              // size of joint_pos_cmd_, joint_vel_cmd_, joint_trq_cmd_ =  37
+              // size of wbc_qddot_cmd_ = 43
+              static_cast<WBIC *>(wbic_)->FindConfiguration(
+                  robot_->GetJointPos(), tci_container_->task_vector_,
+                  tci_container_->contact_vector_,
+                  tci_container_->internal_constraint_vector_, joint_pos_cmd_,
+                  joint_vel_cmd_, wbc_qddot_cmd_);
+              // Clock clock;
+              // clock.Start();
+              static_cast<WBIC *>(wbic_)->MakeTorque(
+                  wbc_qddot_cmd_, tci_container_->force_task_vector_,
+                  tci_container_->contact_map_, joint_trq_cmd_);
+              // clock.Stop();
+              // std::cout << "QP computation time: " << clock.duration() << std::endl;
+          }
+      }
   }
+
 
   if (b_smoothing_command_) {
     // do smoothing command, only for real experiment
@@ -388,6 +397,10 @@ void G1Controller::_SaveData() {
         tci_container_->task_map_["rf_ori_task"]->Weight();
     dm->data_->rf_ori_kp = tci_container_->task_map_["rf_ori_task"]->Kp();
     dm->data_->rf_ori_kd = tci_container_->task_map_["rf_ori_task"]->Kd();
+
+    dm->data_->joint_pos_des =  joint_pos_cmd_;
+    dm->data_->joint_vel_des =  joint_vel_cmd_;
+    dm->data_->joint_trq_des =  joint_trq_cmd_;
   }
 
 #endif

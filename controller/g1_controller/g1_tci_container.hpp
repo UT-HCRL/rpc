@@ -1,4 +1,5 @@
 #pragma once
+#include <controller/whole_body_controller/robot_command.hpp>
 #include "controller/whole_body_controller/tci_container.hpp"
 #include "util/util.hpp"
 
@@ -10,6 +11,9 @@ public:
   virtual ~G1TCIContainer();
 
   QPParams *qp_params_;
+
+  // Offline Planner
+  RobotCommand* robot_commands_;
 
 private:
   Task *jpos_task_;

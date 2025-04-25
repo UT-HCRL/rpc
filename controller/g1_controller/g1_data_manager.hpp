@@ -21,6 +21,7 @@ public:
   Eigen::Vector4d kf_base_joint_ori_ = Eigen::Vector4d::Zero();
 
   Eigen::VectorXd joint_positions_ = Eigen::VectorXd::Zero(27);
+  Eigen::VectorXd joint_velocities_ = Eigen::VectorXd::Zero(27);
 
   Eigen::Vector3d des_com_pos_ = Eigen::Vector3d::Zero();
   Eigen::Vector3d act_com_pos_ = Eigen::Vector3d::Zero();
@@ -86,6 +87,12 @@ public:
   std::vector<Eigen::Vector3d> des_rf_pos_traj;
   std::vector<Eigen::Vector3d> des_lf_ori_traj;
   std::vector<Eigen::Vector3d> des_rf_ori_traj;
+
+  // offline planner data
+  Eigen::VectorXd joint_pos_des;
+  Eigen::VectorXd joint_vel_des;
+  Eigen::VectorXd joint_trq_des;
+
 };
 
 // Singleton class

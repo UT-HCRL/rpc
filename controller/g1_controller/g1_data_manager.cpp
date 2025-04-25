@@ -48,8 +48,10 @@ void G1DataManager::SendData() {
   msg.add_lfoot_ori(data_->lfoot_ori_[3]);
   msg.add_rfoot_ori(data_->rfoot_ori_[3]);
 
-  for (int i(0); i < data_->joint_positions_.size(); i++)
+  for (int i(0); i < data_->joint_positions_.size(); i++) {
     msg.add_joint_positions(data_->joint_positions_[i]);
+    msg.add_joint_velocities(data_->joint_velocities_[i]);
+  }
 
   for (int i(0); i < data_->lfoot_rf_cmd_.size(); i++)
     msg.add_lfoot_rf_cmd(data_->lfoot_rf_cmd_[i]);
@@ -157,6 +159,16 @@ void G1DataManager::SendData() {
     rf_ori_msg.set_z(des_ori(2));
     msg.add_des_rf_ori_traj()->CopyFrom(rf_ori_msg);
   }
+
+  // =============================================================
+  // Offline Planner
+  // =============================================================
+  for (int i(0); i < data_->joint_positions_.size(); i++) {
+    msg.add_joint_pos_des(data_->joint_pos_des[i]);
+    msg.add_joint_vel_des(data_->joint_vel_des[i]);
+    msg.add_joint_trq_des(data_->joint_trq_des[i]);
+  }
+
   // serialize msg in string type
   std::string encoded_msg;
   msg.SerializeToString(&encoded_msg);

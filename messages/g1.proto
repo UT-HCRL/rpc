@@ -90,6 +90,11 @@ message pnc_msg {
   repeated Pos des_rf_pos_traj = 53;
   repeated Euler des_lf_ori_traj = 54;
   repeated Euler des_rf_ori_traj = 55;
+
+  repeated float joint_pos_des = 56;
+  repeated float joint_vel_des = 57;
+  repeated float joint_trq_des = 58;
+  repeated float joint_velocities = 59;
 }
 
 message rs_teleop_msg {
