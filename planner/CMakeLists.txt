@@ -1,1 +1,2 @@
 add_subdirectory(locomotion)
+add_subdirectory(multicontact)

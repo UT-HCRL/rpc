@@ -51,3 +51,10 @@ note.txt
 cmake-build-debug/*
 .vscode/*
 *.asv
+
+#protobuf install folder
+protobuf/*
+
+#CMake related
+CMakeCache.txt
+CMakeFiles/*

@@ -23,10 +23,10 @@ from scipy.spatial.transform import Rotation as R
 parser = argparse.ArgumentParser()
 parser.add_argument("--b_use_plotjuggler", type=bool, default=False)
 parser.add_argument(
-    "--visualizer", choices=["none", "meshcat", "foxglove"], default="none"
+    "--visualizer", choices=["none", "meshcat", "foxglove"], default="meshcat"
 )
 parser.add_argument(
-    "--robot", choices=["draco", "g1", "fixed_draco", "manipulator"], default="draco"
+    "--robot", choices=["draco", "g1", "fixed_draco", "manipulator"], default="g1"
 )
 parser.add_argument("--hw_or_sim", choices=["hw", "sim"], default="sim")
 args = parser.parse_args()
