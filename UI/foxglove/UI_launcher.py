@@ -11,7 +11,6 @@ sys.path.append(cwd + "/build")
 
 # NEED TO GET THIS BACK --- FIX LATER
 from util.python_utils.util import rot_to_quat, quat_to_rot
-from messages.draco_pb2 import *
 
 from plot.data_saver import *
 import pinocchio as pin
@@ -606,8 +605,6 @@ if args.b_use_plotjuggler:
     pj_socket = pj_context.socket(zmq.PUB)
     pj_socket.bind("tcp://*:9872")
 
-msg = pnc_msg()
-
 data_saver = DataSaver()
 
 #
@@ -616,12 +613,16 @@ data_saver = DataSaver()
 if args.visualizer != "none":
     # both meshcat and foxglove make use of Pinocchio model and model data
     if args.robot == "draco":
+        from messages.draco_pb2 import *
+
         model, collision_model, visual_model = pin.buildModelsFromUrdf(
             "robot_model/draco/draco_modified.urdf",
             "robot_model/draco",
             pin.JointModelFreeFlyer(),
         )
     elif args.robot == "g1":
+        from messages.g1_pb2 import *
+
         model, collision_model, visual_model = pin.buildModelsFromUrdf(
             "robot_model/g1/g1_29dof_lock_waist.urdf",
             "robot_model/g1",
@@ -629,6 +630,8 @@ if args.visualizer != "none":
         )
     else:
         raise NotImplementedError(f"Specify location of URDF of {args.robot}")
+
+    msg = pnc_msg()
 
     data, collision_data, visual_data = pin.createDatas(
         model, collision_model, visual_model
@@ -717,6 +720,9 @@ def process_data_saver(visualize_type):
         data_saver.add("des_icp", list(msg.des_icp))
         data_saver.add("des_cmp", list(msg.des_cmp))
         data_saver.add("quat_world_local", list(msg.quat_world_local))
+        data_saver.add("joint_pos_des", list(msg.joint_pos_des))
+        data_saver.add("joint_vel_des", list(msg.joint_vel_des))
+        data_saver.add("joint_trq_des", list(msg.joint_trq_des))
 
     elif visualize_type == "foxglove":
         pass
@@ -772,6 +778,9 @@ def process_data_saver(visualize_type):
         data_saver.add("rf_ori_kp", list(msg.rf_ori_kp))
         data_saver.add("rf_ori_kd", list(msg.rf_ori_kd))
         data_saver.add("quat_world_local", list(msg.quat_world_local))
+        data_saver.add("joint_pos_des", list(msg.joint_pos_des))
+        data_saver.add("joint_vel_des", list(msg.joint_vel_des))
+        data_saver.add("joint_trq_des", list(msg.joint_trq_des))
 
     data_saver.advance()
 

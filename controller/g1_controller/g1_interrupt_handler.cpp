@@ -147,6 +147,20 @@ void G1InterruptHandler::Process() {
         std::cout << "Wait Until Balance State" << std::endl;
     }
 
+    if (b_button_o) {
+      std::cout << "-----------------------------------" << std::endl;
+      std::cout << "button o pressed: Replay Recorded Plan " << std::endl;
+      std::cout << "-----------------------------------" << std::endl;
+      if (ctrl_arch_->locostate() == g1_states::kDoubleSupportBalance) {
+          static_cast<DoubleSupportBalance *>(
+              ctrl_arch_->locomotion_state_machine_container()
+                  [g1_states::kDoubleSupportBalance])
+              ->DoReplayRecordedPlan();
+      } else
+          std::cout << "Wait Until Balance State" << std::endl;
+    }
+
+
     if (b_button_p) {
       std::cout << "-----------------------------------" << std::endl;
       std::cout << "button P pressed: Track Trajectory " << std::endl;

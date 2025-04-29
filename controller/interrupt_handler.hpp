@@ -69,6 +69,10 @@ public:
     b_signal_received_ = true;
     b_button_d = true;
   }
+  void PressO() {
+    b_signal_received_ = true;
+    b_button_o = true;
+  }
   void PressP(){
     b_signal_received_ = true;
     b_button_p = true;
@@ -91,6 +95,7 @@ protected:
     b_button_y = false;
     b_button_z = false;
     b_button_d = false;
+    b_button_o = false;
     b_button_p = false;
   }
 
@@ -109,5 +114,6 @@ protected:
   bool b_button_y;
   bool b_button_z;
   bool b_button_d;
+  bool b_button_o;
   bool b_button_p;
 };

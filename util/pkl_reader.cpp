@@ -116,9 +116,6 @@ public:
                 
                 for(size_t i=0; i<py::len(obj_list); i++){
                     py::object obj = obj_list[i];
-                    // int temp=0;
-                    // std::cout<<"Enter a number: ";
-                    // std::cin>>temp;
 
                     if (py::isinstance<py::dict>(obj)) {
                         py::dict robot_data = obj;
@@ -128,15 +125,54 @@ public:
                             // std::cout <<"[PKL_READER] - " <<key << ": ";
 
                             if (py::isinstance<py::float_>(value)) {
-                                // std::cout << value.cast<float>() << std::endl;
                             } else if (py::isinstance<py::list>(value)) {
+                                Vector<double, 44> tmp_pos_vec;
+                                Vector<double, 43> tmp_vel_vec;
+                                Vector<double, 37> tmp_tau_vec;
                                 py::list pylist = value;
                                 // std::cout << "[ ";
                                 for (auto elem : pylist) {
                                     if (py::isinstance<py::float_>(elem)) {
-                                        // std::cout << elem.cast<float>() << " ";
+                                        if (key == "time") {
+                                            time_vec_.emplace_back(elem.cast<double>());
+                                            // std::cout << " LOGGED " << std::endl;
+                                        }
                                     } else {
-                                        // std::cout << py::str(elem) << " ";
+                                        size_t vec_idx = 0;
+                                        if (key == "joint_pos"){
+                                            for (auto el : elem) {
+                                                tmp_pos_vec(vec_idx) = el.cast<double>();
+                                                vec_idx++;
+                                                // std::cout << " LOGGED " << std::endl;
+                                            }
+                                            // store current vector and clear for next iteration
+                                            joint_pos_des_.emplace_back(tmp_pos_vec);
+                                            tmp_pos_vec.setZero();
+                                        } else if (key == "joint_vel") {
+                                            for (auto el : elem) {
+                                                tmp_vel_vec(vec_idx) = el.cast<double>();
+                                                vec_idx++;
+                                                // std::cout << " LOGGED " << std::endl;
+                                            }
+                                            // store current vector and clear for next iteration
+                                            joint_vel_des_.emplace_back(tmp_vel_vec);
+                                            tmp_vel_vec.setZero();
+                                        } else if (key == "joint_torque") {
+                                            for (auto el : elem) {
+                                                tmp_tau_vec(vec_idx) = el.cast<double>();
+                                                vec_idx++;
+                                                // std::cout << " LOGGED " << std::endl;
+                                            }
+                                            // store current vector and clear for next iteration
+                                            joint_tau_des_.emplace_back(tmp_tau_vec);
+                                            tmp_tau_vec.setZero();
+                                        } else if (key == "grf_lfoot") {
+                                        } else if (key == "grf_rfoot") {
+                                        } else if (key == "grf_lhand") {
+                                        } else if (key == "grf_rhand") {
+                                        } else {
+                                            std::cerr << "[PKL_READER] - Unknown format for variable: " << key << std::endl;
+                                        }
                                     }
                                 }
                                 // std::cout << "]\n";
@@ -149,8 +185,6 @@ public:
                     } else {
                         std::cerr << "[PKL_READER] - Object " << i << " is not a dictionary!" << std::endl;
                     }
-
-                    // std::cout << "\n\n\n";
                 }
 
             }
@@ -210,27 +244,8 @@ public:
         for (size_t i = 0; i < composite_bez_list.size(); ++i) {
             py::object obj = composite_bez_list[i];
 
-            // std::cout << "[PKL_READER] - Object " << i << ": "
-            //        << std::string(py::str(obj.get_type())) << std::endl;
-            
-            // py::object N = obj.attr("N");
-            // py::object d = obj.attr("d");
-            // py::object a = obj.attr("a");
-            // py::object b = obj.attr("b");
-            // py::object duration = obj.attr("duration");
-            // py::object transition_times = obj.attr("transition_times");
-            // std::cout << "N: " << std::string(py::str(N)) << std::endl;
-            // std::cout << "d: " << std::string(py::str(d)) << std::endl;
-            // std::cout << "a: " << std::string(py::str(a)) << std::endl;
-            // std::cout << "b: " << std::string(py::str(b)) << std::endl;
-            // std::cout << "duration: " << std::string(py::str(duration)) << std::endl;
-            // std::cout << "transition_times: " << std::string(py::str(transition_times)) << std::endl;
-            
-            // py::object beziers = obj.attr("beziers");
-            // py::object points = bez_i.attr("points");
-            // py::object bez_i = beziers[py::int_(i)];
-            // std::cout << "Bezier points: " << std::string(py::str(points)) << std::endl;
-            // std::cout << "Object: " << std::string(py::str(obj)) << std::endl;
+            std::cout << "[PKL_READER] - Object " << i << ": "
+                    << std::string(py::str(obj.get_type())) << std::endl;
 
             // for all the beziers inside the object:
             std::vector<BezierCurve> beziers;
@@ -242,7 +257,9 @@ public:
                 py::object points = bezier.attr("points");
                 // std::cout << "points type: " << std::string(py::str(points.get_type())) << std::endl; <- sono numpy array!
 
-                std::vector<Eigen::Vector3d> points_vec = numpy2eigen(points);
+                Matrix<double, 8, 3> points_mat;
+                points_mat.setZero();
+                points_mat = numpy2eigen(points);
                 // for(size_t k = 0; k < points_vec.size(); k++) {
                 //     std::cout << "Point " << k << ": " << points_vec[k].transpose() << std::endl;
                 // }
@@ -252,21 +269,10 @@ public:
                 py::object a = bezier.attr("a");
                 py::object b = bezier.attr("b");
                 py::object duration = bezier.attr("duration");
-                // std::cout << "h: " << std::string(py::str(h)) << std::endl;
-                // std::cout << "d: " << std::string(py::str(d)) << std::endl;
-                // std::cout << "a: " << std::string(py::str(a)) << std::endl;
-                // std::cout << "b: " << std::string(py::str(b)) << std::endl;
-                // std::cout << "duration: " << std::string(py::str(duration)) << std::endl;
-                // std::cout << "points: " << std::string(py::str(points)) << std::endl;
 
                 double a_bez = bezier.attr("a").cast<double>();
                 double b_bez = bezier.attr("b").cast<double>();
-                BezierCurve bezier_curve(points_vec, a_bez, b_bez);
-                // std::cout << "Bezier h: " << bezier_curve.getH() << std::endl;
-                // std::cout << "Bezier d: " << bezier_curve.getD() << std::endl;
-                // std::cout << "Bezier a: " << bezier_curve.getA() << std::endl;
-                // std::cout << "Bezier b: " << bezier_curve.getB() << std::endl;
-                // std::cout << "Bezier duration: " << bezier_curve.getDuration() << std::endl;
+                BezierCurve bezier_curve(points_mat, a_bez, b_bez);
 
                 beziers.emplace_back(bezier_curve);
             
@@ -282,22 +288,40 @@ public:
         return pkl_type_;
     }
 
-    std::vector<Eigen::Vector3d> numpy2eigen(py::array_t<double> input_array) {
+    Matrix<double, 8, 3> numpy2eigen(py::array_t<double> input_array) {
         py::buffer_info buf = input_array.request();
         if (buf.ndim != 2 || buf.shape[1] != 3)
             throw std::runtime_error("Expected shape (N, 3)");
 
         auto ptr = static_cast<double*>(buf.ptr);
-        std::vector<Eigen::Vector3d> result(buf.shape[0]);
+        Matrix<double, 8, 3> result;
 
-        for (ssize_t i = 0; i < buf.shape[0]; ++i) {
-            result[i] = Eigen::Vector3d(ptr[i * 3], ptr[i * 3 + 1], ptr[i * 3 + 2]);
+        for (ssize_t i = 0; i < buf.shape[1]; ++i) {
+            for (ssize_t j = 0; j < buf.shape[0]; ++j) {
+                result(j, i) = ptr[i * buf.shape[0] + j];
+            }
         }
         return result;
     }
     
     std::vector<CompositeBezierCurve> getCompositeBezierCurves() const {
         return composite_bezier_curves_;
+    }
+
+    std::vector<Matrix<double, 44, 1>> getJointPosDes() const {
+        return joint_pos_des_;
+    }
+
+    std::vector<Matrix<double, 43, 1>> getJointVelDes() const {
+        return joint_vel_des_;
+    }
+
+    std::vector<Matrix<double, 37, 1>> getJointTauDes() const {
+        return joint_tau_des_;
+    }
+
+    std::vector<double> getTimeVec() const {
+        return time_vec_;
     }
 
 private:
@@ -308,6 +332,10 @@ private:
     PickleType pkl_type_;
 
     std::vector<CompositeBezierCurve> composite_bezier_curves_;
+    std::vector<Matrix<double, 44, 1>> joint_pos_des_;
+    std::vector<Matrix<double, 43, 1>> joint_vel_des_;
+    std::vector<Matrix<double, 37, 1>> joint_tau_des_;
+    std::vector<double> time_vec_;
     std::function<void(const std::string&)> log_;
 
 };
@@ -331,6 +359,22 @@ const PickleType& PickleReader::getPickleType() const {
 
 std::vector<CompositeBezierCurve> PickleReader::getCompositeBezierCurves() const {
     return impl_->getCompositeBezierCurves();
+}
+
+std::vector<Matrix<double, 44, 1>> PickleReader::getJointPosDes() const {
+    return impl_->getJointPosDes();
+}
+
+std::vector<Matrix<double, 43, 1>> PickleReader::getJointVelDes() const {
+    return impl_->getJointVelDes();
+}
+
+std::vector<Matrix<double, 37, 1>> PickleReader::getJointTauDes() const {
+    return impl_->getJointTauDes();
+}
+
+std::vector<double> PickleReader::getTimeVec() const {
+    return impl_->getTimeVec();
 }
 
 } // namespace pkl_utils

@@ -1,4 +1,5 @@
 #pragma once
+#include <util/pkl_utils.hpp>
 #include "configuration.hpp"
 #include "util/util.hpp"
 
@@ -6,6 +7,8 @@
 #include <matlogger2/matlogger2.h>
 #include <matlogger2/utils/mat_appender.h>
 #endif
+
+using namespace pkl_utils;
 
 class PinocchioRobotSystem;
 class G1TCIContainer;

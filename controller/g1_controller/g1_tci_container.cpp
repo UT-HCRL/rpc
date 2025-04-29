@@ -156,6 +156,11 @@ G1TCIContainer::G1TCIContainer(PinocchioRobotSystem *robot,
   // Tasks, Contacts parameter initialization
   //=============================================================
   this->_InitializeParameters(cfg);
+
+  //=============================================================
+  // Robot Commands List from Offline Planner
+  //=============================================================
+  robot_commands_ = new RobotCommand(robot_);
 }
 
 G1TCIContainer::~G1TCIContainer() {
@@ -187,6 +192,9 @@ G1TCIContainer::~G1TCIContainer() {
 
   // QP Params
   delete qp_params_;
+
+  // Offline Planner
+  delete robot_commands_;
 }
 
 void G1TCIContainer::_InitializeParameters(const YAML::Node &cfg) {

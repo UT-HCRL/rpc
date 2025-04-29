@@ -19,5 +19,6 @@ PYBIND11_MODULE(interrupt_py, m) {
       .def("PressX", &InterruptHandler::PressX)
       .def("PressY", &InterruptHandler::PressY)
       .def("PressZ", &InterruptHandler::PressZ)
-      .def("PressD", &InterruptHandler::PressD);
+      .def("PressD", &InterruptHandler::PressD)
+      .def("PressR", &InterruptHandler::PressO);
 }

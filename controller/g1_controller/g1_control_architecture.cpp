@@ -9,6 +9,7 @@
 #include "controller/g1_controller/g1_state_machines/double_support_stand_up.hpp"
 #include "controller/g1_controller/g1_state_machines/double_support_swaying.hpp"
 #include "controller/g1_controller/g1_state_machines/initialize.hpp"
+#include "controller/g1_controller/g1_state_machines/replay_recorded_plan.hpp"
 #include "controller/g1_controller/g1_state_machines/single_support_swing.hpp"
 #include "controller/g1_controller/g1_state_machines/track_plan.hpp"
 #include "controller/g1_controller/g1_state_provider.hpp"
@@ -256,6 +257,9 @@ G1ControlArchitecture::G1ControlArchitecture(PinocchioRobotSystem *robot,
   locomotion_state_machine_container_[g1_states::kRFSingleSupportSwing]
       ->SetParameters(cfg);
 
+  locomotion_state_machine_container_[g1_states::kReplayRecordedPlan] =
+      new ReplayRecordedPlan(g1_states::kReplayRecordedPlan, robot_, this);
+
   locomotion_state_machine_container_[g1_states::kTrackPlan] =
       new TrackPlan(g1_states::kTrackPlan, robot_, this);
   locomotion_state_machine_container_[g1_states::kTrackPlan]
@@ -312,6 +316,8 @@ G1ControlArchitecture::~G1ControlArchitecture() {
       [g1_states::kLFSingleSupportSwing];
   delete locomotion_state_machine_container_
       [g1_states::kRFSingleSupportSwing];
+  delete locomotion_state_machine_container_
+      [g1_states::kReplayRecordedPlan];
   delete locomotion_state_machine_container_
   [g1_states::kTrackPlan];
 #if B_USE_TELEOP

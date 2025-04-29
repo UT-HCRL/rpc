@@ -64,6 +64,7 @@
 #define mjKEY_D 68
 #define mjKEY_R 82
 #define mjKEY_M 77
+#define mjKEY_O 79
 #define mjKEY_X 88
 #define mjKEY_Y 89
 #define mjKEY_Z 90

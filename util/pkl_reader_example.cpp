@@ -42,9 +42,9 @@ int main(int argc, char** argv) {
         std::cout << "[MAIN] - Points of selected bezier curve:" << std::endl;
         for (const auto& bezier : selected_bezier.getBeziers()) {
             const auto& points = bezier.getPoints();
-            for (const auto& point : points) {
-                std::cout << point.transpose() << std::endl;
-            }
+            std::cout << "[MAIN] - Points: " << std::endl << points << std::endl;
+            double mid_time = bezier.getA() + (bezier.getB() - bezier.getA()) / 2.;
+            std::cout << " --- Mid time: " << mid_time << " " << bezier.eval(mid_time).transpose() << " --- " << std::endl;
         }
     
     }
