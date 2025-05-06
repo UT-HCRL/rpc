@@ -11,7 +11,7 @@ DoubleSupportBalance::DoubleSupportBalance(const StateId state_id,
                                            G1ControlArchitecture *ctrl_arch)
     : StateMachine(state_id, robot), ctrl_arch_(ctrl_arch),
       b_com_swaying_(false), b_dcm_walking_(false), b_static_walking_(false),
-      b_replay_recorded_plan_(false) {
+      b_replay_recorded_plan_(false), b_track_plan_(false) {
   util::PrettyConstructor(2, "DoubleSupportBalance");
 
   sp_ = G1StateProvider::GetStateProvider();
@@ -28,6 +28,7 @@ void DoubleSupportBalance::FirstVisit() {
   b_dcm_walking_ = false;
   b_static_walking_ = false;
   b_replay_recorded_plan_ = false;
+  b_track_plan_ = false;
 
   // set current foot position as nominal (desired) for rest of this state
   nominal_lfoot_iso_ = robot_->GetLinkIsometry(g1_link::l_foot_contact);
@@ -50,7 +51,7 @@ void DoubleSupportBalance::OneStep() {
 }
 
 bool DoubleSupportBalance::EndOfState() {
-  if (b_com_swaying_ || b_static_walking_ || b_replay_recorded_plan_)
+  if (b_com_swaying_ || b_static_walking_ || b_replay_recorded_plan_ || b_track_plan_)
     return true;
 
   if (b_dcm_walking_ && ctrl_arch_->dcm_tm_->GetFootStepList().size() > 0 &&
@@ -93,6 +94,11 @@ StateId DoubleSupportBalance::GetNextState() {
   if (b_replay_recorded_plan_) {
     std::cout << " Next state is kReplayRecordedPlan" << std::endl;
     return g1_states::kReplayRecordedPlan;
+  }
+
+  if (b_track_plan_) {
+    std::cout << " Next state is kTrackPlan" << std::endl;
+    return g1_states::kTrackPlan;
   }
 
   // if (b_static_walking_) {

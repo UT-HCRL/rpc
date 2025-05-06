@@ -166,9 +166,9 @@ void G1InterruptHandler::Process() {
       std::cout << "button P pressed: Track Trajectory " << std::endl;
       std::cout << "-----------------------------------" << std::endl;
       if(ctrl_arch_->locostate() == g1_states::kDoubleSupportBalance){
-        static_cast<TrackPlan *>(
+        static_cast<DoubleSupportBalance *>(
             ctrl_arch_->locomotion_state_machine_container()
-                [g1_states::kTrackPlan])->DoTrackPlan();
+                [g1_states::kDoubleSupportBalance])->DoTrackPlan();
       } else
         std::cout << "Wait Until Balance State" << std::endl;
       

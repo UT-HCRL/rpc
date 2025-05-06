@@ -1,90 +1,90 @@
 actuator_gains:
   left_hip_pitch_joint:
-    kp: 80
-    kd: 4
+    kp: 0.8
+    kd: 0.01
   left_hip_roll_joint:
-    kp: 80
-    kd: 4
+    kp: 0.8
+    kd: 0.01
   left_hip_yaw_joint:
-    kp: 80
-    kd: 4
+    kp: 0.8
+    kd: 0.01
   left_knee_joint:
-    kp: 50
-    kd: 5
+    kp: 0.8
+    kd: 0.01
   left_ankle_pitch_joint:
-    kp: 40
-    kd: 2
+    kp: 0.1
+    kd: 0.001
   left_ankle_roll_joint:
-    kp: 40
-    kd: 2
+    kp: 0.08
+    kd: 0.001
   right_hip_pitch_joint:
-    kp: 80
-    kd: 4
+    kp: 0.8
+    kd: 0.01
   right_hip_roll_joint:
-    kp: 80
-    kd: 4
+    kp: 0.8
+    kd: 0.01
   right_hip_yaw_joint:
-    kp: 80
-    kd: 4
+    kp: 0.8
+    kd: 0.01
   right_knee_joint:
-    kp: 50
-    kd: 5
+    kp: 0.8
+    kd: 0.01
   right_ankle_pitch_joint:
-    kp: 40
-    kd: 2
+    kp: 0.08
+    kd: 0.001
   right_ankle_roll_joint:
-    kp: 40
-    kd: 2
+    kp: 0.08
+    kd: 0.001
   waist_yaw_joint:
-    kp: 40
-    kd: 6
+    kp: 0.8
+    kd: 0.01
   left_shoulder_pitch_joint:
-    kp: 80
-    kd: 4
+    kp: 0.4
+    kd: 0.01
   left_shoulder_roll_joint:
-    kp: 80
-    kd: 4
+    kp: 0.4
+    kd: 0.01
   left_shoulder_yaw_joint:
-    kp: 40
-    kd: 5
+    kp: 0.4
+    kd: 0.01
   left_elbow_joint:
-    kp: 40
-    kd: 5
+    kp: 0.4
+    kd: 0.01
   left_wrist_roll_joint:
-    kp: 40
-    kd: 5
+    kp: 0.4
+    kd: 0.01
   left_wrist_pitch_joint:
-    kp: 40
-    kd: 5
+    kp: 0.4
+    kd: 0.01
   left_wrist_yaw_joint:
-    kp: 40
-    kd: 5
+    kp: 0.4
+    kd: 0.01
   right_shoulder_pitch_joint:
-    kp: 80
-    kd: 4
+    kp: 0.4
+    kd: 0.01
   right_shoulder_roll_joint:
-    kp: 80
-    kd: 4
+    kp: 0.4
+    kd: 0.01
   right_shoulder_yaw_joint:
-    kp: 40
-    kd: 5
+    kp: 0.4
+    kd: 0.01
   right_elbow_joint:
-    kp: 30
-    kd: 5
+    kp: 0.4
+    kd: 0.01
   right_wrist_roll_joint:
-    kp: 40
-    kd: 5
+    kp: 0.4
+    kd: 0.01
   right_wrist_pitch_joint:
-    kp: 40
-    kd: 5
+    kp: 0.4
+    kd: 0.01
   right_wrist_yaw_joint:
-    kp: 40
-    kd: 5
+    kp: 0.4
+    kd: 0.01
 
 initial_config:
   base_pos_x: 0.
   base_pos_y: 0.
-  base_pos_z: 0.9
+  base_pos_z: 0.65
   base_quat_w: 1.
   base_quat_x: 0.
   base_quat_y: 0.

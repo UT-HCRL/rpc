@@ -2,6 +2,10 @@
 
 #include "controller/state_machine.hpp"
 #include "util/pkl_reader.hpp"
+#include <thread>
+#include <atomic>
+
+#include "humanoid_multicontact_tracker.hpp"
 
 class G1ControlArchitecture;
 class G1StateProvider;
@@ -9,7 +13,7 @@ class TrackPlan : public StateMachine {
 public:
   TrackPlan(const StateId state_id, PinocchioRobotSystem *robot,
                        G1ControlArchitecture *ctrl_arch);
-  ~TrackPlan() = default;
+  ~TrackPlan();
 
   void FirstVisit() override;
   void OneStep() override;
@@ -23,6 +27,18 @@ public:
   void DoTrackPlan() { b_tracking_plan_ = true; }
 
 private:
+
+  std::unique_ptr<HumanoidMulticontactTracker> g1_mpc_;
+
+  std::thread compute_thread_;
+  std::atomic<bool> run_threads_{false};
+
+  std::mutex data_mutex_;
+  Eigen::VectorXd mpc_q_;
+  Eigen::VectorXd mpc_q_dot_;
+  Eigen::VectorXd mpc_tau_;
+  bool has_new_data_;
+
   G1ControlArchitecture *ctrl_arch_;
   G1StateProvider *sp_;
 
@@ -34,6 +50,12 @@ private:
   Eigen::Matrix<double, 6, 1> des_reaction_force_;
 
   std::unique_ptr<pkl_utils::PickleReader> pkl_reader_;
-
   std::vector<pkl_utils::CompositeBezierCurve> bezier_curves_;
+
+  //Member vars to avoid dyn alloc in OneStep
+  Eigen::VectorXd new_q;
+  Eigen::VectorXd new_q_dot;
+  Eigen::VectorXd new_tau;
+
+  void Compute();
 };

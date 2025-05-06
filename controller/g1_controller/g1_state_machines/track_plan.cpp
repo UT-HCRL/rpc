@@ -2,15 +2,13 @@
 #include "controller/g1_controller/g1_control_architecture.hpp"
 #include "controller/g1_controller/g1_definition.hpp"
 #include "controller/g1_controller/g1_state_provider.hpp"
-#include "controller/g1_controller/g1_task/g1_com_task.hpp"
 #include "controller/robot_system/pinocchio_robot_system.hpp"
-#include "controller/whole_body_controller/managers/end_effector_trajectory_manager.hpp"
-#include "controller/whole_body_controller/managers/floating_base_trajectory_manager.hpp"
-#include "controller/whole_body_controller/managers/max_normal_force_trajectory_manager.hpp"
-#include "controller/whole_body_controller/managers/reaction_force_trajectory_manager.hpp"
-#include "planner/locomotion/dcm_planner/foot_step.hpp"
+#include "controller/g1_controller/g1_tci_container.hpp"
 #include "util/util.hpp"
 
+namespace {
+  double kGravity = 9.81;
+}
 
 TrackPlan::TrackPlan(const StateId state_id,
                                            PinocchioRobotSystem *robot,
@@ -18,24 +16,37 @@ TrackPlan::TrackPlan(const StateId state_id,
     : StateMachine(state_id, robot), ctrl_arch_(ctrl_arch), rf_z_max_interp_duration_(0.), b_tracking_plan_(false) {
   util::PrettyConstructor(2, "TrackPlan");
 
+  has_new_data_ = false;
   sp_ = G1StateProvider::GetStateProvider();
   init_reaction_force_.setZero();
   des_reaction_force_.setZero();
   double half_mass = robot_->GetTotalMass() / 2.;
-  init_reaction_force_(5) = half_mass * 9.81; //FIXME: @alesof
-  des_reaction_force_(5) = half_mass * 9.81;
-
-  std::string file_path = THIS_COM "data_example/g1_test.pkl";
-  pkl_reader_ = std::make_unique<pkl_utils::PickleReader>(file_path, pkl_utils::PickleType::BEZIER);
-
-  if (!pkl_reader_->isReady()) {
-      std::cerr << "Failed to open the file." << std::endl;
-  }
-
-  pkl_reader_->parse();
-  bezier_curves_ = pkl_reader_->getCompositeBezierCurves();
-  pkl_reader_.reset();  //NOTE: I need this otherwise on ctrl+c I get sigfault due to pybind scope
+  init_reaction_force_(5) = half_mass * kGravity;
+  des_reaction_force_(5) = half_mass * kGravity;
   
+  std::string r_file_path = THIS_COM "/robot_model/g1/g1_29dof_lock_waist.urdf";
+  std::vector<int> locked_joints_list = {};
+  const std::unordered_map<std::string, mpc_utils::Weights> gains = {
+      {"torso",  mpc_utils::fromValues(1.0, 5., 0.5, 0.8, 0.8, 0.8)},
+      {"feet",   mpc_utils::fromValues(8.0, 8.0, 8.0, 0.00001, 0.00001, 0.00001)},
+      {"L_knee", mpc_utils::fromValues(4.0, 4.0, 4.0, 0.00001, 0.00001, 0.00001)},
+      {"R_knee", mpc_utils::fromValues(4.0, 4.0, 4.0, 0.00001, 0.00001, 0.00001)},
+      {"hands",  mpc_utils::fromValues(2.0, 2.0, 2.0, 0.00001, 0.00001, 0.00001)},
+  };
+
+  g1_mpc_ = std::make_unique<HumanoidMulticontactTracker>(r_file_path, gains, locked_joints_list);
+  // g1_mpc_->printModel();
+
+  // std::string file_path = THIS_COM "data_example/g1_test.pkl";
+  // pkl_reader_ = std::make_unique<pkl_utils::PickleReader>(file_path, pkl_utils::PickleType::BEZIER);
+
+  // if (!pkl_reader_->isReady()) {
+  //     std::cerr << "Failed to open the file." << std::endl;
+  // }
+
+  // pkl_reader_->parse();
+  // bezier_curves_ = pkl_reader_->getCompositeBezierCurves();
+  // pkl_reader_.reset();  //NOTE: I need this otherwise on ctrl+c I get sigfault due to pybind scope
   // Uncomment to test bezier curve read
   // const auto selected_bezier = bezier_curves_[0];
         
@@ -49,89 +60,78 @@ TrackPlan::TrackPlan(const StateId state_id,
 
 }
 
+TrackPlan::~TrackPlan() {
+  delete sp_;
+  delete ctrl_arch_;
+}
+
 void TrackPlan::FirstVisit() {
   std::cout << "g1_states::kTrackPlan" << std::endl;
   state_machine_start_time_ = sp_->current_time_;
 
-  // // update contact state
-  // sp_->b_lf_contact_ = true;
-  // sp_->b_rf_contact_ = true;
+  run_threads_ = true;
+  compute_thread_ = std::thread(&TrackPlan::Compute, this);
 
-  // Eigen::Isometry3d stance_foot_iso =
-  //     robot_->GetLinkIsometry(sp_->stance_foot_);
-  // FootStep::MakeHorizontal(stance_foot_iso);
-  // sp_->rot_world_local_ = stance_foot_iso.linear();
-
-  // // initial com & torso ori setting
-  // Eigen::Vector3d init_com_pos = robot_->GetRobotComPos();
-  // if (sp_->b_use_base_height_)
-  //   init_com_pos[2] =
-  //       robot_->GetLinkIsometry(g1_link::torso_com_link).translation()[2];
-  // Eigen::Matrix3d R_w_torso =
-  //     robot_->GetLinkIsometry(g1_link::torso_com_link).linear();
-  // Eigen::Quaterniond init_torso_quat(R_w_torso);
-
-  // // desired com & torso ori setting
-  // Eigen::Isometry3d lfoot_iso =
-  //     robot_->GetLinkIsometry(g1_link::l_foot_contact);
-  // Eigen::Isometry3d rfoot_iso =
-  //     robot_->GetLinkIsometry(g1_link::r_foot_contact);
-
-  // FootStep::MakeHorizontal(lfoot_iso);
-  // FootStep::MakeHorizontal(rfoot_iso);
-
-  // Eigen::Vector3d target_com_pos =
-  //     (lfoot_iso.translation() + rfoot_iso.translation()) / 2.;
-  // target_com_pos[2] = target_height_;
-
-  // Eigen::Quaterniond lfoot_quat(lfoot_iso.linear());
-  // Eigen::Quaterniond rfoot_quat(rfoot_iso.linear());
-  // Eigen::Quaterniond target_torso_quat = lfoot_quat.slerp(0.5, rfoot_quat);
-  // sp_->des_torso_quat_ = target_torso_quat;
-
-  // // initialize floating trajectory
-  // ctrl_arch_->floating_base_tm_->InitializeFloatingBaseInterpolation(
-  //     init_com_pos, target_com_pos, init_torso_quat, target_torso_quat,
-  //     end_time_);
-
-  // //  increase maximum normal reaction force
-  // ctrl_arch_->lf_max_normal_froce_tm_->InitializeRampToMax(
-  //     rf_z_max_interp_duration_);
-  // ctrl_arch_->rf_max_normal_froce_tm_->InitializeRampToMax(
-  //     rf_z_max_interp_duration_);
-
-  // // initialize reaction force tasks
-  // // smoothly increase the fz in world frame
-  // ctrl_arch_->lf_force_tm_->InitializeInterpolation(
-  //     init_reaction_force_, des_reaction_force_, end_time_);
-  // ctrl_arch_->rf_force_tm_->InitializeInterpolation(
-  //     init_reaction_force_, des_reaction_force_, end_time_);
 }
 
 void TrackPlan::OneStep() {
-  // state_machine_time_ = sp_->current_time_ - state_machine_start_time_;
 
-  // // com & torso ori task update
-  // ctrl_arch_->floating_base_tm_->UpdateDesired(state_machine_time_);
+  {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    if (has_new_data_) {
 
-  // // foot task
-  // ctrl_arch_->lf_SE3_tm_->UseCurrent();
-  // ctrl_arch_->rf_SE3_tm_->UseCurrent();
-
-  // //  increase maximum normal reaction force
-  // ctrl_arch_->lf_max_normal_froce_tm_->UpdateRampToMax(state_machine_time_);
-  // ctrl_arch_->rf_max_normal_froce_tm_->UpdateRampToMax(state_machine_time_);
-
-  // // update force traj manager
-  // ctrl_arch_->lf_force_tm_->UpdateDesired(state_machine_time_);
-  // ctrl_arch_->rf_force_tm_->UpdateDesired(state_machine_time_);
+      new_q = mpc_q_;
+      new_q_dot = mpc_q_dot_;
+      new_tau = mpc_tau_;
+      has_new_data_ = false;
+      ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(new_q.tail(27), new_q_dot.tail(27), new_tau);  //FIXME: remove hardcoded magic numbers
+      
+    }
+  }
 }
 
-void TrackPlan::LastVisit() {}
+void TrackPlan::Compute() {
+
+  while (run_threads_) {
+    Eigen::VectorXd x0;
+    x0.resize(34 + 33);
+
+    std::vector<Eigen::VectorXd> xs_out(g1_mpc_->getNhorizon(), x0);
+    xs_out[0] << robot_->GetQ(), robot_->GetQdot();
+    // std::cout << "xs_out: " << xs_out[0].transpose() << std::endl;
+
+    static Eigen::Vector3d com_ref = robot_->GetRobotComPos();
+    // auto torso = robot_->GetLinkIsometry("torso_link");
+    // auto torso_pos = torso.translation();
+    // auto torso_rot = torso.rotation();
+    // std::cout << "torso_pos: " << torso_pos.transpose() << std::endl;
+    // std::cout << "torso_rot: " << torso_rot.eulerAngles(0, 1, 2).transpose() << std::endl;
+
+    std::vector<Eigen::VectorXd> us_out;
+    g1_mpc_->solveOneStep(xs_out, us_out, com_ref);
+    // std::cout<< "us_out: " << us_out[0].transpose() << "\n\n";
+
+    {
+      std::lock_guard<std::mutex> lock(data_mutex_);
+      mpc_q_ = xs_out[0].head(xs_out[0].size() / 2);
+      mpc_q_dot_ = xs_out[0].tail(xs_out[0].size() / 2);
+      mpc_tau_ = us_out[0];
+      has_new_data_ = true;
+    }  
+  }
+}
+
+void TrackPlan::LastVisit() {
+
+  run_threads_ = false;
+  if (compute_thread_.joinable()) {
+    compute_thread_.join();
+  }
+
+}
 
 bool TrackPlan::EndOfState() {
-  // return (state_machine_time_ > end_time_) ? true : false
-  return true; //TODO: fixme just testing @alesof
+  return false; //TODO: define conditions to end state
 }
 
 StateId TrackPlan::GetNextState() {
@@ -139,19 +139,5 @@ StateId TrackPlan::GetNextState() {
 }
 
 void TrackPlan::SetParameters(const YAML::Node &node) {
-  // try {
-  //   util::ReadParameter(node["state_machine"]["stand_up"], "standup_duration",
-  //                       end_time_);
-  //   std::string prefix = sp_->b_use_base_height_ ? "base" : "com";
-  //   util::ReadParameter(node["state_machine"]["stand_up"],
-  //                       "target_" + prefix + "_height", target_height_);
-  //   sp_->des_com_height_ = target_height_;
-  //   util::ReadParameter(node["state_machine"]["stand_up"],
-  //                       "rf_z_max_interp_duration", rf_z_max_interp_duration_);
-  // } catch (std::runtime_error &e) {
-  //   std::cerr << "Error reading parameter [" << e.what() << "] at file: ["
-  //             << __FILE__ << "]" << std::endl
-  //             << std::endl;
-  //   std::exit(EXIT_FAILURE);
-  // }
+  std::cerr << "TrackPlan::SetParameters not implemented" << std::endl;
 }

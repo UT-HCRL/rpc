@@ -1,5 +1,3 @@
-# FIXME: this is copied from draco without modifications
-
 b_save_mpc_solution: true
 
 iterations_btw_mpc: 30

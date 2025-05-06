@@ -9,7 +9,7 @@ public:
         b_button_six(false), b_button_seven(false), b_button_eight(false),
         b_button_nine(false), b_button_m(false), b_button_x(false),
         b_button_y(false), b_button_z(false), b_button_d(false),
-        b_button_p(false) {}
+        b_button_o(false), b_button_p(false) {}
   virtual ~InterruptHandler() = default;
 
   virtual void Process() { _ResetFlags(); };

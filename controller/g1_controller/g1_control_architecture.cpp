@@ -319,7 +319,7 @@ G1ControlArchitecture::~G1ControlArchitecture() {
   delete locomotion_state_machine_container_
       [g1_states::kReplayRecordedPlan];
   delete locomotion_state_machine_container_
-  [g1_states::kTrackPlan];
+      [g1_states::kTrackPlan];
 #if B_USE_TELEOP
   delete manipulation_state_machine_container_
       [g1_states::kTeleopManipulation];

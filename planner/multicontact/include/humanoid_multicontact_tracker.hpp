@@ -8,9 +8,11 @@
 #include "crocoddyl/core/solvers/fddp.hpp"
 #include "crocoddyl/multibody/actions/contact-fwddyn.hpp"
 #include <pinocchio/parsers/urdf.hpp>
+#include <pinocchio/multibody/model.hpp>
 
 #include "contact_sequence.hpp"
 #include "mpc_utils.hpp"
+#include "util/util.hpp"
 
 class HumanoidMulticontactTracker{
 
@@ -20,21 +22,39 @@ class HumanoidMulticontactTracker{
 
         void printModel() const;
         
+        void setConfigPath(const std::string& config_path){config_path_ = config_path;}
+
+        void loadContactFrames();
+        void loadInitialConfiguration();
+        void loadRegularizationWeights();
+        void loadBoundWeights();
+        void loadCoMWeights();
+        void loadTrackingFramesWeights();
+
         void setInitialJointConfiguration(const Eigen::VectorXd& q0);
         void setFrames(const std::vector<std::string>& frame_names);
 
         boost::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameActionModel(const std::vector<std::string>& frame_names);
         boost::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameTerminalActionModel(const std::vector<std::string>& frame_names);
 
+        unsigned int getT() const { return T_; }
+        double getDt() const { return dt_; }
+        int getNhorizon() const { return N_horizon_; }
+        int getMaxIter() const { return max_iter_; }
+
+        int getQ0Size() const { return q0_.size(); }
+        int getX0Size() const { return x0_.size(); }
 
         // BASE MPC OCP DEFS
-        void addCoMCost(const double com_tracking_weight);
-        void addXBoundCost(const double x_bound_weight);
-        void addContactCosts(const std::vector<std::string>& frame_names);
-        void addRegularizationCosts(const Eigen::VectorXd& xreg_weights, const double xreg_weight, const double ureg_weight);
+        void addCoMCost(const double com_tracking_weight, const mpc_utils::Phase phase);
+        void addXBoundCost(const double x_bound_weight, const mpc_utils::Phase phase);
+        void addContactCosts(const std::vector<std::string>& frame_names, const mpc_utils::Phase phase);
+        void addRegularizationCosts(const Eigen::VectorXd& xreg_weights, const double xreg_weight, const double ureg_weight, const mpc_utils::Phase phase);
+        void addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase);
 
 
-        void solveOneStep(std::vector<Eigen::VectorXd>& us_out);
+        void initializeSolver();
+        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, const Eigen::Vector3d& desired_com);
         
     private:
 
@@ -46,6 +66,11 @@ class HumanoidMulticontactTracker{
 
         Eigen::Matrix3d RH_rotation_;
         Eigen::Matrix3d LH_rotation_;
+
+        Eigen::Vector3d com_reference_;
+
+        std::string config_path_;
+        YAML::Node params_;
         //######################
 
 
@@ -60,7 +85,19 @@ class HumanoidMulticontactTracker{
         int N_horizon_;
         int max_iter_;
         std::unordered_map<std::string, mpc_utils::Weights> cost_weights_;
-        std::unordered_map<std::string, mpc_utils::Weights> frame_targets_;
+        std::unordered_map<std::string, double> frame_targets_;
+
+        Eigen::VectorXd xreg_weights_;
+        double xreg_weight_;
+        double ureg_weight_;
+        double xbound_weight_;
+        double com_tracking_weight_;
+
+        Eigen::VectorXd terminal_xreg_weights_;
+        double terminal_xreg_weight_;
+        double terminal_ureg_weight_;
+        double terminal_xbound_weight_;
+        double terminal_com_tracking_weight_;
 
         boost::shared_ptr<crocoddyl::ActivationModelAbstract> xreg_activation_;
         boost::shared_ptr<crocoddyl::CostModelAbstract> xreg_cost_;
@@ -68,6 +105,12 @@ class HumanoidMulticontactTracker{
 
         boost::shared_ptr<crocoddyl::CostModelSum> running_cost_model_;
         boost::shared_ptr<crocoddyl::ContactModelMultiple> running_contact_models_;
+
+        boost::shared_ptr<crocoddyl::CostModelSum> terminal_cost_model_;
+        boost::shared_ptr<crocoddyl::ContactModelMultiple> terminal_contact_models_;
+
+        boost::shared_ptr<crocoddyl::ResidualModelCoMPosition> com_residual_;
+
         //###########################
 
 
@@ -80,11 +123,10 @@ class HumanoidMulticontactTracker{
 
         //### CROCODDYL ###
         boost::shared_ptr<crocoddyl::ShootingProblem> problem_;
-        boost::shared_ptr<crocoddyl::SolverFDDP> solver_;
+        boost::shared_ptr<crocoddyl::SolverFDDP> fddp_;
 
         boost::shared_ptr<crocoddyl::ActuationModelFloatingBase> actuation_;
         boost::shared_ptr<crocoddyl::StateMultibody> state_;
-        // FIXME: std::shared_ptr<crocoddyl::StateMultibody> state_; //Use this if bump works
         //#################
 
 };

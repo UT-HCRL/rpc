@@ -29,6 +29,8 @@ public:
 
   void DoReplayRecordedPlan() { b_replay_recorded_plan_ = true; }
 
+  void DoTrackPlan() { b_track_plan_ = true; }
+
 private:
   G1ControlArchitecture *ctrl_arch_;
 
@@ -41,6 +43,8 @@ private:
   bool b_static_walking_;
 
   bool b_replay_recorded_plan_;
+
+  bool b_track_plan_;
 
   // set nominal desired position/orientation (e.g., for zero acceleration cmd)
   bool b_use_fixed_foot_pos_;

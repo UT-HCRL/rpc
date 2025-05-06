@@ -19,6 +19,7 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} 
     PUBLIC crocoddyl::crocoddyl
+    PUBLIC rpc-util
 )
 
 add_executable(${PROJECT_NAME}_test src/model_example.cpp)

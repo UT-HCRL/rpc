@@ -174,6 +174,16 @@ void G1Controller::GetCommand(void *command) {
           joint_pos_cmd_ = tci_container_->robot_commands_->DesiredPos();
           joint_vel_cmd_ = tci_container_->robot_commands_->DesiredVel();
           joint_trq_cmd_ = tci_container_->robot_commands_->DesiredTrq();
+      }
+      else if(sp_->state_ == g1_states::kTrackPlan){
+        // std::cout<<"GETTING COMMAND FROM TRACK PLAN"<<std::endl;
+        // std::cout<<"joint_pos_cmd: "<<joint_pos_cmd_.transpose()<<std::endl;
+        // std::cout<<"joint_vel_cmd: "<<joint_vel_cmd_.transpose()<<std::endl;
+        // std::cout<<"joint_trq_cmd: "<<joint_trq_cmd_.transpose()<<std::endl;
+
+        joint_pos_cmd_ = tci_container_->robot_commands_->DesiredPos();
+        joint_vel_cmd_ = tci_container_->robot_commands_->DesiredVel();
+        joint_trq_cmd_ = tci_container_->robot_commands_->DesiredTrq();
       } else {
 
           // whole body controller (feedforward torque computation) with contact

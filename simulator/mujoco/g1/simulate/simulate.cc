@@ -1438,6 +1438,7 @@ void UiEvent(mjuiState* state) {
 
     case mjKEY_O:
       if (sim->interrupt_handler_) {
+        std::cout<<"inside mjKEY_O"<<std::endl;
         sim->interrupt_handler_->PressO(); // Replay recorded plan
       } else {
         std::cout << "[Mujoco Sim] Interrupt Handler Error!" << '\n';
@@ -1526,7 +1527,7 @@ void UiEvent(mjuiState* state) {
 
       case mjKEY_P:
         if (sim->interrupt_handler_) {
-          sim->interrupt_handler_->PressP(); // TODO: MPC walking -> Call to Track Plan | To be implemented
+          sim->interrupt_handler_->PressP();
         } else {
           std::cout << "[Mujoco Sim] Interrupt Handler Error!" << '\n';
         }

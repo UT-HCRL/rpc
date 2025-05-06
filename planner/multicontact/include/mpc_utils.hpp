@@ -8,6 +8,8 @@
 
 namespace mpc_utils {
 
+    enum class Phase { Running, Terminal };
+
     using Weights = Eigen::Matrix<double, 6, 1>;
 
     inline Weights fromValues(double wp0, double wp1, double wp2, double wo1, double wo2, double wo3) {
