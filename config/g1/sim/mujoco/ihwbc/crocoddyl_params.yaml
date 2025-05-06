@@ -1,0 +1,194 @@
+contact_frames:
+  - l_foot_contact
+  - r_foot_contact
+  
+joint_names:
+  - base_pos_x
+  - base_pos_y
+  - base_pos_z
+  - base_quat_x
+  - base_quat_y
+  - base_quat_z
+  - base_quat_w
+  - left_hip_pitch_joint
+  - left_hip_roll_joint
+  - left_hip_yaw_joint
+  - left_knee_joint
+  - left_ankle_pitch_joint
+  - left_ankle_roll_joint
+  - right_hip_pitch_joint
+  - right_hip_roll_joint
+  - right_hip_yaw_joint
+  - right_knee_joint
+  - right_ankle_pitch_joint
+  - right_ankle_roll_joint
+  - waist_yaw_joint
+  - left_shoulder_pitch_joint
+  - left_shoulder_roll_joint
+  - left_shoulder_yaw_joint
+  - left_elbow_joint
+  - left_wrist_roll_joint
+  - left_wrist_pitch_joint
+  - left_wrist_yaw_joint
+  - right_shoulder_pitch_joint
+  - right_shoulder_roll_joint
+  - right_shoulder_yaw_joint
+  - right_elbow_joint
+  - right_wrist_roll_joint
+  - right_wrist_pitch_joint
+  - right_wrist_yaw_joint
+
+# -0.519322 -1.58821e-08  2.55624e-07     0.778007    -0.259296  -1.2494e-08    -0.519322  -1.5882e-08  2.55624e-07     0.778007    -0.259296  -1.2494e-08   1.5275e-06  0.000341455   0.5242   -0.000281106    1.5716  2.26703e-05   -0.000468246  -0.000421437  0.000345501    -0.524201  0.000277768      1.57159 -2.20417e-05  -0.00046809  0.000421363
+# -0.758050 -0.000524287  0.004236087     1.387007    -0.629020   0.00372037    -0.760836   -0.0056537  -0.00164348     1.386064    -0.625275   0.002036101  -0.0004609  -3.9425e-06   0.5239   -8.611943-09    1.5709  -1.9067e-08   -7.367046-07  4.16678e-08   -3.4153e-06    -0.523996  9.01492e-08      1.57099  2.057354-08  -6.8165e-07  1.84461e-07
+
+# joint_pos_des[-1]:  [-0.758 -0.001  0.004  1.387 -0.629  0.004 -0.761 -0.006 -0.002  1.386
+#  -0.625  0.002 -0.001 -0.     0.524 -0.     1.571 -0.    -0.     0.
+#  -0.    -0.524  0.     1.571  0.    -0.     0.   ]
+
+
+initial_config:
+  base_pos_x: 0.
+  base_pos_y: 0.
+  base_pos_z: 0.65
+  base_quat_x: 0.
+  base_quat_y: 0.
+  base_quat_z: 0.
+  base_quat_w: 1.
+  left_hip_pitch_joint: -0.758
+  left_hip_roll_joint: -0.001
+  left_hip_yaw_joint: 0.004
+  left_knee_joint: 1.387
+  left_ankle_pitch_joint: -0.629
+  left_ankle_roll_joint: 0.004
+  right_hip_pitch_joint: -0.761
+  right_hip_roll_joint: -0.006
+  right_hip_yaw_joint: -0.002
+  right_knee_joint: 1.386
+  right_ankle_pitch_joint:  -0.625
+  right_ankle_roll_joint: 0.002
+  waist_yaw_joint: -0.001
+  left_shoulder_pitch_joint: 0.
+  left_shoulder_roll_joint: 0.524
+  left_shoulder_yaw_joint: 0.
+  left_elbow_joint: 1.571
+  left_wrist_roll_joint: 0
+  left_wrist_pitch_joint: 0
+  left_wrist_yaw_joint: 0
+  left_five_joint: 0
+  left_six_joint: 0
+  left_three_joint: 0.
+  left_four_joint: 0.
+  left_zero_joint: 0.
+  left_one_joint: 0.
+  left_two_joint: 0.
+  right_shoulder_pitch_joint: 0.
+  right_shoulder_roll_joint: -0.524
+  right_shoulder_yaw_joint: 0.
+  right_elbow_joint: 1.571
+  right_wrist_roll_joint: 0.
+  right_wrist_pitch_joint: 0.
+  right_wrist_yaw_joint: 0.
+  right_five_joint: 0.
+  right_six_joint: 0.
+  right_three_joint: 0.
+  right_four_joint: 0.
+  right_zero_joint: 0.
+  right_one_joint: 0.
+  right_two_joint: 0.
+
+tracking_frames:
+  - torso_link
+
+running_costs:
+  xReg:
+    w: 0.001
+    state_w:
+      base_pos: [10.0, 10.0, 10.0]
+      base_rot: [100.0, 100.0, 100.0]
+      joint_pos: 10.0
+      joint_vel: 1.0
+  uReg:
+    w: 0.1
+  xBound:
+    w: 0.00001
+  CoM:
+    w: 0.0
+  tracking_frames:
+    torso_link: 800000.0
+
+
+terminal_costs:
+  xReg:
+    w: 0.1
+    state_w:
+      base_pos: [10.0, 10.0, 10.0]
+      base_rot: [0.0, 0.0, 0.0]
+      joint_pos: 100.0
+      joint_vel: 10.0
+  uReg:
+    w: 0.00001 #0.01
+  xBound:
+    w: 1000.0
+  CoM:
+    w: 0.0
+
+# CoM tracking
+# running_costs:
+#   xReg:
+#     w: 0.01
+#     state_w:
+#       base_pos: [100.0, 100.0, 100.0]
+#       base_rot: [10.0, 10.0, 10.0]
+#       joint_pos: 1000.0
+#       joint_vel: 100.0
+#   uReg:
+#     w: 0.001
+#   xBound:
+#     w: 0.1
+#   CoM:
+#     w: 10000.0
+
+# terminal_costs:
+#   xReg:
+#     w: 0.01
+#     state_w:
+#       base_pos: [100.0, 100.0, 100.0]
+#       base_rot: [0.0, 0.0, 0.0]
+#       joint_pos: 0.0
+#       joint_vel: 100.0
+#   uReg:
+#     w: 1.0 #0.01
+#   xBound:
+#     w: 0.01
+#   CoM:
+#     w: 10000.0
+
+#     running_costs:
+#   xReg:
+#     w: 0.01
+#     state_w:
+#       base_pos: [100.0, 100.0, 100.0]
+#       base_rot: [10.0, 10.0, 10.0]
+#       joint_pos: 1000.0
+#       joint_vel: 100.0
+#   uReg:
+#     w: 0.001
+#   xBound:
+#     w: 0.1
+#   CoM:
+#     w: 10000.0
+
+# terminal_costs:
+#   xReg:
+#     w: 0.01
+#     state_w:
+#       base_pos: [100.0, 100.0, 100.0]
+#       base_rot: [0.0, 0.0, 0.0]
+#       joint_pos: 0.0
+#       joint_vel: 100.0
+#   uReg:
+#     w: 1.0 #0.01
+#   xBound:
+#     w: 0.01
+#   CoM:
+#     w: 10000.0
