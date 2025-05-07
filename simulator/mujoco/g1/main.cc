@@ -365,8 +365,8 @@ void SetInitialConfig(mjModel *m, mjData *d,
 
     // set joint pos
     for (const auto &[joint_name, qpos_adr] : mj_qpos_map) {
-      std::cout<<"joint_name: " << joint_name << std::endl;
-      std::cout<<"qpos_adr: " << qpos_adr << std::endl;
+      // std::cout<<"joint_name: " << joint_name << std::endl;
+      // std::cout<<"qpos_adr: " << qpos_adr << std::endl;
       d->qpos[qpos_adr] =
           util::ReadParameter<double>(cfg_["initial_config"], joint_name);
     }

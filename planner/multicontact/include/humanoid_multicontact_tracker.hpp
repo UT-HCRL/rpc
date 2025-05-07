@@ -17,13 +17,15 @@
 class HumanoidMulticontactTracker{
 
     public:
-        HumanoidMulticontactTracker(const std::string&, const std::unordered_map<std::string, mpc_utils::Weights>&, const std::vector<int>&);
+        HumanoidMulticontactTracker(const std::string&, const std::unordered_map<std::string, mpc_utils::Weights>&, const std::vector<int>& = {0}, const bool = false);
         ~HumanoidMulticontactTracker() = default;
 
         void printModel() const;
+        void printWeights() const;
         
         void setConfigPath(const std::string& config_path){config_path_ = config_path;}
 
+        void loadCostMask();
         void loadContactFrames();
         void loadInitialConfiguration();
         void loadRegularizationWeights();
@@ -37,7 +39,6 @@ class HumanoidMulticontactTracker{
         boost::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameActionModel(const std::vector<std::string>& frame_names);
         boost::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameTerminalActionModel(const std::vector<std::string>& frame_names);
 
-        unsigned int getT() const { return T_; }
         double getDt() const { return dt_; }
         int getNhorizon() const { return N_horizon_; }
         int getMaxIter() const { return max_iter_; }
@@ -52,9 +53,8 @@ class HumanoidMulticontactTracker{
         void addRegularizationCosts(const Eigen::VectorXd& xreg_weights, const double xreg_weight, const double ureg_weight, const mpc_utils::Phase phase);
         void addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase);
 
-
         void initializeSolver();
-        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, const Eigen::Vector3d& desired_com);
+        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.), std::unordered_map<std::string, pinocchio::SE3> desired_frames = {});
         
     private:
 
@@ -80,12 +80,13 @@ class HumanoidMulticontactTracker{
         Eigen::VectorXd x0_;
         mpc_utils::Weights w_frame_;
 
-        unsigned int T_;
         double dt_;
         int N_horizon_;
         int max_iter_;
         std::unordered_map<std::string, mpc_utils::Weights> cost_weights_;
         std::unordered_map<std::string, double> frame_targets_;
+    
+        std::vector<int> cost_mask_;
 
         Eigen::VectorXd xreg_weights_;
         double xreg_weight_;
@@ -110,7 +111,7 @@ class HumanoidMulticontactTracker{
         boost::shared_ptr<crocoddyl::ContactModelMultiple> terminal_contact_models_;
 
         boost::shared_ptr<crocoddyl::ResidualModelCoMPosition> com_residual_;
-
+        std::unordered_map<std::string, boost::shared_ptr<crocoddyl::ResidualModelFramePlacement>> frame_residuals_;
         //###########################
 
 
@@ -127,6 +128,7 @@ class HumanoidMulticontactTracker{
 
         boost::shared_ptr<crocoddyl::ActuationModelFloatingBase> actuation_;
         boost::shared_ptr<crocoddyl::StateMultibody> state_;
+        bool enable_callbacks_;
         //#################
 
 };

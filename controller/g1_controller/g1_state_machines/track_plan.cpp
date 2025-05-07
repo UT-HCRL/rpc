@@ -25,7 +25,6 @@ TrackPlan::TrackPlan(const StateId state_id,
   des_reaction_force_(5) = half_mass * kGravity;
   
   std::string r_file_path = THIS_COM "/robot_model/g1/g1_29dof_lock_waist.urdf";
-  std::vector<int> locked_joints_list = {};
   const std::unordered_map<std::string, mpc_utils::Weights> gains = {
       {"torso",  mpc_utils::fromValues(1.0, 5., 0.5, 0.8, 0.8, 0.8)},
       {"feet",   mpc_utils::fromValues(8.0, 8.0, 8.0, 0.00001, 0.00001, 0.00001)},
@@ -34,7 +33,7 @@ TrackPlan::TrackPlan(const StateId state_id,
       {"hands",  mpc_utils::fromValues(2.0, 2.0, 2.0, 0.00001, 0.00001, 0.00001)},
   };
 
-  g1_mpc_ = std::make_unique<HumanoidMulticontactTracker>(r_file_path, gains, locked_joints_list);
+  g1_mpc_ = std::make_unique<HumanoidMulticontactTracker>(r_file_path, gains);
   // g1_mpc_->printModel();
 
   // std::string file_path = THIS_COM "data_example/g1_test.pkl";
@@ -84,7 +83,7 @@ void TrackPlan::OneStep() {
       new_q_dot = mpc_q_dot_;
       new_tau = mpc_tau_;
       has_new_data_ = false;
-      ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(new_q.tail(27), new_q_dot.tail(27), new_tau);  //FIXME: remove hardcoded magic numbers
+      ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(new_q.tail(g1_mpc_->getQ0Size()), new_q_dot.tail(g1_mpc_->getQ0Size()), new_tau);  //FIXME: remove hardcoded magic numbers
       
     }
   }
@@ -92,24 +91,28 @@ void TrackPlan::OneStep() {
 
 void TrackPlan::Compute() {
 
+  Eigen::VectorXd x0;
+  x0.resize(g1_mpc_->getX0Size());
+
+  std::vector<Eigen::VectorXd> xs_out(g1_mpc_->getNhorizon(), x0);
+  std::vector<Eigen::VectorXd> us_out;
+
+  Eigen::Vector3d com_ref;
+  com_ref = robot_->GetRobotComPos();
+
+  std::unordered_map<std::string, pinocchio::SE3> desired_frames;
+  desired_frames.reserve(1);
+  Eigen::Isometry3d torso = robot_->GetLinkIsometry("torso_link");
+  Eigen::Vector3d torso_pos = torso.translation();
+  Eigen::Vector3d torso_rot = torso.rotation().eulerAngles(0, 1, 2);
+  pinocchio::SE3 current_pose = pinocchio::SE3(Eigen::AngleAxisd(torso_rot[0], Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(torso_rot[1], Eigen::Vector3d::UnitY()) * Eigen::AngleAxisd(torso_rot[2], Eigen::Vector3d::UnitZ()), torso_pos);
+  desired_frames["torso_link"] = current_pose;
+
   while (run_threads_) {
-    Eigen::VectorXd x0;
-    x0.resize(34 + 33);
 
-    std::vector<Eigen::VectorXd> xs_out(g1_mpc_->getNhorizon(), x0);
     xs_out[0] << robot_->GetQ(), robot_->GetQdot();
-    // std::cout << "xs_out: " << xs_out[0].transpose() << std::endl;
-
-    static Eigen::Vector3d com_ref = robot_->GetRobotComPos();
-    // auto torso = robot_->GetLinkIsometry("torso_link");
-    // auto torso_pos = torso.translation();
-    // auto torso_rot = torso.rotation();
-    // std::cout << "torso_pos: " << torso_pos.transpose() << std::endl;
-    // std::cout << "torso_rot: " << torso_rot.eulerAngles(0, 1, 2).transpose() << std::endl;
-
-    std::vector<Eigen::VectorXd> us_out;
-    g1_mpc_->solveOneStep(xs_out, us_out, com_ref);
-    // std::cout<< "us_out: " << us_out[0].transpose() << "\n\n";
+    
+    g1_mpc_->solveOneStep(xs_out, us_out, com_ref, desired_frames);
 
     {
       std::lock_guard<std::mutex> lock(data_mutex_);
@@ -117,7 +120,7 @@ void TrackPlan::Compute() {
       mpc_q_dot_ = xs_out[0].tail(xs_out[0].size() / 2);
       mpc_tau_ = us_out[0];
       has_new_data_ = true;
-    }  
+    }
   }
 }
 
