@@ -14,6 +14,8 @@
 #include "mpc_utils.hpp"
 #include "util/util.hpp"
 
+class CostRecorderCallback;
+
 class HumanoidMulticontactTracker{
 
     public:
@@ -54,7 +56,7 @@ class HumanoidMulticontactTracker{
         void addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase);
 
         void initializeSolver();
-        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.), std::unordered_map<std::string, pinocchio::SE3> desired_frames = {});
+        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.), std::unordered_map<std::string, pinocchio::SE3> desired_frames = {});
         
     private:
 
@@ -129,6 +131,7 @@ class HumanoidMulticontactTracker{
         boost::shared_ptr<crocoddyl::ActuationModelFloatingBase> actuation_;
         boost::shared_ptr<crocoddyl::StateMultibody> state_;
         bool enable_callbacks_;
+        boost::shared_ptr<CostRecorderCallback> cost_callback_;
         //#################
 
 };

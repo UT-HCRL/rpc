@@ -28,8 +28,9 @@ int main(){
     std::vector<Eigen::VectorXd> us_out;
     std::vector<Eigen::VectorXd> xs_out_test;
     std::vector<Eigen::VectorXd> us_out_test;
+    mpc_utils::MPCData data_out;
     for(int i=0; i<100; i++){
-        g1_test.solveOneStep(xs_out, us_out, Eigen::Vector3d(0., 0., 0.6));
+        g1_test.solveOneStep(xs_out, us_out, data_out);
         xs_out_test.push_back(xs_out.front());
         us_out_test.push_back(us_out.front());
     }

@@ -53,4 +53,14 @@ namespace mpc_utils {
         return getGain(matchKey(frame_name), gain_table);
     }
 
+    struct MPCData{
+        int total_iterations;
+        std::vector<double> xReg_costs;
+        std::vector<double> uReg_costs;
+        std::vector<double> xBound_costs;
+        std::vector<double> com_costs;
+        std::unordered_map<std::string, std::vector<double>> frame_costs;
+        std::unordered_map<std::string, std::vector<double>> contact_costs;
+    };
+
 } // namespace mpc_utils

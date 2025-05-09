@@ -89,101 +89,103 @@ initial_config:
   right_two_joint: 0.
 
 #          [   Reg,   xBound,   CoM,    Frames,    Contacts    ]
-cost_mask: [    1,      1,       0,        1,          1       ]
+cost_mask: [    1,      1,       1,        1,          1       ]
 
 tracking_frames:
   - torso_link
 
+# running_costs:
+#   xReg:
+#     w: 0.001
+#     state_w:
+#       base_pos: [10.0, 10.0, 10.0]
+#       base_rot: [100.0, 100.0, 100.0]
+#       joint_pos: 10.0
+#       joint_vel: 1.0
+#   uReg:
+#     w: 0.1
+#   xBound:
+#     w: 0.00001
+#   CoM:
+#     w: 0.0
+#   tracking_frames:
+#     torso_link: 80000.0
+
+
+# terminal_costs:
+#   xReg:
+#     w: 0.1
+#     state_w:
+#       base_pos: [10.0, 10.0, 10.0]
+#       base_rot: [0.0, 0.0, 0.0]
+#       joint_pos: 100.0
+#       joint_vel: 10.0
+#   uReg:
+#     w: 0.00001 #0.01
+#   xBound:
+#     w: 1000.0
+#   CoM:
+#     w: 0.0
+
+### CoM tracking
 running_costs:
   xReg:
-    w: 0.001
+    w: 0.01
     state_w:
-      base_pos: [10.0, 10.0, 10.0]
-      base_rot: [100.0, 100.0, 100.0]
+      base_pos: [100.0, 100.0, 100.0]
+      base_rot: [10.0, 10.0, 10.0]
       joint_pos: 1000.0
-      joint_vel: 1.0
+      joint_vel: 100.0
   uReg:
-    w: 0.1
+    w: 0.001
   xBound:
-    w: 0.00001
+    w: 0.1
   CoM:
-    w: 0.0
+    w: 10000.0
   tracking_frames:
-    torso_link: 800000.0
-
+    torso_link: 1000.0
 
 terminal_costs:
   xReg:
-    w: 0.1
+    w: 0.01
     state_w:
-      base_pos: [10.0, 10.0, 10.0]
+      base_pos: [100.0, 100.0, 100.0]
       base_rot: [0.0, 0.0, 0.0]
-      joint_pos: 100.0
-      joint_vel: 10.0
+      joint_pos: 10.0
+      joint_vel: 100.0
   uReg:
-    w: 0.00001 #0.01
+    w: 1.0 #0.01
   xBound:
-    w: 1000.0
+    w: 0.01
   CoM:
-    w: 0.0
+    w: 10000.0
 
-# CoM tracking
-# running_costs:
-#   xReg:
-#     w: 0.01
-#     state_w:
-#       base_pos: [100.0, 100.0, 100.0]
-#       base_rot: [10.0, 10.0, 10.0]
-#       joint_pos: 1000.0
-#       joint_vel: 100.0
-#   uReg:
-#     w: 0.001
-#   xBound:
-#     w: 0.1
-#   CoM:
-#     w: 10000.0
+    running_costs:
+  xReg:
+    w: 0.01
+    state_w:
+      base_pos: [100.0, 100.0, 100.0]
+      base_rot: [10.0, 10.0, 10.0]
+      joint_pos: 1000.0
+      joint_vel: 100.0
+  uReg:
+    w: 0.001
+  xBound:
+    w: 0.1
+  CoM:
+    w: 10000.0
 
-# terminal_costs:
-#   xReg:
-#     w: 0.01
-#     state_w:
-#       base_pos: [100.0, 100.0, 100.0]
-#       base_rot: [0.0, 0.0, 0.0]
-#       joint_pos: 0.0
-#       joint_vel: 100.0
-#   uReg:
-#     w: 1.0 #0.01
-#   xBound:
-#     w: 0.01
-#   CoM:
-#     w: 10000.0
-
-#     running_costs:
-#   xReg:
-#     w: 0.01
-#     state_w:
-#       base_pos: [100.0, 100.0, 100.0]
-#       base_rot: [10.0, 10.0, 10.0]
-#       joint_pos: 1000.0
-#       joint_vel: 100.0
-#   uReg:
-#     w: 0.001
-#   xBound:
-#     w: 0.1
-#   CoM:
-#     w: 10000.0
-
-# terminal_costs:
-#   xReg:
-#     w: 0.01
-#     state_w:
-#       base_pos: [100.0, 100.0, 100.0]
-#       base_rot: [0.0, 0.0, 0.0]
-#       joint_pos: 0.0
-#       joint_vel: 100.0
-#   uReg:
-#     w: 1.0 #0.01
-#   xBound:
-#     w: 0.01
-#   CoM:
-#     w: 10000.0
+terminal_costs:
+  xReg:
+    w: 0.01
+    state_w:
+      base_pos: [100.0, 100.0, 100.0]
+      base_rot: [0.0, 0.0, 0.0]
+      joint_pos: 0.0
+      joint_vel: 100.0
+  uReg:
+    w: 1.0 #0.01
+  xBound:
+    w: 0.01
+  CoM:
+    w: 10000.0

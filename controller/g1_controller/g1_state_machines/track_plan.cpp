@@ -5,6 +5,7 @@
 #include "controller/robot_system/pinocchio_robot_system.hpp"
 #include "controller/g1_controller/g1_tci_container.hpp"
 #include "util/util.hpp"
+#include "fstream"
 
 namespace {
   double kGravity = 9.81;
@@ -108,11 +109,110 @@ void TrackPlan::Compute() {
   pinocchio::SE3 current_pose = pinocchio::SE3(Eigen::AngleAxisd(torso_rot[0], Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(torso_rot[1], Eigen::Vector3d::UnitY()) * Eigen::AngleAxisd(torso_rot[2], Eigen::Vector3d::UnitZ()), torso_pos);
   desired_frames["torso_link"] = current_pose;
 
+  mpc_utils::MPCData data_out;
+
+  std::ofstream log_file("solve_timing_log.txt", std::ios::app);
+  if (!log_file.is_open()) {
+    std::cerr << "Failed to open log file for writing." << std::endl;
+  }else{
+    std::cout<<"Start writing computation time [ms] to file."<<std::endl;
+  }
+
+  std::ofstream log_file2("solve_iteration_log.txt", std::ios::app);
+  if (!log_file2.is_open()) {
+    std::cerr << "Failed to open log file for writing." << std::endl;
+  }else{
+    std::cout<<"Start writing iteration number to file."<<std::endl;
+  }
+
+  std::ofstream log_file3("data_out_log.txt", std::ios::app);
+  if (!log_file3.is_open()) {
+    std::cerr << "Failed to open log file for writing." << std::endl;
+  }else{
+    std::cout<<"Start writing data_out to file."<<std::endl;
+  }
+
+  int count = 0;
+
   while (run_threads_) {
 
     xs_out[0] << robot_->GetQ(), robot_->GetQdot();
-    
-    g1_mpc_->solveOneStep(xs_out, us_out, com_ref, desired_frames);
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+    g1_mpc_->solveOneStep(xs_out, us_out, data_out, com_ref, desired_frames);
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+
+    // if (log_file.is_open() && count < 10000) {
+    //   log_file << duration << std::endl;
+    //   log_file2 << data_out.total_iterations << std::endl;
+    //   count++;
+    // } else {
+    //   log_file.close();
+    //   log_file2.close();
+    //   std::cerr << "File closed." << std::endl;
+    // }
+
+    if(log_file3.is_open() && count< 1000) {
+      for(int i=0; i<data_out.xReg_costs.size(); i++){
+        log_file3 << data_out.xReg_costs[i] << " ";
+      }
+
+      log_file3 << std::endl;
+
+      for(int i=0; i<data_out.uReg_costs.size(); i++){
+        log_file3 << data_out.uReg_costs[i] << " ";
+      }
+
+      log_file3 << std::endl;
+
+      for(int i=0; i<data_out.xBound_costs.size(); i++){
+        log_file3 << data_out.xBound_costs[i] << " ";
+      }
+
+      log_file3 << std::endl;
+
+      for(int i=0; i<data_out.com_costs.size(); i++){
+        log_file3 << data_out.com_costs[i] << " ";
+      }
+
+      log_file3 << std::endl;
+
+      for (const auto& frame : data_out.frame_costs) {
+        log_file3 << frame.first << ": ";
+        for (const auto& cost : frame.second) {
+          log_file3 << cost << " ";
+        }
+        log_file3 << std::endl;
+      }
+
+      for (const auto& contact : data_out.contact_costs) {
+        log_file3 << contact.first << ": ";
+        for (const auto& cost : contact.second) {
+          log_file3 << cost << " ";
+        }
+        log_file3 << std::endl;
+      }
+      log_file3 << "----------------------------------------" << std::endl;
+      
+      data_out.xReg_costs.clear();
+      data_out.uReg_costs.clear();
+      data_out.xBound_costs.clear();
+      data_out.com_costs.clear();
+      data_out.frame_costs.clear();
+      data_out.contact_costs.clear();
+      count++;
+    }else{
+      log_file3.close();
+      std::cerr << "File closed." << std::endl;
+      exit(23);
+    }
+
+    // std::cout<<"\n\n\nxReg_costs: "<<data_out.xReg_costs.back()<<std::endl;
+    // std::cout<<"uReg_costs: "<<data_out.uReg_costs.back()<<std::endl;
+    // std::cout<<"xBound_costs: "<<data_out.xBound_costs.back()<<std::endl;
+    // std::cout<<"com_costs: "<<data_out.com_costs.back()<<std::endl;
+    // std::cout<<"solve time: "<<duration<<std::endl;
 
     {
       std::lock_guard<std::mutex> lock(data_mutex_);

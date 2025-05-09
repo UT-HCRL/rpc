@@ -31,6 +31,11 @@ target_include_directories(${PROJECT_NAME}_test
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+add_executable(${PROJECT_NAME}_plot_time src/plot_solvetime.cpp)
+target_link_libraries(${PROJECT_NAME}_plot_time
+    PRIVATE ${PROJECT_NAME}
+)
+
 install(TARGETS ${PROJECT_NAME}
     EXPORT ${PROJECT_NAME}Targets
     LIBRARY DESTINATION lib

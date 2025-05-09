@@ -28,6 +28,26 @@
 
 #include <pinocchio/algorithm/model.hpp>
 
+class CostRecorderCallback : public crocoddyl::CallbackAbstract {
+ public:
+  explicit CostRecorderCallback() = default;
+  virtual ~CostRecorderCallback() = default;
+
+  // The operator() is called by the solver at each iteration
+  void operator()(crocoddyl::SolverAbstract& solver) override {
+    // Store the iteration number and cost in the map
+    iteration_costs_[solver.get_iter()].push_back(solver.get_cost());
+
+  }
+
+  const std::map<int, std::vector<double>>& get_costs() const {
+    return iteration_costs_;
+  }
+
+ private:
+  std::map<int, std::vector<double>> iteration_costs_;
+};
+
 HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robot_path, const std::unordered_map<std::string, mpc_utils::Weights>& cost_weights, const std::vector<int>& locked_joints_list, const bool croc_callbacks) : locked_joints_list_(locked_joints_list), enable_callbacks_(croc_callbacks) {
 
     pinocchio::urdf::buildModel(robot_path, pinocchio::JointModelFreeFlyer(), model_full_);
@@ -408,10 +428,16 @@ void HumanoidMulticontactTracker::initializeSolver(){
     problem_ = boost::make_shared<crocoddyl::ShootingProblem>(x0_, running_models, terminalModelWithEuler);
     fddp_ = boost::make_shared<crocoddyl::SolverFDDP>(problem_);
     if(enable_callbacks_) fddp_->setCallbacks({boost::make_shared<crocoddyl::CallbackVerbose>()});
+    fddp_->setCallbacks({boost::make_shared<crocoddyl::CallbackVerbose>()});
+
+    // cost_callback_ = boost::make_shared<CostRecorderCallback>();
+    // std::vector<boost::shared_ptr<crocoddyl::CallbackAbstract>> callbacks;
+    // callbacks.push_back(cost_callback_);
+    // fddp_->setCallbacks(callbacks);
 
 }
 
-void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, const Eigen::Vector3d& desired_com, std::unordered_map<std::string, pinocchio::SE3> desired_frames) {
+void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const Eigen::Vector3d& desired_com, std::unordered_map<std::string, pinocchio::SE3> desired_frames) {
 
     static bool first_iteration = true;
     const std::size_t N = fddp_->get_problem()->get_T();
@@ -445,7 +471,22 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
     
     xs_out = fddp_->get_xs();
     us_out = fddp_->get_us();
-    
+
+    for(int i=0; i<N; i++){
+        data_out.xReg_costs.push_back(boost::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(boost::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(fddp_->get_problem()->get_runningDatas()[i])->differential)->costs->costs["xReg"]->cost);
+        data_out.uReg_costs.push_back(boost::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(boost::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(fddp_->get_problem()->get_runningDatas()[i])->differential)->costs->costs["uReg"]->cost);
+        data_out.xBound_costs.push_back(boost::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(boost::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(fddp_->get_problem()->get_runningDatas()[i])->differential)->costs->costs["xBounds"]->cost);
+        data_out.com_costs.push_back(boost::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(boost::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(fddp_->get_problem()->get_runningDatas()[i])->differential)->costs->costs["CoMTracking"]->cost);
+        //TODO: split it in multiple vars as this is unreadable!
+        for (const auto& frame : frame_targets_) {
+            data_out.frame_costs[frame.first].push_back(boost::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(boost::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(fddp_->get_problem()->get_runningDatas()[i])->differential)->costs->costs["frame_"+frame.first]->cost);
+        }
+        for(const auto& frame : frame_names_){
+            std::cout<<"frame: " << frame << std::endl;
+            data_out.contact_costs[frame].push_back(boost::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(boost::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(fddp_->get_problem()->get_runningDatas()[i])->differential)->costs->costs[frame + "_friction_cone"]->cost);
+        }
+    }
+
 }
 
 // void HumanoidMulticontactTracker::printCoMResidual() const {
