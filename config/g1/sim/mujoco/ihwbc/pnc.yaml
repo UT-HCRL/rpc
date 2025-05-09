@@ -178,14 +178,15 @@ state_machine:
 
     initialize:
       init_duration: 2
-      target_joint_pos: [-0.524, 0., 0., 0.785, -0.262, 0., -0.524, 0., 0., 0.785, -0.262, 0., 0., 0., 0.524, 0., 1.571, 0., 0., 0., 0., -0.524, 0., 1.571, 0., 0., 0.] #pinocchio robotsystem joint order
+#      target_joint_pos: [-0.524, 0., 0., 0.785, -0.262, 0., -0.524, 0., 0., 0.785, -0.262, 0., 0., 0., 0.524, 0., 1.571, 0., 0., 0., 0., -0.524, 0., 1.571, 0., 0., 0.] #pinocchio robotsystem joint order
+      target_joint_pos: [-0.524, 0., 0., 0.785, -0.262, 0., -0.524, 0., 0., 0.785, -0.262, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.] #pinocchio robotsystem joint order
       b_only_joint_pos_control: false
       wait_time: 1.
 
     stand_up:
       standup_duration: 1.
       target_com_height: 0.65
-      target_base_height: 0.85
+      target_base_height: 0.88
 
       rf_z_max_interp_duration: 0.1
 

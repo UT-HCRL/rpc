@@ -8,6 +8,11 @@ class PinocchioRobotSystem;
 class G1ControlArchitecture;
 class G1StateProvider;
 
+enum InterpolationMethod {
+  kZOH = 0,
+  kLinear = 1,
+};
+
 class ReplayRecordedPlan : public StateMachine {
 public:
   ReplayRecordedPlan(const StateId state_id, PinocchioRobotSystem *robot,
@@ -34,5 +39,6 @@ private:
   std::vector<Matrix<double, 37, 1>> pkl_joint_tau_;
   std::vector<double> pkl_time_;
   unsigned int planner_counter_;
+  InterpolationMethod k_interp_method_;
 
 };

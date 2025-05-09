@@ -5,11 +5,12 @@
 #include "controller/g1_controller/g1_tci_container.hpp"
 #include "controller/robot_system/pinocchio_robot_system.hpp"
 #include "configuration.hpp"
+#include "interpolation.hpp"
 
 
 ReplayRecordedPlan::ReplayRecordedPlan(const StateId state_id,
-                                           PinocchioRobotSystem *robot,
-                                           G1ControlArchitecture *ctrl_arch)
+                                       PinocchioRobotSystem *robot,
+                                       G1ControlArchitecture *ctrl_arch)
     : StateMachine(state_id, robot), ctrl_arch_(ctrl_arch),
       planner_counter_(0) {
   util::PrettyConstructor(2, "ReplayRecordedPlan");
@@ -17,13 +18,14 @@ ReplayRecordedPlan::ReplayRecordedPlan(const StateId state_id,
   sp_ = G1StateProvider::GetStateProvider();
 
   // load recorded plan
-  std::string file_path = THIS_COM "experiment_data/g1_knee_knocker_sca_on.pkl";
+  std::string file_path = THIS_COM "experiment_data/g1_29dof_knee_knocker_full_step_over.pkl";
   reader_ = new PickleReader(file_path, PickleType::LIST);
   reader_->parse();
   pkl_joint_pos_ = reader_->getJointPosDes();
   pkl_joint_vel_ = reader_->getJointVelDes();
   pkl_joint_tau_ = reader_->getJointTauDes();
   pkl_time_ = reader_->getTimeVec();
+  k_interp_method_ = kLinear;
 }
 
 ReplayRecordedPlan::~ReplayRecordedPlan() {
@@ -39,14 +41,43 @@ void ReplayRecordedPlan::FirstVisit() {
 void ReplayRecordedPlan::OneStep() {
   state_machine_time_ = sp_->current_time_ - state_machine_start_time_;
 
-  // send commands (ZOH version)
+  Matrix<double, 44, 1> des_joint_pos;
+  Matrix<double, 43, 1> des_joint_vel;
+  Matrix<double, 37, 1> des_joint_trq;
+  des_joint_trq.setZero();
+
+  // get corresponding time index
   if (state_machine_time_ >= pkl_time_[planner_counter_ + 1]) {
-      // increase planner counter
-      planner_counter_++;
+    // increase planner counter
+    planner_counter_++;
   }
-  Matrix<double, 44, 1> des_joint_pos = pkl_joint_pos_[planner_counter_];
-  Matrix<double, 43, 1> des_joint_vel = pkl_joint_vel_[planner_counter_];
-  Matrix<double, 37, 1> des_joint_trq = pkl_joint_tau_[planner_counter_];
+
+  // send commands (ZOH version)
+  double alpha = 0.;
+  switch (k_interp_method_) {
+    case kZOH:
+      // apply desired joint position/velocity/torque at corresponding time
+      des_joint_pos = pkl_joint_pos_[planner_counter_];
+      des_joint_vel = pkl_joint_vel_[planner_counter_];
+      // des_joint_trq = pkl_joint_tau_[planner_counter_];
+      break;
+    case kLinear:
+      alpha = (state_machine_time_ - pkl_time_[planner_counter_]) /
+        (pkl_time_[planner_counter_ + 1] - pkl_time_[planner_counter_]);
+      des_joint_pos = Lerp<Matrix<double, 44, 1>, double>(
+        pkl_joint_pos_[planner_counter_], pkl_joint_pos_[planner_counter_ + 1],
+        alpha);
+      des_joint_vel = Lerp<Matrix<double, 43, 1>, double>(
+        pkl_joint_vel_[planner_counter_], pkl_joint_vel_[planner_counter_ + 1],
+        alpha);
+      des_joint_trq = Lerp<Matrix<double, 37, 1>, double>(
+        pkl_joint_tau_[planner_counter_], pkl_joint_tau_[planner_counter_ + 1],
+        alpha);
+      break;
+    default:
+      std::cout << "[ReplayRecordedPlan] - Invalid interpolation method" << std::endl;
+      break;
+  }
 
   // update commands
   ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(
