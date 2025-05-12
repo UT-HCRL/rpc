@@ -1,2 +1,4 @@
+find_package(hpp-fcl REQUIRED)
+
 pybind11_add_module(go2_interface_py go2_interface_pybind_pin.cpp)
-target_link_libraries(go2_interface_py PUBLIC rpc-go2-controller)
+target_link_libraries(go2_interface_py PUBLIC rpc-go2-controller hpp-fcl::hpp-fcl)
