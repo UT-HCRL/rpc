@@ -4,6 +4,11 @@
 #include "controller/g1_controller/g1_state_provider.hpp"
 #include "controller/robot_system/pinocchio_robot_system.hpp"
 #include "controller/g1_controller/g1_tci_container.hpp"
+
+#if B_USE_ZMQ
+  #include "controller/g1_controller/g1_data_manager.hpp"
+#endif
+
 #include "util/util.hpp"
 #include "fstream"
 
@@ -140,6 +145,22 @@ void TrackPlan::Compute() {
 
     auto start_time = std::chrono::high_resolution_clock::now();
     g1_mpc_->solveOneStep(xs_out, us_out, data_out, com_ref, desired_frames);
+
+    #if B_USE_ZMQ
+      G1DataManager *dm = G1DataManager::GetDataManager();
+      dm->data_->total_iterations_ = data_out.total_iterations;
+      dm->data_->xReg_costs_.resize(data_out.xReg_costs.size());
+      dm->data_->uReg_costs_.resize(data_out.uReg_costs.size());
+      dm->data_->xBound_costs_.resize(data_out.xBound_costs.size());
+      dm->data_->com_costs_.resize(data_out.com_costs.size());
+      dm->data_->xReg_costs_ = data_out.xReg_costs;
+      dm->data_->uReg_costs_ = data_out.uReg_costs;
+      dm->data_->xBound_costs_ = data_out.xBound_costs;
+      dm->data_->com_costs_ = data_out.com_costs;
+
+      //dm->data_->joint_positions_ = sensor_data->joint_pos_;
+    #endif
+
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 

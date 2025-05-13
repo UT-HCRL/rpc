@@ -169,6 +169,19 @@ void G1DataManager::SendData() {
     msg.add_joint_trq_des(data_->joint_trq_des[i]);
   }
 
+  // =============================================================
+  // MPC Costs
+  // =============================================================
+  msg.set_total_iterations(data_->total_iterations_);
+  for (int i(0); i < data_->xReg_costs_.size(); i++)
+    msg.add_xreg_costs(data_->xReg_costs_[i]);
+  for (int i(0); i < data_->uReg_costs_.size(); i++)
+    msg.add_ureg_costs(data_->uReg_costs_[i]);
+  for (int i(0); i < data_->xBound_costs_.size(); i++)
+    msg.add_xbound_costs(data_->xBound_costs_[i]);
+  for (int i(0); i < data_->com_costs_.size(); i++)
+    msg.add_com_costs(data_->com_costs_[i]);
+    
   // serialize msg in string type
   std::string encoded_msg;
   msg.SerializeToString(&encoded_msg);

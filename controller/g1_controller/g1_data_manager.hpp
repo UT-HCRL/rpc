@@ -93,6 +93,15 @@ public:
   Eigen::VectorXd joint_vel_des;
   Eigen::VectorXd joint_trq_des;
 
+  // MPC Costs:
+  int total_iterations_;
+  std::vector<double> xReg_costs_;
+  std::vector<double> uReg_costs_;
+  std::vector<double> xBound_costs_;
+  std::vector<double> com_costs_;
+  // std::unordered_map<std::string, std::vector<double>> frame_costs;
+  // std::unordered_map<std::string, std::vector<double>> contact_costs;
+
 };
 
 // Singleton class
