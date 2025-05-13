@@ -52,7 +52,8 @@ private:
   Eigen::Matrix<double, 6, 1> des_reaction_force_;
 
   std::unique_ptr<pkl_utils::PickleReader> pkl_reader_;
-  std::vector<pkl_utils::CompositeBezierCurve> bezier_curves_;
+  // std::vector<pkl_utils::CompositeBezierCurve> bezier_curves_;
+  std::unique_ptr<pkl_utils::BezierCurvesManager> bezier_curves_mgr_;
 
   //Member vars to avoid dyn alloc in OneStep
   Eigen::VectorXd new_q;

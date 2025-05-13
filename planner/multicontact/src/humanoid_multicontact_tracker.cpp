@@ -28,6 +28,8 @@
 
 #include <pinocchio/algorithm/model.hpp>
 
+#include "util/pkl_utils.hpp"
+
 class CostRecorderCallback : public crocoddyl::CallbackAbstract {
  public:
   explicit CostRecorderCallback() = default;
@@ -106,7 +108,6 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
     loadTrackingFramesWeights();
 
     initializeSolver();
-
 }
 
 void HumanoidMulticontactTracker::loadCostMask(){
@@ -186,9 +187,8 @@ void HumanoidMulticontactTracker::loadCoMWeights(){
 }
 
 void HumanoidMulticontactTracker::loadTrackingFramesWeights(){
-    std::vector<std::string> track_frame_names;
-    util::ReadParameter(params_, "tracking_frames", track_frame_names);
-    for (const auto& frame_name : track_frame_names) {
+    util::ReadParameter(params_, "tracking_frames", track_frame_names_);
+    for (const auto& frame_name : track_frame_names_) {
         double w_frame;
         util::ReadParameter(params_["running_costs"]["tracking_frames"], frame_name, w_frame);
         frame_targets_[frame_name] = w_frame;
@@ -433,6 +433,7 @@ void HumanoidMulticontactTracker::initializeSolver(){
     // std::shared_ptr<crocoddyl::ActionModelAbstract> runningModelWithEuler = std::make_shared<crocoddyl::IntegratedActionModelEuler>(running_DAM, dt_);
     std::shared_ptr<crocoddyl::ActionModelAbstract> terminalModelWithEuler = std::make_shared<crocoddyl::IntegratedActionModelEuler>(terminal_DAM, dt_);
 
+    // TODO move running_models to class property?
     std::vector<std::shared_ptr<crocoddyl::ActionModelAbstract>> running_models;
     for(std::size_t i = 0; i < N_horizon_; ++i) {
         running_models.push_back(runningModelsWithEuler[i]);

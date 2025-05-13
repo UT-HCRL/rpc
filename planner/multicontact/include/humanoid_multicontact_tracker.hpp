@@ -12,6 +12,7 @@
 
 #include "contact_sequence.hpp"
 #include "mpc_utils.hpp"
+#include "util/pkl_utils.hpp"
 #include "util/util.hpp"
 
 class CostRecorderCallback;
@@ -57,12 +58,14 @@ class HumanoidMulticontactTracker{
 
         void initializeSolver();
         void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.), std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {});
-        
+        std::vector<std::string> getTargetFrameNames() const {return track_frame_names_;}
+
     private:
 
         //### HUMANOID MODEL ###
         bool reduced_model_;
         std::vector<std::string> frame_names_;
+        std::vector<std::string> track_frame_names_;
         std::vector<int> locked_joints_list_;
         double mu_;
 
