@@ -36,6 +36,8 @@ target_link_libraries(friction_compensator_test gtest pthread rpc-friction-compe
 add_executable(mujoco_pinocchio_comparison mujoco_pinocchio_comparison.cpp)
 target_link_libraries(mujoco_pinocchio_comparison gtest pthread ${mujoco_LIBRARIES}
                                                         rpc-pin-robot-system)
+add_executable(pkl_reader_test pkl_reader_test.cpp)
+target_link_libraries(pkl_reader_test ${GTEST_LIBRARIES} pkl_reader)
 if(BUILD_WITH_MATLOGGER)
     add_executable(min_jerk_traj_test min_jerk_traj.cpp)
     target_link_libraries(min_jerk_traj_test matlogger2::matlogger2)

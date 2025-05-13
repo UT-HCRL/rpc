@@ -126,4 +126,16 @@ namespace pkl_utils {
         std::vector<double> transition_times_;
     };
 
+    static const Vector3d get_frame_des_pos(const CompositeBezierCurve& bezier, const double& t) {
+        unsigned int seg = 0;
+        for (const auto& bez : bezier.getBeziers()) {
+            if (t >= bez.getA() && t <= bez.getB()) {
+                break;
+            }
+            seg += 1;
+        }
+        const auto bez_seg = bezier.getBeziers().at(seg);
+        return bez_seg.eval(t);
+    }
+
 } // namespace pkl_utils
