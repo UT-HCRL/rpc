@@ -1,2 +1,4 @@
+find_package(hpp-fcl REQUIRED)
+
 pybind11_add_module(g1_interface_py g1_interface_pybind_pin.cpp)
-target_link_libraries(g1_interface_py PUBLIC rpc-g1-controller)
+target_link_libraries(g1_interface_py PUBLIC rpc-g1-controller hpp-fcl::hpp-fcl)
