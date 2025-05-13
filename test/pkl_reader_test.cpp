@@ -71,10 +71,15 @@ TEST_F(PklReaderTest, readBezier) {
   reader.parse();
 
   std::vector<CompositeBezierCurve> read_beziers = reader.getCompositeBezierCurves();
+  std::vector<std::shared_ptr<CompositeBezierCurve>> bezier_curves_ptrs;
 
+  // Convert using a loop
+  for (const auto& curve : read_beziers) {
+    bezier_curves_ptrs.push_back(std::make_shared<CompositeBezierCurve>(curve));
+  }
   for (unsigned int fr_idx = 0; fr_idx<read_beziers.size(); fr_idx++){
     // get Bezier curves of current frame
-    const auto selected_bezier_fr = read_beziers[fr_idx];
+    const auto selected_bezier_fr = bezier_curves_ptrs[fr_idx];
 
     // test a few points for the corresponding frame
     for (const auto& t : test_times) {

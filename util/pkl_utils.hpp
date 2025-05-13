@@ -126,16 +126,50 @@ namespace pkl_utils {
         std::vector<double> transition_times_;
     };
 
-    static const Vector3d get_frame_des_pos(const CompositeBezierCurve& bezier, const double& t) {
+    static const Vector3d get_frame_des_pos(const std::shared_ptr<CompositeBezierCurve> bezier, const double& t) {
         unsigned int seg = 0;
-        for (const auto& bez : bezier.getBeziers()) {
+        for (const auto& bez : bezier->getBeziers()) {
             if (t >= bez.getA() && t <= bez.getB()) {
                 break;
             }
             seg += 1;
         }
-        const auto bez_seg = bezier.getBeziers().at(seg);
+        const auto bez_seg = bezier->getBeziers().at(seg);
         return bez_seg.eval(t);
     }
+
+    class BezierCurvesManager {
+    public:
+        BezierCurvesManager(const std::vector<std::shared_ptr<CompositeBezierCurve>> bezier_curves,
+                            const std::vector<std::string>& frame_names) {
+            if (bezier_curves.empty()) {
+                throw std::invalid_argument("bezier_curves cannot be empty");
+            }
+
+            // check if frame_names.size() == bezier_curves.size()
+            if (frame_names.size() != bezier_curves.size()) {
+                throw std::invalid_argument("frame_names and bezier_curves must have the same size");
+            }
+
+            // store Bezier curves in corresponding frame name
+            for (unsigned int idx = 0; idx < frame_names.size(); idx++) {
+                bezier_curves_map_.emplace(frame_names[idx], bezier_curves.at(idx));
+            }
+        }
+
+        ~BezierCurvesManager() = default;
+
+        const Vector3d getCurrentDesiredPosition(const std::string& frame_name, const double& t) {
+            if (bezier_curves_map_.find(frame_name) == bezier_curves_map_.end()) {
+                throw std::invalid_argument("Frame name not found in Bezier curves map");
+            }
+            std::shared_ptr<CompositeBezierCurve> bezier_curve = bezier_curves_map_[frame_name];
+            return get_frame_des_pos(bezier_curve, t);
+        }
+
+    private:
+        std::unordered_map<std::string, std::shared_ptr<CompositeBezierCurve>> bezier_curves_map_;
+    };
+
 
 } // namespace pkl_utils

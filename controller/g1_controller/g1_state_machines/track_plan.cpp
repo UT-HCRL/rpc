@@ -37,27 +37,25 @@ TrackPlan::TrackPlan(const StateId state_id,
   g1_mpc_ = std::make_unique<HumanoidMulticontactTracker>(r_file_path, gains, locked_joints_list);
   // g1_mpc_->printModel();
 
-  // std::string file_path = THIS_COM "data_example/g1_test.pkl";
-  // pkl_reader_ = std::make_unique<pkl_utils::PickleReader>(file_path, pkl_utils::PickleType::BEZIER);
+  std::string file_path = THIS_COM "data_example/g1_test.pkl";
+  pkl_reader_ = std::make_unique<pkl_utils::PickleReader>(file_path, pkl_utils::PickleType::BEZIER);
 
-  // if (!pkl_reader_->isReady()) {
-  //     std::cerr << "Failed to open the file." << std::endl;
-  // }
+  if (!pkl_reader_->isReady()) {
+  std::cerr << "Failed to open the file." << std::endl;
+  }
 
-  // pkl_reader_->parse();
+  pkl_reader_->parse();
   // bezier_curves_ = pkl_reader_->getCompositeBezierCurves();
-  // pkl_reader_.reset();  //NOTE: I need this otherwise on ctrl+c I get sigfault due to pybind scope
-  // Uncomment to test bezier curve read
-  // const auto selected_bezier = bezier_curves_[0];
-        
-  // std::cout << "[MAIN] - Points of selected bezier curve:" << std::endl;
-  // for (const auto& bezier : selected_bezier.getBeziers()) {
-  //     const auto& points = bezier.getPoints();
-  //     for (const auto& point : points) {
-  //         std::cout << point.transpose() << std::endl;
-  //     }
-  // }
+  std::vector<pkl_utils::CompositeBezierCurve> bezier_curves = pkl_reader_->getCompositeBezierCurves();
+  std::vector<std::shared_ptr<pkl_utils::CompositeBezierCurve>> bezier_curves_ptrs;
+  // Convert to pointers
+  for (const auto& curve : bezier_curves) {
+    bezier_curves_ptrs.push_back(std::make_shared<pkl_utils::CompositeBezierCurve>(curve));
+  }
 
+  std::vector<std::string> target_names = g1_mpc_->getTargetFrameNames();
+  bezier_curves_mgr_ = std::make_unique<pkl_utils::BezierCurvesManager>(bezier_curves_ptrs, target_names);
+  pkl_reader_.reset();  //NOTE: I need this otherwise on ctrl+c I get sigfault due to pybind scope
 }
 
 TrackPlan::~TrackPlan() {
@@ -93,8 +91,12 @@ void TrackPlan::OneStep() {
 void TrackPlan::Compute() {
 
   while (run_threads_) {
+    double controller_time = sp_->current_time_ - state_machine_start_time_;
     Eigen::VectorXd x0;
     x0.resize(34 + 33);
+
+    // update guide references
+    g1_mpc_->updateTasksGuidesReferences(controller_time, bezier_curves_mgr_);
 
     std::vector<Eigen::VectorXd> xs_out(g1_mpc_->getNhorizon(), x0);
     xs_out[0] << robot_->GetQ(), robot_->GetQdot();

@@ -28,6 +28,8 @@
 
 #include <pinocchio/algorithm/model.hpp>
 
+#include "util/pkl_utils.hpp"
+
 HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robot_path, const std::unordered_map<std::string, mpc_utils::Weights>& cost_weights, const std::vector<int>& locked_joints_list = {0}) : locked_joints_list_(locked_joints_list) {
 
     pinocchio::urdf::buildModel(robot_path, pinocchio::JointModelFreeFlyer(), model_full_);
@@ -84,7 +86,6 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
     loadTrackingFramesWeights();
 
     initializeSolver();
-
 }
 
 void HumanoidMulticontactTracker::loadInitialConfiguration() {
@@ -187,9 +188,8 @@ void HumanoidMulticontactTracker::loadCoMWeights(){
 }
 
 void HumanoidMulticontactTracker::loadTrackingFramesWeights(){
-    std::vector<std::string> track_frame_names;
-    util::ReadParameter(params_, "tracking_frames", track_frame_names);
-    for (const auto& frame_name : track_frame_names) {
+    util::ReadParameter(params_, "tracking_frames", track_frame_names_);
+    for (const auto& frame_name : track_frame_names_) {
         double w_frame;
         util::ReadParameter(params_["running_costs"]["tracking_frames"], frame_name, w_frame);
         frame_targets_[frame_name] = w_frame;
@@ -248,7 +248,28 @@ void HumanoidMulticontactTracker::addCoMCost(const double com_tracking_weight = 
 
 }
 
-void HumanoidMulticontactTracker::addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase = mpc_utils::Phase::Running){
+void HumanoidMulticontactTracker::addFrameGuidesTrackingCost(const mpc_utils::Phase phase = mpc_utils::Phase::Running){
+
+    auto& cost_model = (phase == mpc_utils::Phase::Running) ? running_cost_model_ : terminal_cost_model_;
+
+    pinocchio::Data data_full_(model_full_);
+    Eigen::VectorXd q = x0_.head(state_->get_nq());
+    pinocchio::forwardKinematics(model_full_, data_full_, q);
+    pinocchio::updateFramePlacements(model_full_, data_full_);
+
+    for (const auto& fname: track_frame_names_) {
+        pinocchio::SE3 current_pose = data_full_.oMf[model_full_.getFrameId(fname)];
+        // std::cout << "current_pose which will be desired is: " << current_pose.translation().transpose() << std::endl;
+        // std::cout << "current_pose rotation is: " << current_pose.rotation().eulerAngles(0, 1, 2).transpose() << std::endl;
+
+        guides_residual_map_[fname] = std::make_shared<crocoddyl::ResidualModelFramePlacement>(state_, model_full_.getFrameId(fname), current_pose, actuation_->get_nu());
+        std::shared_ptr<crocoddyl::CostModelAbstract> goal_tracking_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, guides_residual_map_[fname]);
+        cost_model->addCost("frame_"+fname, goal_tracking_cost, frame_targets_[fname]);
+    }
+}
+
+
+void HumanoidMulticontactTracker::addFrameTrackingCost(const std::string& frame_name , const mpc_utils::Phase phase = mpc_utils::Phase::Running){
 
     auto& cost_model = (phase == mpc_utils::Phase::Running) ? running_cost_model_ : terminal_cost_model_;
 
@@ -308,7 +329,7 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
 
         std::string frame_name = frame_names[i];
         std::shared_ptr<crocoddyl::ContactModelAbstract> support_contact_model6D =
-        std::make_shared<crocoddyl::ContactModel6D>(state_, model_full_.getFrameId(frame_name), pinocchio::SE3::Identity(), actuation_->get_nu(), Eigen::Vector2d(10., 50.0)); //NOTE: this croc version doesn't have LOCAL_WORLD_ALIGNED
+        std::make_shared<crocoddyl::ContactModel6D>(state_, model_full_.getFrameId(frame_name), pinocchio::SE3::Identity(), pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), Eigen::Vector2d(10., 50.0));
         contact_model->addContact(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact", support_contact_model6D);
 
         //TODO: add hand contact rotation if needed
@@ -359,9 +380,11 @@ std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMu
 
     addContactCosts(frame_names);
     // addCoMCost(com_tracking_weight_);
-    for(const auto frame_names : frame_targets_){
-        addFrameTrackingCost(frame_names.first);
-    }
+    // for(const auto frame_names : frame_targets_){
+    //     addFrameTrackingCost(frame_names.first);
+    // }
+    addFrameGuidesTrackingCost();
+
     addXBoundCost(xbound_weight_);
     addRegularizationCosts(xreg_weights_, xreg_weight_, ureg_weight_);
 
@@ -395,13 +418,13 @@ void HumanoidMulticontactTracker::setFrames(const std::vector<std::string>& fram
 }
 
 void HumanoidMulticontactTracker::initializeSolver(){
-
     std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> running_DAM = createMultiFrameActionModel(frame_names_);
     std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> terminal_DAM = createMultiFrameTerminalActionModel(frame_names_);
 
     std::shared_ptr<crocoddyl::ActionModelAbstract> runningModelWithEuler = std::make_shared<crocoddyl::IntegratedActionModelEuler>(running_DAM, dt_);
     std::shared_ptr<crocoddyl::ActionModelAbstract> terminalModelWithEuler = std::make_shared<crocoddyl::IntegratedActionModelEuler>(terminal_DAM, dt_);
 
+    // TODO move running_models to class property?
     std::vector<std::shared_ptr<crocoddyl::ActionModelAbstract>> running_models;
     for(std::size_t i = 0; i < N_horizon_; ++i) {
         running_models.push_back(runningModelWithEuler);
@@ -409,6 +432,37 @@ void HumanoidMulticontactTracker::initializeSolver(){
 
     problem_ = std::make_shared<crocoddyl::ShootingProblem>(x0_, running_models, terminalModelWithEuler);
     fddp_ = std::make_shared<crocoddyl::SolverFDDP>(problem_);
+}
+
+void HumanoidMulticontactTracker::updateTasksGuidesReferences(const double& start_time, const std::unique_ptr<pkl_utils::BezierCurvesManager>& guides_mgr) {
+
+    // reset costs
+    // for (unsigned int i = 0; i < N_horizon_; ++i) {
+    //     for (const auto& fname: track_frame_names_) {
+    //         running_cost_model_->removeCost("frame_"+ fname + std::to_string(i));
+    //         if (i == 0) terminal_cost_model_->removeCost("frame_"+fname);
+    //     }
+    // }
+    std::vector<std::shared_ptr<crocoddyl::ActionModelAbstract>> runningModels = problem_->get_runningModels();
+    for (unsigned int i = 0; i < N_horizon_; ++i) {
+        for (const auto& fname: track_frame_names_) {
+            pinocchio::SE3 current_pose;
+            current_pose.translation() = guides_mgr->getCurrentDesiredPosition(fname, start_time + i * dt_);
+
+            guides_residual_map_[fname] = std::make_shared<crocoddyl::ResidualModelFramePlacement>(state_, model_full_.getFrameId(fname), current_pose, actuation_->get_nu());
+            // std::shared_ptr<crocoddyl::CostModelAbstract> goal_tracking_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, guides_residual_map_[fname]);
+            // running_cost_model_->addCost("frame_"+ fname + std::to_string(i), goal_tracking_cost, frame_targets_[fname]);
+        }
+    }
+    for (const auto& fname: track_frame_names_) {
+        pinocchio::SE3 current_pose;
+        current_pose.translation() = guides_mgr->getCurrentDesiredPosition(fname, start_time + N_horizon_ * dt_);
+
+        guides_residual_map_[fname] = std::make_shared<crocoddyl::ResidualModelFramePlacement>(state_, model_full_.getFrameId(fname), current_pose, actuation_->get_nu());
+        // std::shared_ptr<crocoddyl::CostModelAbstract> goal_tracking_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, guides_residual_map_[fname]);
+        // terminal_cost_model_->addCost("frame_"+fname, goal_tracking_cost, frame_targets_[fname]);
+    }
+
 }
 
 void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.6)){

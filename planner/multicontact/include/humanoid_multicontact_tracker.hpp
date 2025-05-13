@@ -11,6 +11,7 @@
 
 #include "contact_sequence.hpp"
 #include "mpc_utils.hpp"
+#include "util/pkl_utils.hpp"
 #include "util/util.hpp"
 
 class HumanoidMulticontactTracker{
@@ -20,7 +21,7 @@ class HumanoidMulticontactTracker{
         ~HumanoidMulticontactTracker() = default;
 
         void printModel() const;
-        
+
         void setConfigPath(const std::string& config_path){config_path_ = config_path;}
 
         void loadContactFrames();
@@ -50,16 +51,19 @@ class HumanoidMulticontactTracker{
         void addContactCosts(const std::vector<std::string>& frame_names, const mpc_utils::Phase phase);
         void addRegularizationCosts(const Eigen::VectorXd& xreg_weights, const double xreg_weight, const double ureg_weight, const mpc_utils::Phase phase);
         void addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase);
-
+        void addFrameGuidesTrackingCost(const mpc_utils::Phase phase);
+        void updateTasksGuidesReferences(const double& start_time, const std::unique_ptr<pkl_utils::BezierCurvesManager>& guides_mgr);
 
         void initializeSolver();
         void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, const Eigen::Vector3d& desired_com);
-        
+        std::vector<std::string> getTargetFrameNames() const {return track_frame_names_;}
+
     private:
 
         //### HUMANOID MODEL ###
         bool reduced_model_;
         std::vector<std::string> frame_names_;
+        std::vector<std::string> track_frame_names_;
         std::vector<int> locked_joints_list_;
         double mu_;
 
@@ -109,6 +113,7 @@ class HumanoidMulticontactTracker{
         std::shared_ptr<crocoddyl::ContactModelMultiple> terminal_contact_models_;
 
         std::shared_ptr<crocoddyl::ResidualModelCoMPosition> com_residual_;
+        std::unordered_map<std::string, std::shared_ptr<crocoddyl::ResidualModelFramePlacement>> guides_residual_map_;
 
         //###########################
 

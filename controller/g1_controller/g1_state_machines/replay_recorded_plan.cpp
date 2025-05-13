@@ -17,13 +17,13 @@ ReplayRecordedPlan::ReplayRecordedPlan(const StateId state_id,
   sp_ = G1StateProvider::GetStateProvider();
 
   // load recorded plan
-  std::string file_path = THIS_COM "experiment_data/g1_knee_knocker_sca_on.pkl";
-  reader_ = new PickleReader(file_path, PickleType::LIST);
-  reader_->parse();
-  pkl_joint_pos_ = reader_->getJointPosDes();
-  pkl_joint_vel_ = reader_->getJointVelDes();
-  pkl_joint_tau_ = reader_->getJointTauDes();
-  pkl_time_ = reader_->getTimeVec();
+  // std::string file_path = THIS_COM "experiment_data/g1_knee_knocker_sca_on.pkl";
+  // reader_ = new PickleReader(file_path, PickleType::LIST);
+  // reader_->parse();
+  // pkl_joint_pos_ = reader_->getJointPosDes();
+  // pkl_joint_vel_ = reader_->getJointVelDes();
+  // pkl_joint_tau_ = reader_->getJointTauDes();
+  // pkl_time_ = reader_->getTimeVec();
 }
 
 ReplayRecordedPlan::~ReplayRecordedPlan() {
