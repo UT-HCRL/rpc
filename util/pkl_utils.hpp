@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include <boost/math/special_functions/binomial.hpp>
 using namespace Eigen;
 
 namespace pkl_utils {
@@ -41,8 +40,25 @@ namespace pkl_utils {
         double getDuration() const { return duration_; }
 
     private:
+        const double binomial_coefficient(int n, int k) const {
+            if (k < 0 || k > n) {
+                return 0;
+            }
+            if (k == 0 || k == n) {
+                return 1;
+            }
+            if (k > n / 2) {
+                k = n - k;
+            }
+            double result = 1;
+            for (int i = 1; i <= k; ++i) {
+                result = result * (n - i + 1) / i;
+            }
+            return result;
+        }
+        
         const double _bernstein(double t, int n) const {
-            double c1 = boost::math::binomial_coefficient<double>(h_, n);
+            double c1 = binomial_coefficient(h_, n);
             double c2 = (t - a_) / duration_;
             double c3 = (b_ - t) / duration_;
             return c1 * std::pow(c2,n) * std::pow(c3, (h_ - n));

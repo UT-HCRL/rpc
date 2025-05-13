@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+#include <mutex>
 #include "controller/state_machine.hpp"
 #include "util/pkl_reader.hpp"
 #include <thread>

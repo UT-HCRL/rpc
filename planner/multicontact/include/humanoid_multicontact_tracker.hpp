@@ -2,8 +2,7 @@
 
 #include <Eigen/Dense>
 
-#include <boost/shared_ptr.hpp>
-
+#include <memory>
 #include "crocoddyl/core/fwd.hpp"
 #include "crocoddyl/core/solvers/fddp.hpp"
 #include "crocoddyl/multibody/actions/contact-fwddyn.hpp"
@@ -38,8 +37,8 @@ class HumanoidMulticontactTracker{
         void setInitialJointConfiguration(const Eigen::VectorXd& q0);
         void setFrames(const std::vector<std::string>& frame_names);
 
-        boost::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameActionModel(const std::vector<std::string>& frame_names);
-        boost::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameTerminalActionModel(const std::vector<std::string>& frame_names);
+        std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameActionModel(const std::vector<std::string>& frame_names);
+        std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameTerminalActionModel(const std::vector<std::string>& frame_names);
 
         double getDt() const { return dt_; }
         int getNhorizon() const { return N_horizon_; }
@@ -102,18 +101,18 @@ class HumanoidMulticontactTracker{
         double terminal_xbound_weight_;
         double terminal_com_tracking_weight_;
 
-        boost::shared_ptr<crocoddyl::ActivationModelAbstract> xreg_activation_;
-        boost::shared_ptr<crocoddyl::CostModelAbstract> xreg_cost_;
-        boost::shared_ptr<crocoddyl::CostModelAbstract> ureg_cost_;
+        std::shared_ptr<crocoddyl::ActivationModelAbstract> xreg_activation_;
+        std::shared_ptr<crocoddyl::CostModelAbstract> xreg_cost_;
+        std::shared_ptr<crocoddyl::CostModelAbstract> ureg_cost_;
 
-        boost::shared_ptr<crocoddyl::CostModelSum> running_cost_model_;
-        boost::shared_ptr<crocoddyl::ContactModelMultiple> running_contact_models_;
+        std::shared_ptr<crocoddyl::CostModelSum> running_cost_model_;
+        std::shared_ptr<crocoddyl::ContactModelMultiple> running_contact_models_;
 
-        boost::shared_ptr<crocoddyl::CostModelSum> terminal_cost_model_;
-        boost::shared_ptr<crocoddyl::ContactModelMultiple> terminal_contact_models_;
+        std::shared_ptr<crocoddyl::CostModelSum> terminal_cost_model_;
+        std::shared_ptr<crocoddyl::ContactModelMultiple> terminal_contact_models_;
 
-        boost::shared_ptr<crocoddyl::ResidualModelCoMPosition> com_residual_;
-        std::unordered_map<std::string, boost::shared_ptr<crocoddyl::ResidualModelFramePlacement>> frame_residuals_;
+        std::shared_ptr<crocoddyl::ResidualModelCoMPosition> com_residual_;
+        std::unordered_map<std::string, std::shared_ptr<crocoddyl::ResidualModelFramePlacement>> frame_residuals_;
         //###########################
 
 
@@ -125,13 +124,13 @@ class HumanoidMulticontactTracker{
 
 
         //### CROCODDYL ###
-        boost::shared_ptr<crocoddyl::ShootingProblem> problem_;
-        boost::shared_ptr<crocoddyl::SolverFDDP> fddp_;
+        std::shared_ptr<crocoddyl::ShootingProblem> problem_;
+        std::shared_ptr<crocoddyl::SolverFDDP> fddp_;
 
-        boost::shared_ptr<crocoddyl::ActuationModelFloatingBase> actuation_;
-        boost::shared_ptr<crocoddyl::StateMultibody> state_;
+        std::shared_ptr<crocoddyl::ActuationModelFloatingBase> actuation_;
+        std::shared_ptr<crocoddyl::StateMultibody> state_;
         bool enable_callbacks_;
-        boost::shared_ptr<CostRecorderCallback> cost_callback_;
+        std::shared_ptr<CostRecorderCallback> cost_callback_;
         //#################
 
 };
