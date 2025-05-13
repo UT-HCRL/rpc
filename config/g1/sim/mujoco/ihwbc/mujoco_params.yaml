@@ -51,13 +51,13 @@ actuator_gains:
     kp: 0.4
     kd: 0.01
   left_wrist_roll_joint:
-    kp: 0.4
+    kp: 1.0
     kd: 0.01
   left_wrist_pitch_joint:
-    kp: 0.4
+    kp: 1.0
     kd: 0.01
   left_wrist_yaw_joint:
-    kp: 0.4
+    kp: 1.0
     kd: 0.01
   right_shoulder_pitch_joint:
     kp: 0.4
@@ -72,13 +72,13 @@ actuator_gains:
     kp: 0.4
     kd: 0.01
   right_wrist_roll_joint:
-    kp: 0.4
+    kp: 1.0
     kd: 0.01
   right_wrist_pitch_joint:
-    kp: 0.4
+    kp: 1.0
     kd: 0.01
   right_wrist_yaw_joint:
-    kp: 0.4
+    kp: 1.0
     kd: 0.01
 
 initial_config:

@@ -189,6 +189,23 @@ async def main():
             True, "rf_pos", "json", "rf_pos", ["x", "y", "z"]
         ).add_chan(server)
 
+        # MPC costs
+        mpc_tot_iter = await SceneChannel(
+            True, "total_iterations", "json", "total_iterations", ["value"]
+        ).add_chan(server)
+        mpc_xreg_costs = await SceneChannel(
+            True, "xreg_costs", "json", "xreg_costs", [f"N_{i}" for i in range(2)] #FIXME: can this be dynamic or should we load the horizon from yaml?
+        ).add_chan(server)
+        mpc_ureg_costs = await SceneChannel(
+            True, "ureg_costs", "json", "ureg_costs", [f"N_{i}" for i in range(2)]
+        ).add_chan(server)
+        mpc_xbound_costs = await SceneChannel(
+            True, "xbound_costs", "json", "xbound_costs", [f"N_{i}" for i in range(2)]
+        ).add_chan(server)
+        mpc_com_costs = await SceneChannel(
+            True, "com_costs", "json", "com_costs", [f"N_{i}" for i in range(2)]
+        ).add_chan(server)
+
         for scn in range(len(xyz_scene_names)):
             await sceneinitman(xyz_scene_names[scn], server)
 
@@ -364,6 +381,62 @@ async def main():
                         "x": list(msg.rfoot_pos)[0],
                         "y": list(msg.rfoot_pos)[1],
                         "z": list(msg.rfoot_pos)[2],
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                mpc_tot_iter,
+                now,
+                json.dumps(
+                    {
+                        "value": msg.total_iterations,
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                mpc_xreg_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.xreg_costs[i] for i in range(len(msg.xreg_costs))},
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                mpc_ureg_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.ureg_costs[i] for i in range(len(msg.ureg_costs))},
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                mpc_xbound_costs,
+                now,
+                json.dumps(
+                    {
+                        **{
+                            f"N_{i}": msg.xbound_costs[i]
+                            for i in range(len(msg.xbound_costs))
+                        },
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                mpc_com_costs,
+                now,
+                json.dumps(
+                    { 
+                        **{
+                            f"N_{i}": msg.com_costs[i]
+                            for i in range(len(msg.com_costs))
+                        },
                     }
                 ).encode("utf8"),
             )

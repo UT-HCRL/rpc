@@ -95,6 +95,13 @@ message pnc_msg {
   repeated float joint_vel_des = 57;
   repeated float joint_trq_des = 58;
   repeated float joint_velocities = 59;
+
+  // mpc costs
+  uint32 total_iterations = 60;
+  repeated float xreg_costs = 61;
+  repeated float ureg_costs = 62;
+  repeated float xbound_costs = 63;
+  repeated float com_costs = 64;
 }
 
 message rs_teleop_msg {

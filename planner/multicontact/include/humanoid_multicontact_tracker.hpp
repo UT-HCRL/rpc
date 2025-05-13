@@ -3,6 +3,7 @@
 #include <Eigen/Dense>
 
 #include <memory>
+#include <memory>
 #include "crocoddyl/core/fwd.hpp"
 #include "crocoddyl/core/solvers/fddp.hpp"
 #include "crocoddyl/multibody/actions/contact-fwddyn.hpp"
@@ -14,16 +15,19 @@
 #include "util/pkl_utils.hpp"
 #include "util/util.hpp"
 
+class CostRecorderCallback;
+
 class HumanoidMulticontactTracker{
 
     public:
-        HumanoidMulticontactTracker(const std::string&, const std::unordered_map<std::string, mpc_utils::Weights>&, const std::vector<int>&);
+        HumanoidMulticontactTracker(const std::string&, const std::unordered_map<std::string, mpc_utils::Weights>&, const std::vector<int>& = {0}, const bool = false);
         ~HumanoidMulticontactTracker() = default;
 
         void printModel() const;
-
+        void printWeights() const;
         void setConfigPath(const std::string& config_path){config_path_ = config_path;}
 
+        void loadCostMask();
         void loadContactFrames();
         void loadInitialConfiguration();
         void loadRegularizationWeights();
@@ -37,7 +41,6 @@ class HumanoidMulticontactTracker{
         std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameActionModel(const std::vector<std::string>& frame_names);
         std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameTerminalActionModel(const std::vector<std::string>& frame_names);
 
-        unsigned int getT() const { return T_; }
         double getDt() const { return dt_; }
         int getNhorizon() const { return N_horizon_; }
         int getMaxIter() const { return max_iter_; }
@@ -55,7 +58,7 @@ class HumanoidMulticontactTracker{
         void updateTasksGuidesReferences(const double& start_time, const std::unique_ptr<pkl_utils::BezierCurvesManager>& guides_mgr);
 
         void initializeSolver();
-        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, const Eigen::Vector3d& desired_com);
+        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.), std::unordered_map<std::string, pinocchio::SE3> desired_frames = {});
         std::vector<std::string> getTargetFrameNames() const {return track_frame_names_;}
 
     private:
@@ -83,12 +86,13 @@ class HumanoidMulticontactTracker{
         Eigen::VectorXd x0_;
         mpc_utils::Weights w_frame_;
 
-        unsigned int T_;
         double dt_;
         int N_horizon_;
         int max_iter_;
         std::unordered_map<std::string, mpc_utils::Weights> cost_weights_;
         std::unordered_map<std::string, double> frame_targets_;
+    
+        std::vector<int> cost_mask_;
 
         Eigen::VectorXd xreg_weights_;
         double xreg_weight_;
@@ -102,9 +106,9 @@ class HumanoidMulticontactTracker{
         double terminal_xbound_weight_;
         double terminal_com_tracking_weight_;
 
-        std::shared_ptr<crocoddyl::ActivationModelAbstract> xreg_activation_;
         std::shared_ptr<crocoddyl::CostModelAbstract> xreg_cost_;
         std::shared_ptr<crocoddyl::CostModelAbstract> ureg_cost_;
+        std::shared_ptr<crocoddyl::ActivationModelAbstract> xreg_activation_;
 
         std::shared_ptr<crocoddyl::CostModelSum> running_cost_model_;
         std::shared_ptr<crocoddyl::ContactModelMultiple> running_contact_models_;
@@ -113,8 +117,7 @@ class HumanoidMulticontactTracker{
         std::shared_ptr<crocoddyl::ContactModelMultiple> terminal_contact_models_;
 
         std::shared_ptr<crocoddyl::ResidualModelCoMPosition> com_residual_;
-        std::unordered_map<std::string, std::shared_ptr<crocoddyl::ResidualModelFramePlacement>> guides_residual_map_;
-
+        std::unordered_map<std::string, std::shared_ptr<crocoddyl::ResidualModelFramePlacement>> frame_residuals_map_;
         //###########################
 
 
@@ -131,6 +134,8 @@ class HumanoidMulticontactTracker{
 
         std::shared_ptr<crocoddyl::ActuationModelFloatingBase> actuation_;
         std::shared_ptr<crocoddyl::StateMultibody> state_;
+        bool enable_callbacks_;
+        std::shared_ptr<CostRecorderCallback> cost_callback_;
         //#################
 
 };

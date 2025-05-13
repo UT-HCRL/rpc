@@ -56,7 +56,7 @@ namespace pkl_utils {
             }
             return result;
         }
-
+        
         const double _bernstein(double t, int n) const {
             double c1 = binomial_coefficient(h_, n);
             double c2 = (t - a_) / duration_;
