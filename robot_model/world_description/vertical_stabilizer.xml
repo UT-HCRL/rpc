@@ -1,0 +1,15 @@
+<mujoco model="vertical_stabilizer">
+
+    <!-- NOTE: .obj are exported in cm; .stl are exported in .mm (if this is the units in fusion); mujoco expects meters. Scale accordingly. -->
+
+    <asset>
+        <mesh name="vertical_stabilizer_mesh" file="meshes/v_stabilizer.stl" scale="0.001 0.001 0.001"/>
+    </asset>
+
+    <worldbody>
+        <body name="vertical_stabilizer" pos="0 0.5 0.8">
+            <geom type="mesh" mesh="vertical_stabilizer_mesh" rgba="0.4 0.3 0.3 1.0" euler="0 0 0" />
+        </body>
+    </worldbody>
+
+</mujoco>

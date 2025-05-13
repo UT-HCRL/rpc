@@ -1,0 +1,175 @@
+actuator_gains:
+  left_hip_pitch_joint:
+    kp: 5.0
+    kd: 0
+  left_hip_roll_joint:
+    kp: 5
+    kd: 0
+  left_hip_yaw_join:
+    kd: 0
+    kp: 5
+  left_knee_joint:
+    kd: 0
+    kp: 5
+  left_ankle_pitch_joint:
+    kd: 0
+    kp: 5
+  left_ankle_roll_joint:
+    kd: 0
+    kp: 5
+  l_foot_contact:
+    kd: 0
+    kp: 5
+  right_hip_pitch_joint:
+    kd: 0
+    kp: 5
+  right_hip_roll_joint:
+    kd: 0
+    kp: 5
+  right_hip_yaw_joint:
+    kd: 0
+    kp: 5
+  right_knee_joint:
+    kd: 0
+    kp: 5
+  right_ankle_pitch_joint:
+    kd: 0
+    kp: 5
+  right_ankle_roll_joint:
+    kd: 0
+    kp: 5
+  r_foot_contact:
+    kd: 0
+    kp: 5
+  torso_joint:
+    kp: 5
+    kd: 0
+  torso_com_link:
+    kp: 5
+    kd: 0
+  head_link:
+    kp: 5
+    kd: 0
+  left_shoulder_pitch_joint:
+    kp: 5
+    kd: 0
+  left_shoulder_roll_joint:
+    kp: 5
+    kd: 0
+  left_shoulder_yaw_joint:
+    kp: 5
+    kd: 0
+  left_elbow_pitch_joint:
+    kp: 5
+    kd: 0
+  left_elbow_roll_joint:
+    kp: 5
+    kd: 0
+  left_palm_link:
+    kp: 5
+    kd: 0
+  left_zero_joint:
+    kp: 5
+    kd: 0
+  left_one_joint:
+    kp: 5
+    kd: 0
+  left_two_joint:
+    kp: 5
+    kd: 0
+  left_three_joint:
+    kp: 5
+    kd: 0
+  left_four_joint:
+    kp: 5
+    kd: 0
+  left_five_joint:
+    kp: 5
+    kd: 0
+  left_six_joint:
+    kp: 5
+    kd: 0
+  right_shoulder_pitch_joint:
+    kp: 5
+    kd: 0
+  right_shoulder_roll_joint:
+    kp: 5
+    kd: 0
+  right_shoulder_yaw_joint:
+    kp: 5
+    kd: 0
+  right_elbow_pitch_joint:
+    kp: 5
+    kd: 0
+  right_elbow_roll_joint:
+    kp: 5
+    kd: 0
+  right_palm_link:
+    kp: 5
+    kd: 0
+  right_zero_joint:
+    kp: 5
+    kd: 0
+  right_one_joint:
+    kp: 5
+    kd: 0
+  right_two_joint:
+    kp: 5
+    kd: 0
+  right_three_joint:
+    kp: 5
+    kd: 0
+  right_four_joint:
+    kp: 5
+    kd: 0
+  right_five_joint:
+    kp: 5
+    kd: 0
+  right_six_joint:
+    kp: 5
+    kd: 0
+
+initial_config:
+  left_hip_pitch_joint : 0.0
+  left_hip_roll_joint : 0.0
+  left_hip_yaw_joint : 0.0
+  left_knee_joint : 0.0
+  left_ankle_pitch_joint : 0.0
+  left_ankle_roll_joint : 0.0
+  l_foot_contact : 0.0
+  right_hip_pitch_joint : 0.0
+  right_hip_roll_joint : 0.0
+  right_hip_yaw_joint : 0.0
+  right_knee_joint : 0.0
+  right_ankle_pitch_joint : 0.0
+  right_ankle_roll_joint : 0.0
+  r_foot_contact : 0.0
+  torso_joint : 0.0
+  torso_com_link : 0.0
+  head_link : 0.0
+  left_shoulder_pitch_joint : 0.0
+  left_shoulder_roll_joint : 0.0
+  left_shoulder_yaw_joint : 0.0
+  left_elbow_pitch_joint : 0.0
+  left_elbow_roll_joint : 0.0
+  left_palm_link : 0.0
+  left_zero_joint : 0.0
+  left_one_joint : 0.0
+  left_two_joint : 0.0
+  left_three_joint : 0.0
+  left_four_joint : 0.0
+  left_five_joint : 0.0
+  left_six_joint : 0.0
+  right_shoulder_pitch_joint : 0.0
+  right_shoulder_roll_joint : 0.0
+  right_shoulder_yaw_joint : 0.0
+  right_elbow_pitch_joint : 0.0
+  right_elbow_roll_joint : 0.0
+  right_palm_link : 0.0
+  right_zero_joint : 0.0
+  right_one_joint : 0.0
+  right_two_joint : 0.0
+  right_three_joint : 0.0
+  right_four_joint : 0.0
+  right_five_joint : 0.0
+  right_six_joint : 0.0

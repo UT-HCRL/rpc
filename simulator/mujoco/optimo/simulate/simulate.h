@@ -23,12 +23,13 @@
 #include <optional>
 #include <ratio>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
-#include "simulate/platform_ui_adapter.h"
 #include <mujoco/mjui.h>
 #include <mujoco/mujoco.h>
+#include "platform_ui_adapter.h"
 
 #include "controller/interrupt_handler.hpp"
 
@@ -44,15 +45,16 @@ using MutexLock = std::unique_lock<std::recursive_mutex>;
 
 // Simulate states not contained in MuJoCo structures
 class Simulate {
-public:
+ public:
   using Clock = std::chrono::steady_clock;
   static_assert(std::ratio_less_equal_v<Clock::period, std::milli>);
 
   static constexpr int kMaxGeom = 20000;
 
   // create object and initialize the simulate ui
-  Simulate(std::unique_ptr<PlatformUIAdapter> platform_ui_adapter,
-           mjvCamera *cam, mjvOption *opt, mjvPerturb *pert, bool is_passive);
+  Simulate(
+      std::unique_ptr<PlatformUIAdapter> platform_ui_adapter,
+      mjvCamera* cam, mjvOption* opt, mjvPerturb* pert, bool is_passive);
 
   // Synchronize mjModel and mjData state with UI inputs, and update
   // visualization.
@@ -64,10 +66,10 @@ public:
 
   // Request that the Simulate UI display a "loading" message
   // Called prior to Load or LoadMessageClear
-  void LoadMessage(const char *displayed_filename);
+  void LoadMessage(const char* displayed_filename);
 
   // Request that the Simulate UI thread render a new model
-  void Load(mjModel *m, mjData *d, const char *displayed_filename,
+  void Load(mjModel* m, mjData* d, const char* displayed_filename,
             InterruptHandler *interrupt_handler = nullptr);
 
   // Clear the loading message
@@ -88,6 +90,9 @@ public:
   // add state to history buffer
   void AddToHistory();
 
+  // inject control noise
+  void InjectNoise();
+
   // constants
   static constexpr int kMaxFilenameLength = 1000;
 
@@ -96,19 +101,19 @@ public:
   bool is_passive_ = false;
 
   // model and data to be visualized
-  mjModel *mnew_ = nullptr;
-  mjData *dnew_ = nullptr;
+  mjModel* mnew_ = nullptr;
+  mjData* dnew_ = nullptr;
 
-  mjModel *m_ = nullptr;
-  mjData *d_ = nullptr;
+  mjModel* m_ = nullptr;
+  mjData* d_ = nullptr;
 
   InterruptHandler *interrupt_handler_ = nullptr;
 
   int ncam_ = 0;
   int nkey_ = 0;
-  int state_size_ = 0;     // number of mjtNums in a history buffer state
-  int nhistory_ = 0;       // number of states saved in history buffer
-  int history_cursor_ = 0; // cursor pointing at last saved state
+  int state_size_ = 0;      // number of mjtNums in a history buffer state
+  int nhistory_ = 0;        // number of states saved in history buffer
+  int history_cursor_ = 0;  // cursor pointing at last saved state
 
   std::vector<int> body_parentid_;
 
@@ -122,7 +127,7 @@ public:
   std::vector<std::optional<std::pair<mjtNum, mjtNum>>> actuator_ctrlrange_;
   std::vector<std::string> actuator_names_;
 
-  std::vector<mjtNum> history_; // history buffer (nhistory x state_size)
+  std::vector<mjtNum> history_;  // history buffer (nhistory x state_size)
 
   // mjModel and mjData fields that can be modified by the user through the GUI
   std::vector<mjtNum> qpos_;
@@ -145,7 +150,8 @@ public:
     std::optional<std::string> print_data;
     bool reset;
     bool align;
-    bool copy_pose;
+    bool copy_key;
+    bool copy_key_full_precision;
     bool load_from_history;
     bool load_key;
     bool save_key;
@@ -217,8 +223,11 @@ public:
   float measured_slowdown = 1.0;
   // logarithmically spaced real-time slow-down coefficients (percent)
   static constexpr float percentRealTime[] = {
-      100, 80, 66,  50,  40, 33, 25,  20, 16, 13,  10,  8,  6.6, 5.0, 4, 3.3,
-      2.5, 2,  1.6, 1.3, 1,  .8, .66, .5, .4, .33, .25, .2, .16, .13, .1};
+      100, 80, 66,  50,  40, 33,  25,  20, 16,  13,
+      10,  8,  6.6, 5.0, 4,  3.3, 2.5, 2,  1.6, 1.3,
+      1,  .8, .66, .5,  .4, .33, .25, .2, .16, .13,
+     .1
+  };
 
   // control noise
   double ctrl_noise_std = 0.0;
@@ -238,75 +247,81 @@ public:
 
   // abstract visualization
   mjvScene scn;
-  mjvCamera &cam;
-  mjvOption &opt;
-  mjvPerturb &pert;
+  mjvCamera& cam;
+  mjvOption& opt;
+  mjvPerturb& pert;
   mjvFigure figconstraint = {};
   mjvFigure figcost = {};
   mjvFigure figtimer = {};
   mjvFigure figsize = {};
   mjvFigure figsensor = {};
 
-  // additional user-defined visualization geoms (used in passive mode)
-  mjvScene *user_scn = nullptr;
+  // additional user-defined visualization
+  mjvScene* user_scn = nullptr;
   mjtByte user_scn_flags_prev_[mjNRNDFLAG];
+  std::vector<std::pair<mjrRect, mjvFigure>> user_figures_;
+  std::vector<std::tuple<int, int, std::string, std::string>> user_texts_;
+  std::vector<std::tuple<mjrRect, unsigned char*>> user_images_;
 
   // OpenGL rendering and UI
   int refresh_rate = 60;
   int window_pos[2] = {0};
   int window_size[2] = {0};
   std::unique_ptr<PlatformUIAdapter> platform_ui;
-  mjuiState &uistate;
+  mjuiState& uistate;
   mjUI ui0 = {};
   mjUI ui1 = {};
 
   // Constant arrays needed for the option section of UI and the UI interface
   // TODO setting the size here is not ideal
   const mjuiDef def_option[13] = {
-      {mjITEM_SECTION, "Option", 1, nullptr, "AO"},
-      {mjITEM_CHECKINT, "Help", 2, &this->help, " #290"},
-      {mjITEM_CHECKINT, "Info", 2, &this->info, " #291"},
-      {mjITEM_CHECKINT, "Profiler", 2, &this->profiler, " #292"},
-      {mjITEM_CHECKINT, "Sensor", 2, &this->sensor, " #293"},
-      {mjITEM_CHECKINT, "Pause update", 2, &this->pause_update, ""},
-#ifdef __APPLE__
-      {mjITEM_CHECKINT, "Fullscreen", 0, &this->fullscreen, " #294"},
-#else
-      {mjITEM_CHECKINT, "Fullscreen", 1, &this->fullscreen, " #294"},
-#endif
-      {mjITEM_CHECKINT, "Vertical Sync", 1, &this->vsync, ""},
-      {mjITEM_CHECKINT, "Busy Wait", 1, &this->busywait, ""},
-      {mjITEM_SELECT, "Spacing", 1, &this->spacing, "Tight\nWide"},
-      {mjITEM_SELECT, "Color", 1, &this->color,
-       "Default\nOrange\nWhite\nBlack"},
-      {mjITEM_SELECT, "Font", 1, &this->font,
-       "50 %\n100 %\n150 %\n200 %\n250 %\n300 %"},
-      {mjITEM_END}};
+    {mjITEM_SECTION,  "Option",        mjPRESERVE, nullptr,  "AO"},
+    {mjITEM_CHECKINT, "Help",          2, &this->help,       " #290"},
+    {mjITEM_CHECKINT, "Info",          2, &this->info,       " #291"},
+    {mjITEM_CHECKINT, "Profiler",      2, &this->profiler,   " #292"},
+    {mjITEM_CHECKINT, "Sensor",        2, &this->sensor,     " #293"},
+    {mjITEM_CHECKINT, "Pause update",  2, &this->pause_update,    ""},
+  #ifdef __APPLE__
+    {mjITEM_CHECKINT, "Fullscreen",    0, &this->fullscreen, " #294"},
+  #else
+    {mjITEM_CHECKINT, "Fullscreen",    1, &this->fullscreen, " #294"},
+  #endif
+    {mjITEM_CHECKINT, "Vertical Sync", 1, &this->vsync,      ""},
+    {mjITEM_CHECKINT, "Busy Wait",     1, &this->busywait,   ""},
+    {mjITEM_SELECT,   "Spacing",       1, &this->spacing,    "Tight\nWide"},
+    {mjITEM_SELECT,   "Color",         1, &this->color,      "Default\nOrange\nWhite\nBlack"},
+    {mjITEM_SELECT,   "Font",          1, &this->font,       "50 %\n100 %\n150 %\n200 %\n250 %\n300 %"},
+    {mjITEM_END}
+  };
+
 
   // simulation section of UI
   const mjuiDef def_simulation[14] = {
-      {mjITEM_SECTION, "Simulation", 1, nullptr, "AS"},
-      {mjITEM_RADIO, "", 5, &this->run, "Pause\nRun"},
-      {mjITEM_BUTTON, "Reset", 2, nullptr, " #259"},
-      {mjITEM_BUTTON, "Reload", 5, nullptr, "CL"},
-      {mjITEM_BUTTON, "Align", 2, nullptr, "CA"},
-      {mjITEM_BUTTON, "Copy pose", 2, nullptr, "CC"},
-      {mjITEM_SLIDERINT, "Key", 3, &this->key, "0 0"},
-      {mjITEM_BUTTON, "Load key", 3},
-      {mjITEM_BUTTON, "Save key", 3},
-      {mjITEM_SLIDERNUM, "Noise scale", 5, &this->ctrl_noise_std, "0 2"},
-      {mjITEM_SLIDERNUM, "Noise rate", 5, &this->ctrl_noise_rate, "0 2"},
-      {mjITEM_SEPARATOR, "History", 1},
-      {mjITEM_SLIDERINT, "", 5, &this->scrub_index, "0 0"},
-      {mjITEM_END}};
+    {mjITEM_SECTION,   "Simulation",    mjPRESERVE, nullptr,     "AS"},
+    {mjITEM_RADIO,     "",              5, &this->run,           "Pause\nRun"},
+    {mjITEM_BUTTON,    "Reset",         2, nullptr,              " #259"},
+    {mjITEM_BUTTON,    "Reload",        5, nullptr,              "CL"},
+    {mjITEM_BUTTON,    "Align",         2, nullptr,              "CA"},
+    {mjITEM_BUTTON,    "Copy state",    2, nullptr,              "CC"},
+    {mjITEM_SLIDERINT, "Key",           3, &this->key,           "0 0"},
+    {mjITEM_BUTTON,    "Load key",      3},
+    {mjITEM_BUTTON,    "Save key",      3},
+    {mjITEM_SLIDERNUM, "Noise scale",   5, &this->ctrl_noise_std,  "0 1"},
+    {mjITEM_SLIDERNUM, "Noise rate",    5, &this->ctrl_noise_rate, "0 4"},
+    {mjITEM_SEPARATOR, "History",       1},
+    {mjITEM_SLIDERINT, "",              5, &this->scrub_index,     "0 0"},
+    {mjITEM_END}
+  };
+
 
   // watch section of UI
   const mjuiDef def_watch[5] = {
-      {mjITEM_SECTION, "Watch", 0, nullptr, "AW"},
-      {mjITEM_EDITTXT, "Field", 2, this->field, "qpos"},
-      {mjITEM_EDITINT, "Index", 2, &this->index, "1"},
-      {mjITEM_STATIC, "Value", 2, nullptr, " "},
-      {mjITEM_END}};
+    {mjITEM_SECTION,   "Watch",         mjPRESERVE, nullptr,     "AW"},
+    {mjITEM_EDITTXT,   "Field",         2, this->field,          "qpos"},
+    {mjITEM_EDITINT,   "Index",         2, &this->index,         "1"},
+    {mjITEM_STATIC,    "Value",         2, nullptr,              " "},
+    {mjITEM_END}
+  };
 
   // info strings
   char info_title[Simulate::kMaxFilenameLength] = {0};
@@ -318,6 +333,6 @@ public:
   int mesh_upload_ = -1;
   int hfield_upload_ = -1;
 };
-} // namespace mujoco
+}  // namespace mujoco
 
 #endif

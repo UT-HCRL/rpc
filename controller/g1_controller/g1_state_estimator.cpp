@@ -1,0 +1,311 @@
+#include "controller/robot_system/pinocchio_robot_system.hpp"
+
+#include "controller/filter/digital_filters.hpp"
+
+#include "controller/g1_controller/g1_definition.hpp"
+#include "controller/g1_controller/g1_interface.hpp"
+#include "controller/g1_controller/g1_state_estimator.hpp"
+#include "controller/g1_controller/g1_state_provider.hpp"
+
+#if B_USE_ZMQ
+#include "controller/g1_controller/g1_data_manager.hpp"
+#endif
+
+#include <string>
+
+G1StateEstimator::G1StateEstimator(PinocchioRobotSystem *robot,
+                                         const YAML::Node &cfg)
+    : StateEstimator(robot), R_imu_base_com_(Eigen::Matrix3d::Identity()),
+      global_leg_odometry_(Eigen::Vector3d::Zero()),
+      prev_base_joint_pos_(Eigen::Vector3d::Zero()), b_first_visit_(true),
+      com_vel_exp_filter_(nullptr) {
+  util::PrettyConstructor(1, "G1StateEstimator");
+
+  sp_ = G1StateProvider::GetStateProvider();
+
+  // assume start with double support
+  sp_->b_lf_contact_ = true;
+  sp_->b_rf_contact_ = true;
+
+  R_imu_base_com_ =
+      robot_->GetLinkIsometry(g1_link::imu_in_torso).linear().transpose() *
+      robot_->GetLinkIsometry(g1_link::torso_com_link).linear();
+
+  try {
+    // set the foot that will be used to estimate base in first_visit
+    int foot_frame = util::ReadParameter<int>(cfg["state_estimator"],
+                                              "foot_reference_frame");
+    if (foot_frame == 0) {
+      sp_->stance_foot_ = g1_link::l_foot_contact;
+      sp_->prev_stance_foot_ = g1_link::l_foot_contact;
+    } else {
+      sp_->stance_foot_ = g1_link::r_foot_contact;
+      sp_->prev_stance_foot_ = g1_link::r_foot_contact;
+    }
+
+    com_vel_filter_type_ =
+        util::ReadParameter<int>(cfg["state_estimator"], "com_vel_filter_type");
+    if (com_vel_filter_type_ == com_vel_filter::kMovingAverage) {
+      Eigen::Vector3d num_data_com_vel = util::ReadParameter<Eigen::Vector3d>(
+          cfg["state_estimator"], "num_data_com_vel");
+      com_vel_mv_avg_filter_.clear();
+      for (int i = 0; i < 3; i++) {
+        com_vel_mv_avg_filter_.push_back(
+            new SimpleMovingAverage(num_data_com_vel[i]));
+      }
+    } else if (com_vel_filter_type_ == com_vel_filter::kExponentialSmoother) {
+      double time_constant = util::ReadParameter<double>(
+          cfg["state_estimator"], "com_vel_time_constant");
+      Eigen::VectorXd com_vel_err_limit = util::ReadParameter<Eigen::VectorXd>(
+          cfg["state_estimator"], "com_vel_err_limit");
+      com_vel_exp_filter_ = new ExponentialMovingAverageFilter(
+          sp_->servo_dt_, time_constant, Eigen::VectorXd::Zero(3),
+          -com_vel_err_limit, com_vel_err_limit);
+    } else if (com_vel_filter_type_ == com_vel_filter::kLowPassFilter) {
+      double cut_off_period =
+          util::ReadParameter<double>(cfg["state_estimator"], "cut_off_period");
+      com_vel_lp_filter_ =
+          new LowPassVelocityFilter(sp_->servo_dt_, cut_off_period, 3);
+    }
+  } catch (const std::runtime_error &e) {
+    std::cerr << "Error reading parameter [" << e.what() << "] at file: ["
+              << __FILE__ << "]" << std::endl;
+  }
+
+#if B_USE_MATLOGGER
+  logger_ = XBot::MatLogger2::MakeLogger("/tmp/g1_state_estimator_data");
+  logger_->set_buffer_mode(XBot::VariableBuffer::Mode::producer_consumer);
+  appender_ = XBot::MatAppender::MakeInstance();
+  appender_->add_logger(logger_);
+  appender_->start_flush_thread();
+#endif
+}
+
+G1StateEstimator::~G1StateEstimator() {
+  while (!com_vel_mv_avg_filter_.empty()) {
+    delete com_vel_mv_avg_filter_.back();
+    com_vel_mv_avg_filter_.pop_back();
+  }
+  if (com_vel_exp_filter_ != nullptr)
+    delete com_vel_exp_filter_;
+}
+
+void G1StateEstimator::Initialize(G1SensorData *sensor_data) {
+  robot_->UpdateRobotModel(
+      Eigen::Vector3d::Zero(), Eigen::Quaterniond::Identity(),
+      Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(), sensor_data->joint_pos_,
+      sensor_data->joint_vel_, false);
+
+  // save data
+#if B_USE_MATLOGGER
+  if (sp_->count_ % sp_->data_save_freq_ == 0) {
+    // joint encoder data
+    logger_->add("joint_pos_act", sensor_data->joint_pos_);
+    logger_->add("joint_vel_act", sensor_data->joint_vel_);
+  }
+#endif
+}
+
+void G1StateEstimator::Update(G1SensorData *sensor_data) {
+
+  // Estimate floating base orientation
+  Eigen::Quaterniond imu_quat(
+      sensor_data->imu_frame_quat_[3], sensor_data->imu_frame_quat_[0],
+      sensor_data->imu_frame_quat_[1], sensor_data->imu_frame_quat_[2]);
+  Eigen::Matrix3d base_joint_ori_rot =
+      imu_quat.normalized().toRotationMatrix() * R_imu_base_com_;
+
+  // TODO imu angular velocity filtering for real experiment -> PnC does not use
+  // this in controller
+
+  // Update robot model only with base orientation
+  robot_->UpdateRobotModel(Eigen::Vector3d::Zero(),
+                           Eigen::Quaterniond(base_joint_ori_rot).normalized(),
+                           Eigen::Vector3d::Zero(), sensor_data->imu_ang_vel_,
+                           sensor_data->joint_pos_, sensor_data->joint_vel_,
+                           false);
+
+  // Estimate floating base position
+  // anchor frame depending on the stance foot
+  Eigen::Vector3d anchor_frame_pos =
+      robot_->GetLinkIsometry(sp_->stance_foot_).translation();
+  Eigen::Vector3d anchor_frame_vel =
+      robot_->GetLinkSpatialVel(sp_->stance_foot_).tail<3>();
+  if (sp_->stance_foot_ != sp_->prev_stance_foot_) {
+    Eigen::Vector3d anchor_frame_pos_diff =
+        anchor_frame_pos -
+        robot_->GetLinkIsometry(sp_->prev_stance_foot_).translation();
+    global_leg_odometry_ += anchor_frame_pos_diff;
+  }
+
+  // estimate position
+  Eigen::Vector3d base_joint_pos = global_leg_odometry_ - anchor_frame_pos;
+  if (b_first_visit_) {
+    prev_base_joint_pos_ = base_joint_pos;
+    b_first_visit_ = false;
+  }
+
+  // estimate base linear velocity
+  Eigen::Vector3d base_joint_lin_vel =
+      (base_joint_pos - prev_base_joint_pos_) / sp_->servo_dt_;
+
+  // save current time step data
+  sp_->prev_stance_foot_ = sp_->stance_foot_;
+  prev_base_joint_pos_ = base_joint_pos;
+
+  // Update robot model with full estimate
+  robot_->UpdateRobotModel(
+      base_joint_pos, Eigen::Quaterniond(base_joint_ori_rot).normalized(),
+      base_joint_lin_vel, sensor_data->imu_ang_vel_, sensor_data->joint_pos_,
+      sensor_data->joint_vel_, true);
+
+  // TODO:foot contact switch
+  // sp_->b_lf_contact_ = (sensor_data->b_lf_contact_) ? true : false;
+  // sp_->b_rf_contact_ = (sensor_data->b_rf_contact_) ? true : false;
+
+  // velocity filtering for com vel (for real experiment)
+  Eigen::Vector3d real_com_vel = robot_->GetRobotComLinVel();
+  if (com_vel_filter_type_ == com_vel_filter::kMovingAverage) {
+    for (int i = 0; i < 3; ++i) {
+      com_vel_mv_avg_filter_[i]->Input(real_com_vel[i]);
+      sp_->com_vel_est_[i] = com_vel_mv_avg_filter_[i]->Output();
+    }
+  } else if (com_vel_filter_type_ == com_vel_filter::kExponentialSmoother) {
+    Eigen::VectorXd real_com_vel_xd(3);
+    real_com_vel_xd << real_com_vel;
+    com_vel_exp_filter_->Input(real_com_vel_xd);
+    Eigen::VectorXd output = com_vel_exp_filter_->Output();
+    sp_->com_vel_est_ << output[0], output[1], output[2];
+  } else if (com_vel_filter_type_ == com_vel_filter::kLowPassFilter) {
+    Eigen::Vector3d com_pos = robot_->GetRobotComPos();
+
+    if (b_lp_first_visit_) {
+      com_vel_lp_filter_->Reset(com_pos);
+      b_lp_first_visit_ = false;
+    }
+
+    com_vel_lp_filter_->Input(com_pos);
+    Eigen::VectorXd output = com_vel_lp_filter_->Output();
+    sp_->com_vel_est_ << output[0], output[1], output[2];
+  }
+
+  // compute dcm
+  this->_ComputeDCM();
+
+  // compute CAM
+  sp_->cam_est_ = robot_->GetHg().head<3>();
+
+#if B_USE_ZMQ
+  if (sp_->count_ % sp_->data_save_freq_ == 0) {
+    // Save estimated floating base joint states
+    G1DataManager *dm = G1DataManager::GetDataManager();
+    dm->data_->est_base_joint_pos_ = base_joint_pos;
+    Eigen::Quaterniond base_joint_quat(base_joint_ori_rot);
+    dm->data_->est_base_joint_ori_ = base_joint_quat.normalized().coeffs();
+
+    // Save joint pos data
+    dm->data_->joint_positions_ = sensor_data->joint_pos_;
+
+    dm->data_->est_icp = sp_->dcm_.head<2>();
+    // for simulation only (ground truth data from simulator)
+    // dm->data_->base_joint_pos_ = sensor_data->base_joint_pos_;
+    // dm->data_->base_joint_ori_ = sensor_data->base_joint_quat_;
+    // dm->data_->base_joint_lin_vel_ = sensor_data->base_joint_lin_vel_;
+    // dm->data_->base_joint_ang_vel_ = sensor_data->base_joint_ang_vel_;
+  }
+#endif
+
+  // save data
+#if B_USE_MATLOGGER
+  if (sp_->count_ % sp_->data_save_freq_ == 0) {
+    // joint encoder data
+    logger_->add("joint_pos_act", sensor_data->joint_pos_);
+    logger_->add("joint_vel_act", sensor_data->joint_vel_);
+
+    // floating base estimate data
+    logger_->add("base_joint_pos_est", base_joint_pos);
+    logger_->add("base_joint_rpy_est", util::RPYFromSO3(base_joint_ori_rot));
+    logger_->add("base_joint_lin_vel_est", base_joint_lin_vel);
+    logger_->add("base_joint_ang_vel_est", sensor_data->imu_ang_vel_);
+
+    // com velocities
+    logger_->add("com_vel_raw", real_com_vel);
+    logger_->add("com_vel_est", sp_->com_vel_est_);
+
+    // icp data
+    logger_->add("icp_est", sp_->dcm_.head<2>());
+    logger_->add("icp_vel_est", sp_->dcm_vel_.head<2>());
+
+    // TODO: imu ang vel
+  }
+#endif
+}
+
+void G1StateEstimator::_ComputeDCM() {
+  Eigen::Vector3d com_pos = robot_->GetRobotComPos();
+  Eigen::Vector3d com_vel = sp_->com_vel_est_; // TODO: use filtered com vel
+  double omega = sqrt(9.81 / com_pos[2]);
+
+  sp_->prev_dcm_ = sp_->dcm_;
+  sp_->dcm_ = com_pos + com_vel / omega;
+
+  double cutoff_period =
+      0.01; // 10ms cut-off period for first-order low pass filter
+  double alpha = sp_->servo_dt_ / cutoff_period;
+
+  sp_->dcm_vel_ = alpha * (sp_->dcm_ - sp_->prev_dcm_) / sp_->servo_dt_ +
+                  (1 - alpha) * sp_->dcm_vel_; // not being used in controller
+}
+
+void G1StateEstimator::UpdateGroundTruthSensorData(
+    G1SensorData *sensor_data) {
+  Eigen::Vector4d base_joint_ori = sensor_data->base_joint_quat_;
+  Eigen::Quaterniond base_joint_quat(base_joint_ori[3], base_joint_ori[0],
+                                     base_joint_ori[1], base_joint_ori[2]);
+
+  robot_->UpdateRobotModel(
+      sensor_data->base_joint_pos_, base_joint_quat.normalized(),
+      sensor_data->base_joint_lin_vel_, sensor_data->base_joint_ang_vel_,
+      sensor_data->joint_pos_, sensor_data->joint_vel_, true);
+
+  // compute DCM
+  Eigen::Vector3d com_pos = robot_->GetRobotComPos();
+  Eigen::Vector3d com_vel = robot_->GetRobotComLinVel();
+  sp_->com_vel_est_ = com_vel;
+  double omega = sqrt(9.81 / com_pos[2]);
+
+  sp_->prev_dcm_ = sp_->dcm_;
+  sp_->dcm_ = com_pos + com_vel / omega;
+
+  double cutoff_period =
+      0.01; // 10ms cut-off period for first-order low pass filter
+  double alpha = sp_->servo_dt_ / cutoff_period;
+
+  sp_->dcm_vel_ = alpha * (sp_->dcm_ - sp_->prev_dcm_) / sp_->servo_dt_ +
+                  (1 - alpha) * sp_->dcm_vel_; // not being used in controller
+
+#if B_USE_ZMQ
+  if (sp_->count_ % sp_->data_save_freq_ == 0) {
+    G1DataManager *dm = G1DataManager::GetDataManager();
+    // dm->data_->base_joint_pos_ = sensor_data->base_joint_pos_;
+    // dm->data_->base_joint_ori_ = sensor_data->base_joint_quat_;
+    // dm->data_->base_joint_lin_vel_ = sensor_data->base_joint_lin_vel_;
+    // dm->data_->base_joint_ang_vel_ = sensor_data->base_joint_ang_vel_;
+
+    dm->data_->est_base_joint_pos_ = sensor_data->base_joint_pos_;
+    dm->data_->est_base_joint_ori_ = sensor_data->base_joint_quat_;
+    dm->data_->joint_positions_ = sensor_data->joint_pos_;
+
+    dm->data_->est_icp = sp_->dcm_.head<2>();
+    dm->data_->b_lfoot_ = sp_->b_lf_contact_;
+    dm->data_->b_rfoot_ = sp_->b_rf_contact_;
+  }
+#endif
+#if B_USE_MATLOGGER
+  if (sp_->count_ % sp_->data_save_freq_ == 0) {
+    // joint encoder data
+    logger_->add("joint_pos_act", sensor_data->joint_pos_);
+    logger_->add("joint_vel_act", sensor_data->joint_vel_);
+  }
+#endif
+}

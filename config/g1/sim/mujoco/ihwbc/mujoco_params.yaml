@@ -1,0 +1,132 @@
+actuator_gains:
+  left_hip_pitch_joint:
+    kp: 80
+    kd: 4
+  left_hip_roll_joint:
+    kp: 80
+    kd: 4
+  left_hip_yaw_joint:
+    kp: 80
+    kd: 4
+  left_knee_joint:
+    kp: 50
+    kd: 5
+  left_ankle_pitch_joint:
+    kp: 40
+    kd: 2
+  left_ankle_roll_joint:
+    kp: 40
+    kd: 2
+  right_hip_pitch_joint:
+    kp: 80
+    kd: 4
+  right_hip_roll_joint:
+    kp: 80
+    kd: 4
+  right_hip_yaw_joint:
+    kp: 80
+    kd: 4
+  right_knee_joint:
+    kp: 50
+    kd: 5
+  right_ankle_pitch_joint:
+    kp: 40
+    kd: 2
+  right_ankle_roll_joint:
+    kp: 40
+    kd: 2
+  waist_yaw_joint:
+    kp: 40
+    kd: 6
+  left_shoulder_pitch_joint:
+    kp: 80
+    kd: 4
+  left_shoulder_roll_joint:
+    kp: 80
+    kd: 4
+  left_shoulder_yaw_joint:
+    kp: 40
+    kd: 5
+  left_elbow_joint:
+    kp: 40
+    kd: 5
+  left_wrist_roll_joint:
+    kp: 40
+    kd: 5
+  left_wrist_pitch_joint:
+    kp: 40
+    kd: 5
+  left_wrist_yaw_joint:
+    kp: 40
+    kd: 5
+  right_shoulder_pitch_joint:
+    kp: 80
+    kd: 4
+  right_shoulder_roll_joint:
+    kp: 80
+    kd: 4
+  right_shoulder_yaw_joint:
+    kp: 40
+    kd: 5
+  right_elbow_joint:
+    kp: 30
+    kd: 5
+  right_wrist_roll_joint:
+    kp: 40
+    kd: 5
+  right_wrist_pitch_joint:
+    kp: 40
+    kd: 5
+  right_wrist_yaw_joint:
+    kp: 40
+    kd: 5
+
+initial_config:
+  base_pos_x: 0.
+  base_pos_y: 0.
+  base_pos_z: 0.9
+  base_quat_w: 1.
+  base_quat_x: 0.
+  base_quat_y: 0.
+  base_quat_z: 0.
+  left_hip_pitch_joint: -0.524
+  left_hip_roll_joint: 0.
+  left_hip_yaw_joint: 0.
+  left_knee_joint: 0.785
+  left_ankle_pitch_joint: -0.262
+  left_ankle_roll_joint: 0.
+  right_hip_pitch_joint: -0.524
+  right_hip_roll_joint: 0.
+  right_hip_yaw_joint: 0.
+  right_knee_joint: 0.785
+  right_ankle_pitch_joint: -0.262
+  right_ankle_roll_joint: 0.
+  waist_yaw_joint: 0.
+  left_shoulder_pitch_joint: 0.
+  left_shoulder_roll_joint: 0.524
+  left_shoulder_yaw_joint: 0.
+  left_elbow_joint: 1.571
+  left_wrist_roll_joint: 0
+  left_wrist_pitch_joint: 0
+  left_wrist_yaw_joint: 0
+  left_five_joint: 0
+  left_six_joint: 0
+  left_three_joint: 0.
+  left_four_joint: 0.
+  left_zero_joint: 0.
+  left_one_joint: 0.
+  left_two_joint: 0.
+  right_shoulder_pitch_joint: 0.
+  right_shoulder_roll_joint: -0.524
+  right_shoulder_yaw_joint: 0.
+  right_elbow_joint: 1.571
+  right_wrist_roll_joint: 0.
+  right_wrist_pitch_joint: 0.
+  right_wrist_yaw_joint: 0.
+  right_five_joint: 0.
+  right_six_joint: 0.
+  right_three_joint: 0.
+  right_four_joint: 0.
+  right_zero_joint: 0.
+  right_one_joint: 0.
+  right_two_joint: 0.

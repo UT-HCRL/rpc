@@ -1,0 +1,50 @@
+cff-version: 1.0.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Bang"
+  given-names: "Seung Hyeon"
+- family-names: "Gonzalez"
+  given-names: "Carlos"
+- family-names: "Moore"
+  given-names: "Gabriel"
+- family-names: "Kang"
+  given-names: "Dong Ho"
+- family-names: "Seo"
+  given-names: "Mingyo"
+- family-names: "Gupta"
+  given-names: "Ryan"
+- family-names: "Sentis"
+  given-names: "Luis"
+title: "RPC: A Modular Framework for Robot Planning, Control, and Deployment"
+version: 1.0.0
+doi: 10.1109/SII59315.2025.10871130
+date-released: 2025-01-21
+url: "https://github.com/shbang91/rpc"
+license: "MIT"
+
+preferred-citation:
+  type: article
+  authors:
+  - family-names: "Bang"
+    given-names: "Seung Hyeon"
+  - family-names: "Gonzalez"
+    given-names: "Carlos"
+  - family-names: "Moore"
+    given-names: "Gabriel"
+  - family-names: "Kang"
+    given-names: "Dong Ho"
+  - family-names: "Seo"
+    given-names: "Mingyo"
+  - family-names: "Gupta"
+    given-names: "Ryan"
+  - family-names: "Sentis"
+    given-names: "Luis"
+  doi: "10.1109/SII59315.2025.10871130"
+  journal: "RPC: A Modular Framework for Robot Planning, Control, and Deployment"
+  month: 01
+  start: 1142 # First page number
+  end: 1148 # Last page number
+  title: "RPC: A Modular Framework for Robot Planning, Control, and Deployment"
+  issue:
+  volume:
+  year: 2025

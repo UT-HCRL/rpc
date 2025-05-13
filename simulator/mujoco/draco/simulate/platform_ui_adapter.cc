@@ -12,16 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "simulate/platform_ui_adapter.h"
+#include "platform_ui_adapter.h"
 
 #include <chrono>
 
 namespace mujoco {
-PlatformUIAdapter::PlatformUIAdapter() { mjr_defaultContext(&con_); }
+PlatformUIAdapter::PlatformUIAdapter() {
+  mjr_defaultContext(&con_);
+}
 
-void PlatformUIAdapter::FreeMjrContext() { mjr_freeContext(&con_); }
+void PlatformUIAdapter::FreeMjrContext() {
+  mjr_freeContext(&con_);
+}
 
-bool PlatformUIAdapter::RefreshMjrContext(const mjModel *m, int fontscale) {
+bool PlatformUIAdapter::RefreshMjrContext(const mjModel* m, int fontscale) {
   if (m != last_model_ || fontscale != last_fontscale_) {
     mjr_makeContext(m, &con_, fontscale);
     last_model_ = m;
@@ -31,9 +35,11 @@ bool PlatformUIAdapter::RefreshMjrContext(const mjModel *m, int fontscale) {
   return false;
 }
 
-bool PlatformUIAdapter::EnsureContextSize() { return false; }
+bool PlatformUIAdapter::EnsureContextSize() {
+  return false;
+}
 
-void PlatformUIAdapter::OnFilesDrop(int count, const char **paths) {
+void PlatformUIAdapter::OnFilesDrop(int count, const char** paths) {
   state_.type = mjEVENT_FILESDROP;
   state_.dropcount = count;
   state_.droppaths = paths;
@@ -64,8 +70,7 @@ void PlatformUIAdapter::OnKey(int key, int scancode, int act) {
   state_.type = mjEVENT_KEY;
   state_.key = mj_key;
   state_.keytime = std::chrono::duration<double>(
-                       std::chrono::steady_clock::now().time_since_epoch())
-                       .count();
+      std::chrono::steady_clock::now().time_since_epoch()).count();
 
   // application-specific processing
   if (event_callback_) {
@@ -75,7 +80,7 @@ void PlatformUIAdapter::OnKey(int key, int scancode, int act) {
   last_key_ = mj_key;
 }
 
-void PlatformUIAdapter::OnMouseButton(int button, int act) {
+void PlatformUIAdapter::OnMouseButton(int button, int act)  {
   // translate API-specific mouse button code
   mjtButton mj_button = TranslateMouseButton(button);
 
@@ -94,8 +99,7 @@ void PlatformUIAdapter::OnMouseButton(int button, int act) {
   // press
   if (IsMouseButtonDownEvent(act)) {
     double now = std::chrono::duration<double>(
-                     std::chrono::steady_clock::now().time_since_epoch())
-                     .count();
+        std::chrono::steady_clock::now().time_since_epoch()).count();
 
     // detect doubleclick: 250 ms
     if (mj_button == state_.button && now - state_.buttontime < 0.25) {
@@ -181,8 +185,7 @@ void PlatformUIAdapter::OnWindowResize(int width, int height) {
   auto [buf_width, buf_height] = GetFramebufferSize();
   state_.rect[0].width = buf_width;
   state_.rect[0].height = buf_height;
-  if (state_.nrect < 1)
-    state_.nrect = 1;
+  if (state_.nrect < 1) state_.nrect = 1;
 
   // update window layout
   if (layout_callback_) {
@@ -240,8 +243,6 @@ void PlatformUIAdapter::UpdateMjuiState() {
   state_.y = y;
 
   // find mouse rectangle
-  state_.mouserect = mjr_findRect(mju_round(x), mju_round(y), state_.nrect - 1,
-                                  state_.rect + 1) +
-                     1;
+  state_.mouserect = mjr_findRect(mju_round(x), mju_round(y), state_.nrect-1, state_.rect+1) + 1;
 }
-} // namespace mujoco
+}  // namespace mujoco

@@ -442,7 +442,7 @@ void PhysicsLoop(mj::Simulate &sim) {
       if (mnew)
         dnew = mj_makeData(mnew);
       if (dnew) {
-        sim.Load(mnew, dnew, sim.dropfilename);
+        sim.Load(mnew, dnew, sim.dropfilename, optimo_interface->interrupt_handler_);
 
         // lock the sim mutex
         const std::unique_lock<std::recursive_mutex> lock(sim.mtx);
@@ -647,7 +647,7 @@ void PhysicsThread(mj::Simulate *sim, const char *filename) {
 
       // Pass keystroke interrupt
       //**********************************************
-      sim->Load(m, d, filename, optimo_interface->interrupt_handler_);
+      sim->Load(m, d, filename);
       //**********************************************
 
       // Set up mujoco joint & actuator maps based on the mujoco model

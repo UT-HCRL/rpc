@@ -1,0 +1,132 @@
+#include "controller/g1_controller/g1_task/g1_com_task.hpp"
+#include "controller/g1_controller/g1_definition.hpp"
+#include "controller/g1_controller/g1_state_provider.hpp"
+#include "controller/robot_system/pinocchio_robot_system.hpp"
+
+G1ComTask::G1ComTask(PinocchioRobotSystem *robot)
+    : Task(robot, 3), com_feedback_source_(com_feedback_source::kComFeedback),
+      com_height_target_source_(com_height_target_source::kComHeight),
+      b_sim_(true) {
+  util::PrettyConstructor(3, "G1CoMTask");
+
+  sp_ = G1StateProvider::GetStateProvider();
+}
+
+void G1ComTask::UpdateOpCommand(const Eigen::Matrix3d &world_R_local) {
+  if (com_feedback_source_ == com_feedback_source::kComFeedback) {
+    Eigen::Vector3d com_pos = robot_->GetRobotComPos();
+    Eigen::Vector3d com_vel =
+        b_sim_ ? robot_->GetRobotComLinVel() : sp_->com_vel_est_;
+
+    pos_ << com_pos[0], com_pos[1], com_pos[2];
+    vel_ << com_vel[0], com_vel[1], com_vel[2];
+
+    if (com_height_target_source_ == com_height_target_source::kBaseHeight) {
+      pos_[2] =
+          robot_->GetLinkIsometry(g1_link::torso_com_link).translation()[2];
+      vel_[2] = robot_->GetLinkSpatialVel(g1_link::torso_com_link)[5];
+    }
+
+    pos_err_ = des_pos_ - pos_;
+    vel_err_ = des_vel_ - vel_;
+
+    op_cmd_ =
+        des_acc_ + kp_.cwiseProduct(pos_err_) + kd_.cwiseProduct(vel_err_);
+
+  } else if (com_feedback_source_ == com_feedback_source::kDcmFeedback) {
+    Eigen::Vector3d com_pos = robot_->GetRobotComPos();
+    Eigen::Vector3d com_vel =
+        b_sim_ ? robot_->GetRobotComLinVel() : sp_->com_vel_est_;
+
+    // TODO:  should be desired com height not base height
+    double omega = sqrt(9.81 / des_pos_[2]);
+    Eigen::Vector2d des_icp = des_pos_.head<2>() + des_vel_.head<2>() / omega;
+    Eigen::Vector2d des_icp_dot =
+        des_vel_.head<2>() + des_acc_.head<2>() / omega;
+
+    if (com_height_target_source_ == com_height_target_source::kBaseHeight) {
+      pos_[2] =
+          robot_->GetLinkIsometry(g1_link::torso_com_link).translation()[2];
+      vel_[2] = robot_->GetLinkSpatialVel(g1_link::torso_com_link)[5];
+    }
+
+    // TODO: add integral feedback control law
+    Eigen::Vector2d des_cmp =
+        sp_->dcm_.head<2>() - des_icp_dot / omega +
+        kp_.head<2>().cwiseProduct(sp_->dcm_.head<2>() - des_icp);
+
+    op_cmd_.head<2>() = omega * omega * (com_pos.head<2>() - des_cmp);
+    op_cmd_[2] = des_acc_[2] + kp_[2] * (des_pos_[2] - com_pos[2]) +
+                 kd_[2] * (des_vel_[2] - com_vel[2]);
+  } else {
+    throw std::invalid_argument("No Matching Feedback Source on CoM Task");
+  }
+}
+
+void G1ComTask::UpdateJacobian() {
+  if (com_height_target_source_ == com_height_target_source::kComHeight) {
+    jacobian_ = robot_->GetComLinJacobian();
+  } else if (com_height_target_source_ ==
+             com_height_target_source::kBaseHeight) {
+    jacobian_.block(0, 0, 2, robot_->NumQdot()) =
+        robot_->GetComLinJacobian().block(0, 0, 2, robot_->NumQdot());
+    jacobian_.block(2, 0, 1, robot_->NumQdot()) =
+        robot_->GetLinkJacobian(g1_link::torso_com_link)
+            .block(5, 0, 1, robot_->NumQdot());
+  } else {
+    throw std::invalid_argument("No Matching CoM Task Jacobian");
+  }
+}
+
+void G1ComTask::UpdateJacobianDotQdot() {
+  if (com_height_target_source_ == com_height_target_source::kComHeight) {
+    jacobian_dot_q_dot_ = robot_->GetComLinJacobianDotQdot();
+  } else if (com_height_target_source_ ==
+             com_height_target_source::kBaseHeight) {
+    jacobian_dot_q_dot_.head<2>() =
+        robot_->GetComLinJacobianDotQdot().head<2>();
+    jacobian_dot_q_dot_[2] =
+        robot_->GetLinkJacobianDotQdot(g1_link::torso_com_link)[5];
+  } else {
+    throw std::invalid_argument("No Matching CoM Task JacobianDotQdot");
+  }
+}
+
+void G1ComTask::SetParameters(const YAML::Node &node,
+                                 const WBC_TYPE wbc_type) {
+  try {
+
+    std::string test_env_name = util::ReadParameter<std::string>(node, "env");
+    if (test_env_name == "hw") {
+      b_sim_ = false;
+    }
+
+    util::ReadParameter(node, "com_feedback_source", com_feedback_source_);
+    util::ReadParameter(node, "com_height_target_source",
+                        com_height_target_source_);
+    // TODO:
+    sp_->b_use_base_height_ =
+        com_height_target_source_ == com_height_target_source::kBaseHeight
+            ? true
+            : false;
+
+    if (com_feedback_source_ == com_feedback_source::kComFeedback) {
+      util::ReadParameter(node, "kp", kp_);
+      util::ReadParameter(node, "kd", kd_);
+    } else if (com_feedback_source_ == com_feedback_source::kDcmFeedback) {
+      util::ReadParameter(node, "icp_kp", kp_);
+      util::ReadParameter(node, "icp_kd", kd_);
+      util::ReadParameter(node, "icp_ki", ki_);
+    } else {
+      throw std::invalid_argument("No Matching CoM Feedback Source");
+    }
+  } catch (const std::runtime_error &e) {
+    std::cerr << "Error reading parameter [" << e.what() << "] at file: ["
+              << __FILE__ << "]" << std::endl;
+    std::exit(EXIT_FAILURE);
+  } catch (const std::invalid_argument &ex) {
+    std::cerr << "Error: " << ex.what() << " at file: [" << __FILE__ << "]"
+              << std::endl;
+    std::exit(EXIT_FAILURE);
+  }
+}

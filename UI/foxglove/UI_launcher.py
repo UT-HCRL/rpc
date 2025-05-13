@@ -26,7 +26,7 @@ parser.add_argument(
     "--visualizer", choices=["none", "meshcat", "foxglove"], default="none"
 )
 parser.add_argument(
-    "--robot", choices=["draco", "fixe_draco", "manipulator"], default="draco"
+    "--robot", choices=["draco", "g1", "fixed_draco", "manipulator"], default="draco"
 )
 parser.add_argument("--hw_or_sim", choices=["hw", "sim"], default="sim")
 args = parser.parse_args()
@@ -615,11 +615,20 @@ data_saver = DataSaver()
 #
 if args.visualizer != "none":
     # both meshcat and foxglove make use of Pinocchio model and model data
-    model, collision_model, visual_model = pin.buildModelsFromUrdf(
-        "robot_model/draco/draco_modified.urdf",
-        "robot_model/draco",
-        pin.JointModelFreeFlyer(),
-    )
+    if args.robot == "draco":
+        model, collision_model, visual_model = pin.buildModelsFromUrdf(
+            "robot_model/draco/draco_modified.urdf",
+            "robot_model/draco",
+            pin.JointModelFreeFlyer(),
+        )
+    elif args.robot == "g1":
+        model, collision_model, visual_model = pin.buildModelsFromUrdf(
+            "robot_model/g1/g1_29dof_lock_waist.urdf",
+            "robot_model/g1",
+            pin.JointModelFreeFlyer(),
+        )
+    else:
+        raise NotImplementedError(f"Specify location of URDF of {args.robot}")
 
     data, collision_data, visual_data = pin.createDatas(
         model, collision_model, visual_model
@@ -637,7 +646,7 @@ if args.visualizer != "none":
             )
             print(err)
             exit()
-        viz.loadViewerModel(rootNodeName="draco3")
+        viz.loadViewerModel(rootNodeName=args.robot)
 
         # add other visualizations to viewer
         com_des_viz, com_des_model = vis_tools.add_sphere(

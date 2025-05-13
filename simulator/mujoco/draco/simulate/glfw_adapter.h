@@ -17,18 +17,18 @@
 
 #include <utility>
 
-#include "simulate/platform_ui_adapter.h"
 #include <GLFW/glfw3.h>
 #include <mujoco/mujoco.h>
+#include "platform_ui_adapter.h"
 
 #ifdef __APPLE__
-#include "simulate/glfw_corevideo.h"
 #include <optional>
+#include "glfw_corevideo.h"
 #endif
 
 namespace mujoco {
 class GlfwAdapter : public PlatformUIAdapter {
-public:
+ public:
   GlfwAdapter();
   ~GlfwAdapter() override;
 
@@ -38,9 +38,9 @@ public:
   std::pair<int, int> GetWindowSize() const override;
   bool IsGPUAccelerated() const override;
   void PollEvents() override;
-  void SetClipboardString(const char *text) override;
+  void SetClipboardString(const char* text) override;
   void SetVSync(bool enabled) override;
-  void SetWindowTitle(const char *title) override;
+  void SetWindowTitle(const char* title) override;
   bool ShouldCloseWindow() const override;
   void SwapBuffers() override;
   void ToggleFullscreen() override;
@@ -59,9 +59,9 @@ public:
   int TranslateKeyCode(int key) const override;
   mjtButton TranslateMouseButton(int button) const override;
 
-private:
+ private:
   GLFWvidmode vidmode_;
-  GLFWwindow *window_;
+  GLFWwindow* window_;
 
   // store last window information when going to full screen
   std::pair<int, int> window_pos_;
@@ -73,6 +73,6 @@ private:
   std::optional<GlfwCoreVideo> core_video_;
 #endif
 };
-} // namespace mujoco
+}  // namespace mujoco
 
-#endif // MUJOCO_SIMULATE_GLFW_ADAPTER_H_
+#endif  // MUJOCO_SIMULATE_GLFW_ADAPTER_H_
