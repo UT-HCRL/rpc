@@ -38,7 +38,7 @@ class HumanoidMulticontactTracker{
         void setInitialJointConfiguration(const Eigen::VectorXd& q0);
         void setFrames(const std::vector<std::string>& frame_names);
 
-        std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameActionModel(const std::vector<std::string>& frame_names);
+        std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameActionModel(const std::vector<std::string>& frame_names, const int horizon_index = 0);
         std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> createMultiFrameTerminalActionModel(const std::vector<std::string>& frame_names);
 
         double getDt() const { return dt_; }
@@ -49,14 +49,14 @@ class HumanoidMulticontactTracker{
         int getX0Size() const { return x0_.size(); }
 
         // BASE MPC OCP DEFS
-        void addCoMCost(const double com_tracking_weight, const mpc_utils::Phase phase);
-        void addXBoundCost(const double x_bound_weight, const mpc_utils::Phase phase);
-        void addContactCosts(const std::vector<std::string>& frame_names, const mpc_utils::Phase phase);
-        void addRegularizationCosts(const Eigen::VectorXd& xreg_weights, const double xreg_weight, const double ureg_weight, const mpc_utils::Phase phase);
-        void addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase);
+        void addCoMCost(const double com_tracking_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
+        void addXBoundCost(const double x_bound_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
+        void addContactCosts(const std::vector<std::string>& frame_names, const mpc_utils::Phase phase, const int horizon_index = 0);
+        void addRegularizationCosts(const Eigen::VectorXd& xreg_weights, const double xreg_weight, const double ureg_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
+        void addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase, const int horizon_index = 0);
 
         void initializeSolver();
-        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.), std::unordered_map<std::string, pinocchio::SE3> desired_frames = {});
+        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.), std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {});
         
     private:
 
@@ -106,14 +106,14 @@ class HumanoidMulticontactTracker{
         std::shared_ptr<crocoddyl::CostModelAbstract> ureg_cost_;
         std::shared_ptr<crocoddyl::ActivationModelAbstract> xreg_activation_;
 
-        std::shared_ptr<crocoddyl::CostModelSum> running_cost_model_;
+        std::vector<std::shared_ptr<crocoddyl::CostModelSum>> running_cost_model_;
         std::shared_ptr<crocoddyl::ContactModelMultiple> running_contact_models_;
 
         std::shared_ptr<crocoddyl::CostModelSum> terminal_cost_model_;
         std::shared_ptr<crocoddyl::ContactModelMultiple> terminal_contact_models_;
 
-        std::shared_ptr<crocoddyl::ResidualModelCoMPosition> com_residual_;
-        std::unordered_map<std::string, std::shared_ptr<crocoddyl::ResidualModelFramePlacement>> frame_residuals_;
+        std::vector<std::shared_ptr<crocoddyl::ResidualModelCoMPosition>> com_residual_;
+        std::vector<std::unordered_map<std::string, std::shared_ptr<crocoddyl::ResidualModelFramePlacement>>> frame_residuals_;
         //###########################
 
 
