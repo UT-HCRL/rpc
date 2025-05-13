@@ -102,20 +102,13 @@ class HumanoidMulticontactTracker{
         double terminal_xbound_weight_;
         double terminal_com_tracking_weight_;
 
-        std::shared_ptr<crocoddyl::ActivationModelAbstract> xreg_activation_;
         std::shared_ptr<crocoddyl::CostModelAbstract> xreg_cost_;
         std::shared_ptr<crocoddyl::CostModelAbstract> ureg_cost_;
         std::shared_ptr<crocoddyl::ActivationModelAbstract> xreg_activation_;
-        std::shared_ptr<crocoddyl::CostModelAbstract> xreg_cost_;
-        std::shared_ptr<crocoddyl::CostModelAbstract> ureg_cost_;
 
         std::shared_ptr<crocoddyl::CostModelSum> running_cost_model_;
         std::shared_ptr<crocoddyl::ContactModelMultiple> running_contact_models_;
-        std::shared_ptr<crocoddyl::CostModelSum> running_cost_model_;
-        std::shared_ptr<crocoddyl::ContactModelMultiple> running_contact_models_;
 
-        std::shared_ptr<crocoddyl::CostModelSum> terminal_cost_model_;
-        std::shared_ptr<crocoddyl::ContactModelMultiple> terminal_contact_models_;
         std::shared_ptr<crocoddyl::CostModelSum> terminal_cost_model_;
         std::shared_ptr<crocoddyl::ContactModelMultiple> terminal_contact_models_;
 
@@ -132,8 +125,6 @@ class HumanoidMulticontactTracker{
 
 
         //### CROCODDYL ###
-        std::shared_ptr<crocoddyl::ShootingProblem> problem_;
-        std::shared_ptr<crocoddyl::SolverFDDP> fddp_;
         std::shared_ptr<crocoddyl::ShootingProblem> problem_;
         std::shared_ptr<crocoddyl::SolverFDDP> fddp_;
 

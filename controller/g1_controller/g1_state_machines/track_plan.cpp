@@ -16,6 +16,8 @@ namespace {
   double kGravity = 9.81;
 }
 
+void logToFile(std::ofstream& f_duration, std::ofstream& f_iterations, std::ofstream& f_costs, const std::string &data, int count);
+
 TrackPlan::TrackPlan(const StateId state_id,
                                            PinocchioRobotSystem *robot,
                                            G1ControlArchitecture *ctrl_arch)
@@ -116,28 +118,12 @@ void TrackPlan::Compute() {
 
   mpc_utils::MPCData data_out;
 
-  std::ofstream log_file("solve_timing_log.txt", std::ios::app);
-  if (!log_file.is_open()) {
-    std::cerr << "Failed to open log file for writing." << std::endl;
-  }else{
-    std::cout<<"Start writing computation time [ms] to file."<<std::endl;
-  }
-
-  std::ofstream log_file2("solve_iteration_log.txt", std::ios::app);
-  if (!log_file2.is_open()) {
-    std::cerr << "Failed to open log file for writing." << std::endl;
-  }else{
-    std::cout<<"Start writing iteration number to file."<<std::endl;
-  }
-
-  std::ofstream log_file3("data_out_log.txt", std::ios::app);
-  if (!log_file3.is_open()) {
-    std::cerr << "Failed to open log file for writing." << std::endl;
-  }else{
-    std::cout<<"Start writing data_out to file."<<std::endl;
-  }
-
-  int count = 0;
+  #ifndef B_USE_ZMQ
+    std::ofstream log_file("solve_timing_log.txt", std::ios::app);
+    std::ofstream log_file2("solve_iteration_log.txt", std::ios::app);
+    std::ofstream log_file3("data_out_log.txt", std::ios::app);
+    int count = 0;
+  #endif
 
   while (run_threads_) {
 
@@ -145,6 +131,8 @@ void TrackPlan::Compute() {
 
     auto start_time = std::chrono::high_resolution_clock::now();
     g1_mpc_->solveOneStep(xs_out, us_out, data_out, com_ref, desired_frames);
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
     #if B_USE_ZMQ
       G1DataManager *dm = G1DataManager::GetDataManager();
@@ -157,83 +145,19 @@ void TrackPlan::Compute() {
       dm->data_->uReg_costs_ = data_out.uReg_costs;
       dm->data_->xBound_costs_ = data_out.xBound_costs;
       dm->data_->com_costs_ = data_out.com_costs;
-
-      //dm->data_->joint_positions_ = sensor_data->joint_pos_;
     #endif
 
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-
-    // if (log_file.is_open() && count < 10000) {
-    //   log_file << duration << std::endl;
-    //   log_file2 << data_out.total_iterations << std::endl;
-    //   count++;
-    // } else {
-    //   log_file.close();
-    //   log_file2.close();
-    //   std::cerr << "File closed." << std::endl;
-    // }
-
-    if(log_file3.is_open() && count< 1000) {
-      for(int i=0; i<data_out.xReg_costs.size(); i++){
-        log_file3 << data_out.xReg_costs[i] << " ";
-      }
-
-      log_file3 << std::endl;
-
-      for(int i=0; i<data_out.uReg_costs.size(); i++){
-        log_file3 << data_out.uReg_costs[i] << " ";
-      }
-
-      log_file3 << std::endl;
-
-      for(int i=0; i<data_out.xBound_costs.size(); i++){
-        log_file3 << data_out.xBound_costs[i] << " ";
-      }
-
-      log_file3 << std::endl;
-
-      for(int i=0; i<data_out.com_costs.size(); i++){
-        log_file3 << data_out.com_costs[i] << " ";
-      }
-
-      log_file3 << std::endl;
-
-      for (const auto& frame : data_out.frame_costs) {
-        log_file3 << frame.first << ": ";
-        for (const auto& cost : frame.second) {
-          log_file3 << cost << " ";
-        }
-        log_file3 << std::endl;
-      }
-
-      for (const auto& contact : data_out.contact_costs) {
-        log_file3 << contact.first << ": ";
-        for (const auto& cost : contact.second) {
-          log_file3 << cost << " ";
-        }
-        log_file3 << std::endl;
-      }
-      log_file3 << "----------------------------------------" << std::endl;
-      
-      data_out.xReg_costs.clear();
-      data_out.uReg_costs.clear();
-      data_out.xBound_costs.clear();
-      data_out.com_costs.clear();
-      data_out.frame_costs.clear();
-      data_out.contact_costs.clear();
+    #ifndef B_USE_ZMQ
+      logToFile(log_file, log_file2, log_file3, data_out, std::toString(duration), count);
       count++;
-    }else{
-      log_file3.close();
-      std::cerr << "File closed." << std::endl;
-      exit(23);
-    }
+    #endif
 
-    // std::cout<<"\n\n\nxReg_costs: "<<data_out.xReg_costs.back()<<std::endl;
-    // std::cout<<"uReg_costs: "<<data_out.uReg_costs.back()<<std::endl;
-    // std::cout<<"xBound_costs: "<<data_out.xBound_costs.back()<<std::endl;
-    // std::cout<<"com_costs: "<<data_out.com_costs.back()<<std::endl;
-    // std::cout<<"solve time: "<<duration<<std::endl;
+    data_out.xReg_costs.clear();
+    data_out.uReg_costs.clear();
+    data_out.xBound_costs.clear();
+    data_out.com_costs.clear();
+    data_out.frame_costs.clear();
+    data_out.contact_costs.clear();
 
     {
       std::lock_guard<std::mutex> lock(data_mutex_);
@@ -264,4 +188,67 @@ StateId TrackPlan::GetNextState() {
 
 void TrackPlan::SetParameters(const YAML::Node &node) {
   std::cerr << "TrackPlan::SetParameters not implemented" << std::endl;
+}
+
+void logToFile(std::ofstream& f_duration, std::ofstream& f_iterations, std::ofstream& f_costs, const mpc_utils::MPCData &data_out, const std::string& duration, int count) {
+
+    if (f_duration.is_open() && count < 10000) {
+      f_duration << duration << std::endl;
+      f_iterations << data_out.total_iterations << std::endl;
+      count++;
+    } else {
+      f_duration.close();
+      f_iterations.close();
+      std::cerr << "File closed." << std::endl;
+    }
+
+    if(f_costs.is_open() && count< 1000) {
+      for(int i=0; i<data_out.xReg_costs.size(); i++){
+        f_costs << data_out.xReg_costs[i] << " ";
+      }
+
+      f_costs << std::endl;
+
+      for(int i=0; i<data_out.uReg_costs.size(); i++){
+        f_costs << data_out.uReg_costs[i] << " ";
+      }
+
+      f_costs << std::endl;
+
+      for(int i=0; i<data_out.xBound_costs.size(); i++){
+        f_costs << data_out.xBound_costs[i] << " ";
+      }
+
+      f_costs << std::endl;
+
+      for(int i=0; i<data_out.com_costs.size(); i++){
+        f_costs << data_out.com_costs[i] << " ";
+      }
+
+      f_costs << std::endl;
+
+      for (const auto& frame : data_out.frame_costs) {
+        f_costs << frame.first << ": ";
+        for (const auto& cost : frame.second) {
+          f_costs << cost << " ";
+        }
+        f_costs << std::endl;
+      }
+
+      for (const auto& contact : data_out.contact_costs) {
+        f_costs << contact.first << ": ";
+        for (const auto& cost : contact.second) {
+          f_costs << cost << " ";
+        }
+        f_costs << std::endl;
+      }
+      f_costs << "----------------------------------------" << std::endl;
+      
+      count++;
+    }else{
+      f_costs.close();
+      std::cerr << "File closed." << std::endl;
+      // exit(23);
+    }
+
 }
