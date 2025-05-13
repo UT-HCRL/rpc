@@ -115,18 +115,18 @@ void TrackPlan::Compute() {
   pinocchio::SE3 current_pose = pinocchio::SE3(Eigen::AngleAxisd(torso_rot[0], Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(torso_rot[1], Eigen::Vector3d::UnitY()) * Eigen::AngleAxisd(torso_rot[2], Eigen::Vector3d::UnitZ()), torso_pos);
   desired_frames["torso_link"] = current_pose;
 
-  std::unordered_map<std::string, pinocchio::SE3> desired_frames2;
-  desired_frames2.reserve(1);
-  Eigen::Isometry3d torso2 = robot_->GetLinkIsometry("torso_link");
-  Eigen::Vector3d torso_pos2 = torso2.translation() + Eigen::Vector3d(0.1, 0.2, 0.3); // Slightly offset position
-  Eigen::Vector3d torso_rot2 = torso2.rotation().eulerAngles(0, 1, 2) + Eigen::Vector3d(0.05, -0.05, 0.1); // Slightly modified rotation
-  pinocchio::SE3 current_pose2 = pinocchio::SE3(Eigen::AngleAxisd(torso_rot2[0], Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(torso_rot2[1], Eigen::Vector3d::UnitY()) * Eigen::AngleAxisd(torso_rot2[2], Eigen::Vector3d::UnitZ()), torso_pos2);
-  desired_frames2["torso_link"] = current_pose2;
+  // std::unordered_map<std::string, pinocchio::SE3> desired_frames2;
+  // desired_frames2.reserve(1);
+  // Eigen::Isometry3d torso2 = robot_->GetLinkIsometry("torso_link");
+  // Eigen::Vector3d torso_pos2 = torso2.translation() + Eigen::Vector3d(0.1, 0.2, 0.3); // Slightly offset position
+  // Eigen::Vector3d torso_rot2 = torso2.rotation().eulerAngles(0, 1, 2) + Eigen::Vector3d(0.05, -0.05, 0.1); // Slightly modified rotation
+  // pinocchio::SE3 current_pose2 = pinocchio::SE3(Eigen::AngleAxisd(torso_rot2[0], Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(torso_rot2[1], Eigen::Vector3d::UnitY()) * Eigen::AngleAxisd(torso_rot2[2], Eigen::Vector3d::UnitZ()), torso_pos2);
+  // desired_frames2["torso_link"] = current_pose2;
 
   std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames_vec;
   desired_frames_vec.resize(2);
   desired_frames_vec[0] = desired_frames;
-  desired_frames_vec[1] = desired_frames2;
+  desired_frames_vec[1] = desired_frames;
 
   mpc_utils::MPCData data_out;
 

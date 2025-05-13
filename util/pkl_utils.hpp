@@ -147,9 +147,9 @@ namespace pkl_utils {
             }
 
             // check if frame_names.size() == bezier_curves.size()
-            if (frame_names.size() != bezier_curves.size()) {
-                throw std::invalid_argument("frame_names and bezier_curves must have the same size");
-            }
+            // if (frame_names.size() != bezier_curves.size()) {
+            //     throw std::invalid_argument("frame_names and bezier_curves must have the same size");
+            // }
 
             // store Bezier curves in corresponding frame name
             for (unsigned int idx = 0; idx < frame_names.size(); idx++) {
