@@ -93,12 +93,12 @@ cost_mask: [    1,      1,       1,        1,          1       ]
 
 tracking_frames:
   - torso_link
-  - left_ankle_roll_link
-  - right_ankle_roll_link
-  - left_knee_link
-  - right_knee_link
-  - left_rubber_hand
-  - right_rubber_hand
+  # - left_ankle_roll_link
+  # - right_ankle_roll_link
+  # - left_knee_link
+  # - right_knee_link
+  # - left_rubber_hand
+  # - right_rubber_hand
 
 # running_costs:
 #   xReg:
@@ -150,12 +150,12 @@ running_costs:
     w: 10000.0
   tracking_frames:
     torso_link: 1000.0
-    left_ankle_roll_link: 1000.0
-    right_ankle_roll_link: 1000.0
-    left_knee_link: 1000.0
-    right_knee_link: 1000.0
-    left_rubber_hand: 1000.0
-    right_rubber_hand: 800000.0
+    # left_ankle_roll_link: 0.0
+    # right_ankle_roll_link: 0.0
+    # left_knee_link: 0.0
+    # right_knee_link: 0.0
+    # left_rubber_hand: 0.0
+    # right_rubber_hand: 0.0
 
 terminal_costs:
   xReg:
