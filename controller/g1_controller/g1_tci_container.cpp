@@ -12,7 +12,7 @@
 #include <utility>
 
 G1TCIContainer::G1TCIContainer(PinocchioRobotSystem *robot,
-                                     const YAML::Node &cfg)
+                               const YAML::Node &cfg)
     : TCIContainer(robot) {
   util::PrettyConstructor(2, "G1TCIContainer");
 
@@ -27,23 +27,26 @@ G1TCIContainer::G1TCIContainer(PinocchioRobotSystem *robot,
   pelvis_ori_task_ = new LinkOriTask(robot_, g1_link::pelvis);
   std::vector<int> upper_body_jidx{
       g1_joint::left_shoulder_pitch_joint, g1_joint::left_shoulder_roll_joint,
-      g1_joint::left_shoulder_yaw_joint, g1_joint::left_elbow_joint,
-      g1_joint::left_wrist_roll_joint, g1_joint::left_wrist_pitch_joint,
-      g1_joint::left_wrist_yaw_joint,
-      g1_joint::right_shoulder_pitch_joint, g1_joint::right_shoulder_roll_joint,
-      g1_joint::right_shoulder_yaw_joint, g1_joint::right_elbow_joint,
-      g1_joint::right_wrist_roll_joint, g1_joint::right_wrist_pitch_joint,
-      g1_joint::right_wrist_yaw_joint};
+      g1_joint::left_shoulder_yaw_joint,   g1_joint::left_elbow_joint,
+      g1_joint::left_wrist_roll_joint,     g1_joint::left_wrist_pitch_joint,
+      g1_joint::left_wrist_yaw_joint,      g1_joint::right_shoulder_pitch_joint,
+      g1_joint::right_shoulder_roll_joint, g1_joint::right_shoulder_yaw_joint,
+      g1_joint::right_elbow_joint,         g1_joint::right_wrist_roll_joint,
+      g1_joint::right_wrist_pitch_joint,   g1_joint::right_wrist_yaw_joint};
   upper_body_task_ = new SelectedJointTask(robot_, upper_body_jidx);
   lf_pos_task_ = new LinkPosTask(robot_, g1_link::l_foot_contact);
   rf_pos_task_ = new LinkPosTask(robot_, g1_link::r_foot_contact);
   lf_ori_task_ = new LinkOriTask(robot_, g1_link::l_foot_contact);
   rf_ori_task_ = new LinkOriTask(robot_, g1_link::r_foot_contact);
-  lh_pos_task_ = new LinkPosTask(robot_, g1_link::left_wrist_yaw_link);   // TODO check
-  rh_pos_task_ = new LinkPosTask(robot_, g1_link::right_wrist_yaw_link);  // TODO check
-  lh_ori_task_ = new LinkOriTask(robot_, g1_link::left_wrist_yaw_link);   // TODO check
-  rh_ori_task_ = new LinkOriTask(robot_, g1_link::right_wrist_yaw_link);  // TODO check
-//  wbo_task_ = new G1WBOTask(robot_);
+  lh_pos_task_ =
+      new LinkPosTask(robot_, g1_link::left_wrist_yaw_link); // TODO check
+  rh_pos_task_ =
+      new LinkPosTask(robot_, g1_link::right_wrist_yaw_link); // TODO check
+  lh_ori_task_ =
+      new LinkOriTask(robot_, g1_link::left_wrist_yaw_link); // TODO check
+  rh_ori_task_ =
+      new LinkOriTask(robot_, g1_link::right_wrist_yaw_link); // TODO check
+  //  wbo_task_ = new G1WBOTask(robot_);
 
   task_map_.clear();
   task_map_.insert(std::make_pair("joint_task", jpos_task_));
@@ -114,10 +117,10 @@ G1TCIContainer::G1TCIContainer(PinocchioRobotSystem *robot,
   //=============================================================
   // Contacts List
   //=============================================================
-  lf_contact_ = new SurfaceContact(robot_, g1_link::l_foot_contact, 0.7,
-                                   0.08, 0.025); // params reset later
-  rf_contact_ = new SurfaceContact(robot_, g1_link::r_foot_contact, 0.7,
-                                   0.08, 0.025); // params reset later
+  lf_contact_ = new SurfaceContact(robot_, g1_link::l_foot_contact, 0.7, 0.08,
+                                   0.025); // params reset later
+  rf_contact_ = new SurfaceContact(robot_, g1_link::r_foot_contact, 0.7, 0.08,
+                                   0.025); // params reset later
 
   contact_map_.clear();
   contact_map_.insert(std::make_pair("lf_contact", lf_contact_));
@@ -204,11 +207,11 @@ void G1TCIContainer::_InitializeParameters(const YAML::Node &cfg) {
   com_xy_task_->SetParameters(cfg["wbc"]["task"]["com_xy_task"], wbc_type);
   com_z_task_->SetParameters(cfg["wbc"]["task"]["com_z_task"], wbc_type);
   cam_task_->SetParameters(cfg["wbc"]["task"]["cam_task"], wbc_type);
-//  wbo_task_->SetParameters(cfg["wbc"]["task"]["wbo_task"], wbc_type);
+  //  wbo_task_->SetParameters(cfg["wbc"]["task"]["wbo_task"], wbc_type);
   torso_ori_task_->SetParameters(cfg["wbc"]["task"]["torso_ori_task"],
                                  wbc_type);
   pelvis_ori_task_->SetParameters(cfg["wbc"]["task"]["pelvis_ori_task"],
-                                 wbc_type);
+                                  wbc_type);
   upper_body_task_->SetParameters(cfg["wbc"]["task"]["upper_body_task"],
                                   wbc_type);
   lf_pos_task_->SetParameters(cfg["wbc"]["task"]["foot_pos_task"], wbc_type);

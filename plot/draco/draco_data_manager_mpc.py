@@ -1,6 +1,11 @@
 import zmq
 import sys
 import os
+
+cwd = os.getcwd()
+sys.path.append(cwd + "/build")
+sys.path.append(cwd)
+
 import pickle
 import time
 from typing import Optional
@@ -11,10 +16,6 @@ from pinocchio.visualize import MeshcatVisualizer
 import ruamel.yaml as yaml
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-
-cwd = os.getcwd()
-sys.path.append(cwd + "/build")
-sys.path.append(cwd)
 
 from messages.draco_pb2 import *
 from plot.data_saver import DataSaver

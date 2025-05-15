@@ -86,6 +86,12 @@ public:
   std::vector<Eigen::Vector3d> des_rf_pos_traj;
   std::vector<Eigen::Vector3d> des_lf_ori_traj;
   std::vector<Eigen::Vector3d> des_rf_ori_traj;
+
+  float x_vel_cmd_ = 0.0;
+  float y_vel_cmd_ = 0.0;
+  float yaw_rate_cmd_ = 0.0;
+
+  Eigen::Vector3d des_ori_;
 };
 
 // Singleton class

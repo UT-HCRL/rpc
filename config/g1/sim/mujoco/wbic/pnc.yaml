@@ -14,7 +14,6 @@ state_estimator:
   foot_reference_frame: 1 #0: left foot, 1: right foot
 
   sigma_base_vel: [0.0, 0.0, 0.0]
-  #sigma_base_acc: [0.5, 0.5, 0.5]
   sigma_base_acc: [0.1, 0.1, 0.1]
   sigma_pos_lfoot: [0.001, 0.001, 0.001]
   sigma_pos_rfoot: [0.001, 0.001, 0.001]
@@ -35,7 +34,6 @@ state_estimator:
   num_data_com_vel: [10, 10, 10]
 
   ## IF 1: exponential smoother filter parameter
-  #com_vel_time_constant: 0.1
   com_vel_time_constant: 0.01
   com_vel_err_limit: [1., 1., 1.]
 
@@ -54,13 +52,11 @@ controller:
 wbc:
   task:
     com_xy_task:
-      com_feedback_source: 1 # 0: com feedback / 1: icp feedback
+      com_feedback_source: 0 # 0: com feedback / 1: icp feedback
       icp_integrator_type: 0 # 0: exponential smoother / 1: leaky integrator
 
-      kp : [400, 400]
-      kd : [80., 80.]
-      #kp : [2000, 2000]
-      #kd : [200., 200.]
+      kp : [200, 200]
+      kd : [10., 10.]
 
       icp_kp : [4.0, 4.0]
       icp_kd : [0., 0.] # x, y will be ignored
@@ -78,7 +74,7 @@ wbc:
       lpf_time_constant: 0.03
 
     com_z_task:
-      com_height_target_source: 1 # 0: com height / 1: base height
+      com_height_target_source: 0 # 0: com height / 1: base height
       com_kp : [2000.0]
       com_kd : [200.0]
 
@@ -96,6 +92,11 @@ wbc:
       kp_ik : [0., 0., 1]
 
     torso_ori_task:
+      kp : [1000., 1000, 1000.]
+      kd : [100, 100, 100]
+      kp_ik : [1.0, 1.0, 1.0]
+
+    pelvis_ori_task:
       kp : [1000., 1000, 1000.]
       kd : [100, 100, 100]
       kp_ik : [1.0, 1.0, 1.0]
@@ -126,8 +127,8 @@ wbc:
       kp_ik : [1., 1., 1.]
 
     foot_ori_task:
-      kp : [5000., 5000., 5000.]
-      kd : [100, 100, 100]
+      kp : [5000., 5000., 10000.]
+      kd : [100, 100, 200]
       kp_ik : [1., 1., 1.]
 
     foot_rf_task:
@@ -137,8 +138,8 @@ wbc:
     max_rf_z: 800.
 
     mu: 0.5
-    foot_half_length: 0.08
-    foot_half_width: 0.04
+    foot_half_length: 0.085
+    foot_half_width: 0.025
     kp: [2500, 2500, 2500, 2500, 2500, 2500] ## ori, pos order
     kd: [100, 100, 100, 100, 100, 100]
 
@@ -192,19 +193,15 @@ wbc:
 
 state_machine:
     initialize:
-      init_duration: 3.
-      #target_joint_pos: [0., 0.020, -0.785, 0.785, 0.785, -0.785, -0.020, 0., 0.523, 0., -1.57, 0., 0., 0., 0., -0.020, -0.785, 0.785, 0.785, -0.785, 0.020, 0., -0.523, 0., -1.57, 0., 0.] #pinocchio robotsystem joint order
-      #target_joint_pos: [0., 0.020, -0.785, 0.785, 0.785, -0.785, -0.020, 0., 0.523, 0., -1.57, 0., 0., 0., 0., -0.020, -0.785, 0.785, 0.785, -0.785, 0.020, 0., -0.523, 0., -1.57, 0., 0.] #pinocchio robotsystem joint order
-      #target_joint_pos: [0., 0.020, -0.785, 0.785, 0.785, -0.785, -0.020, 0., 0.1, 0., -1.57, 0., 0., 0., 0., -0.020, -0.785, 0.785, 0.785, -0.785, 0.020, 0., -0.1, 0., -1.57, 0., 0.] #pinocchio robotsystem joint order
-      #target_joint_pos: [0., 0.020, -0.7, 0.84, 0.84, -0.84, -0.020, 0., 0.523, 0., -1.57, 0., 0., 0., 0., -0.020, -0.7, 0.84, 0.84, -0.84, 0.020, 0., -0.523, 0., -1.57, 0., 0.] #pinocchio robotsystem joint order
-      target_joint_pos: [-1.434e-4, -2.827e-3, -5.650e-1, 5.650e-1, 5.650e-1, -5.650e-1, 2.827e-3, 5.574e-8, 0.523, 3.1517e-8, -1.57, 1.555e-7, -4.075e-8, -5.106e-6, 3.007e-6, -2.977e-3, -5.650e-1, 5.650e-1, 5.650e-1, -5.650e-1, -2.9767e-3, -2.347e-8, -0.523, 4.1193e-8, -1.57, -6.215e-7, -3.4377e-7] #pinocchio robotsystem joint order
+      init_duration: 1.
+      target_joint_pos: [-0.524, 0., 0., 0.785, -0.262, 0., -0.524, 0., 0., 0.785, -0.262, 0., 0., 0., 0.524, 0., 1.571, 0., 0., 0., 0., -0.524, 0., 1.571, 0., 0., 0.]
       b_only_joint_pos_control: false
       wait_time: 2.
 
     stand_up:
       standup_duration: 2.
       #target_com_height: 0.658
-      target_com_height: 0.7
+      target_com_height: 0.65
       #target_base_height: 0.88
       target_base_height: 0.93
 
@@ -216,10 +213,6 @@ state_machine:
     com_swaying:
       amplitude: [0., 0.05, 0.] # [m]
       frequency: [0., 0.50, 0.] # [hz]
-      #amplitude: [0.05, 0., 0.] # [m]
-      #frequency: [0.5, 0., 0.] # [hz]
-      #amplitude: [0., 0., 0.03] # [m]
-      #frequency: [0., 0., 0.05] # [hz]
 
     lmpc_com_swaying:
       amplitude: [0., 0.05, 0.] # [m]

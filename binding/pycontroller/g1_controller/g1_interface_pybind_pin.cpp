@@ -45,10 +45,8 @@ PYBIND11_MODULE(g1_interface_py, m) {
       // Debug
       .def_readwrite("base_joint_pos_", &G1SensorData::base_joint_pos_)
       .def_readwrite("base_joint_quat_", &G1SensorData::base_joint_quat_)
-      .def_readwrite("base_joint_lin_vel_",
-                     &G1SensorData::base_joint_lin_vel_)
-      .def_readwrite("base_joint_ang_vel_",
-                     &G1SensorData::base_joint_ang_vel_);
+      .def_readwrite("base_joint_lin_vel_", &G1SensorData::base_joint_lin_vel_)
+      .def_readwrite("base_joint_ang_vel_", &G1SensorData::base_joint_ang_vel_);
 
   py::class_<G1Command>(m, "G1Command")
       .def(py::init<>())

@@ -28,10 +28,10 @@ option(BUILD_WITH_DART "compile with DART" OFF)
 
 option(BUILD_WITH_PROXQP "compile with ProxQP" OFF)
 
-option(BUILD_WITH_MATLOGGER "compile with MatLogger2" OFF)
+option(BUILD_WITH_MATLOGGER "compile with MatLogger2" ON)
 option(BUILD_WITH_ZMQ_PROTOBUF "compile with zmq and protobuf" ON)
 
-option(BUILD_WITH_FOXGLOVE "compile with foxglove" OFF)
+option(BUILD_WITH_FOXGLOVE "compile with foxglove" ON)
 
 option(BUILD_WITH_TELEOP "compile with teleop" OFF)
 
@@ -132,6 +132,7 @@ endif()
 if (BUILD_WITH_HPIPM)
     find_package(hpipm-cpp REQUIRED)
     set(B_USE_HPIPM true)
+    add_compile_definitions(COAL_DISABLE_HPP_FCL_WARNINGS) # disable warning messages during compilation
 else()
     set(B_USE_HPIPM false)
 endif()

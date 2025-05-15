@@ -5,6 +5,10 @@ import time
 import ruamel.yaml as yaml
 import numpy as np
 
+cwd = os.getcwd()
+sys.path.append(cwd + "/build")
+sys.path.append(cwd)
+
 from util.python_utils.util import rot_to_quat
 from messages.draco_pb2 import *
 from plot.data_saver import *
@@ -13,15 +17,9 @@ import pinocchio as pin
 import json
 import argparse
 
-cwd = os.getcwd()
-sys.path.append(cwd + "/build")
-sys.path.append(cwd)
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--b_use_plotjuggler", type=bool, default=False)
-parser.add_argument(
-    "--visualizer", choices=["none", "meshcat", "foxglove"], default="none"
-)
+parser.add_argument("--visualizer", choices=["none", "meshcat", "foxglove"], default="none")
 args = parser.parse_args()
 
 if args.visualizer == "meshcat":
@@ -64,12 +62,8 @@ def isMesh(geometry_object):
     return False
 
 
-scene_schema = b64encode(
-    build_file_descriptor_set(SceneUpdate).SerializeToString()
-).decode("ascii")
-frame_schema = b64encode(
-    build_file_descriptor_set(FrameTransform).SerializeToString()
-).decode("ascii")
+scene_schema = b64encode(build_file_descriptor_set(SceneUpdate).SerializeToString()).decode("ascii")
+frame_schema = b64encode(build_file_descriptor_set(FrameTransform).SerializeToString()).decode("ascii")
 
 
 async def main():
@@ -92,12 +86,10 @@ async def main():
         icpS_chan_id = await SceneChannel(
             False, "icp_viz", "protobuf", SceneUpdate.DESCRIPTOR.full_name, scene_schema
         ).add_chan(server)
-        icp_chan_id = await SceneChannel(
-            True, "icp", "json", "icp", ["est_x", "est_y", "des_x", "des_y"]
-        ).add_chan(server)
-        steptest = await SceneChannel(
-            True, "steptest", "json", "steptest", ["num_steps"]
-        ).add_chan(server)
+        icp_chan_id = await SceneChannel(True, "icp", "json", "icp", ["est_x", "est_y", "des_x", "des_y"]).add_chan(
+            server
+        )
+        steptest = await SceneChannel(True, "steptest", "json", "steptest", ["num_steps"]).add_chan(server)
 
         print("established")
 
@@ -174,9 +166,7 @@ async def main():
             )
 
             # send step data
-            await server.send_message(
-                steptest, now, json.dumps({"num_steps": 6}).encode("utf8")
-            )
+            await server.send_message(steptest, now, json.dumps({"num_steps": 6}).encode("utf8"))
             # print(steptest[0])
 
             # update mesh positions
@@ -208,9 +198,7 @@ async def main():
                 transform.rotation.y = q[1]
                 transform.rotation.z = q[2]
                 transform.rotation.w = q[3]
-                await server.send_message(
-                    tf_chan_id, now, transform.SerializeToString()
-                )
+                await server.send_message(tf_chan_id, now, transform.SerializeToString())
                 transform.rotation.Clear()
                 transform.translation.Clear()
 
@@ -221,9 +209,7 @@ async def main():
                 transform.timestamp.FromNanoseconds(now)
                 transform.translation.x = list(getattr(msg, obj))[0]
                 transform.translation.y = list(getattr(msg, obj))[1]
-                await server.send_message(
-                    tf_chan_id, now, transform.SerializeToString()
-                )
+                await server.send_message(tf_chan_id, now, transform.SerializeToString())
 
             count = 0
             for obj in ["lfoot_cmd", "rfoot_cmd", "lfoot_filt", "rfoot_filt"]:
@@ -233,9 +219,7 @@ async def main():
                 transform.translation.x = count
                 transform.translation.y = count
                 count = count + 0.5
-                await server.send_message(
-                    tf_chan_id, now, transform.SerializeToString()
-                )
+                await server.send_message(tf_chan_id, now, transform.SerializeToString())
 
 
 def check_if_kf_estimator(kf_pos, est_pos):
@@ -287,9 +271,7 @@ if args.visualizer != "none":
         pin.JointModelFreeFlyer(),
     )
 
-    data, collision_data, visual_data = pin.createDatas(
-        model, collision_model, visual_model
-    )
+    data, collision_data, visual_data = pin.createDatas(model, collision_model, visual_model)
     vis_q = pin.neutral(model)
 
     # define and initialize elements to visualize
@@ -298,42 +280,28 @@ if args.visualizer != "none":
         try:
             viz.initViewer(open=True)
         except ImportError as err:
-            print(
-                "Error while initializing the viewer. It seems you should install python meshcat"
-            )
+            print("Error while initializing the viewer. It seems you should install python meshcat")
             print(err)
             exit()
         viz.loadViewerModel(rootNodeName="draco3")
 
         # add other visualizations to viewer
-        com_des_viz, com_des_model = vis_tools.add_sphere(
-            viz.viewer, "com_des", color=[0.0, 0.0, 1.0, 0.5]
-        )
+        com_des_viz, com_des_model = vis_tools.add_sphere(viz.viewer, "com_des", color=[0.0, 0.0, 1.0, 0.5])
         com_des_viz_q = pin.neutral(com_des_model)
 
-        com_viz, com_model = vis_tools.add_sphere(
-            viz.viewer, "com", color=[1.0, 0.0, 0.0, 0.5]
-        )
+        com_viz, com_model = vis_tools.add_sphere(viz.viewer, "com", color=[1.0, 0.0, 0.0, 0.5])
         com_viz_q = pin.neutral(com_model)
 
-        com_proj_viz, com_proj_model = vis_tools.add_sphere(
-            viz.viewer, "com_proj", color=[0.0, 0.0, 1.0, 0.3]
-        )
+        com_proj_viz, com_proj_model = vis_tools.add_sphere(viz.viewer, "com_proj", color=[0.0, 0.0, 1.0, 0.3])
         com_proj_viz_q = pin.neutral(com_proj_model)
 
-        icp_viz, icp_model = vis_tools.add_sphere(
-            viz.viewer, "icp", color=vis_tools.violet
-        )
+        icp_viz, icp_model = vis_tools.add_sphere(viz.viewer, "icp", color=vis_tools.violet)
         icp_viz_q = pin.neutral(icp_model)
 
-        icp_des_viz, icp_des_model = vis_tools.add_sphere(
-            viz.viewer, "icp_des", color=[0.0, 1.0, 0.0, 0.3]
-        )
+        icp_des_viz, icp_des_model = vis_tools.add_sphere(viz.viewer, "icp_des", color=[0.0, 1.0, 0.0, 0.3])
         icp_des_viz_q = pin.neutral(icp_des_model)
 
-        cmp_des_viz, cmp_des_model = vis_tools.add_sphere(
-            viz.viewer, "cmp_des", color=[0.0, 0.75, 0.75, 0.3]
-        )
+        cmp_des_viz, cmp_des_model = vis_tools.add_sphere(viz.viewer, "cmp_des", color=[0.0, 0.75, 0.75, 0.3])
         cmp_des_viz_q = pin.neutral(cmp_des_model)
 
         # add arrows visualizers to viewer
@@ -491,20 +459,12 @@ while True:
 
             # plot GRFs
             if msg.phase != 1:
-                vis_tools.grf_display(
-                    arrow_viz["grf_lf"], msg.lfoot_pos, msg.lfoot_ori, msg.lfoot_rf_cmd
-                )
-                vis_tools.grf_display(
-                    arrow_viz["grf_rf"], msg.rfoot_pos, msg.rfoot_ori, msg.rfoot_rf_cmd
-                )
+                vis_tools.grf_display(arrow_viz["grf_lf"], msg.lfoot_pos, msg.lfoot_ori, msg.lfoot_rf_cmd)
+                vis_tools.grf_display(arrow_viz["grf_rf"], msg.rfoot_pos, msg.rfoot_ori, msg.rfoot_rf_cmd)
 
                 # add sensed normal force
-                lfoot_rf_normal = np.array(
-                    [0.0, 0.0, 0.0, 0.0, 0.0, msg.lfoot_rf_normal_filt]
-                )
-                rfoot_rf_normal = np.array(
-                    [0.0, 0.0, 0.0, 0.0, 0.0, msg.rfoot_rf_normal_filt]
-                )
+                lfoot_rf_normal = np.array([0.0, 0.0, 0.0, 0.0, 0.0, msg.lfoot_rf_normal_filt])
+                rfoot_rf_normal = np.array([0.0, 0.0, 0.0, 0.0, 0.0, msg.rfoot_rf_normal_filt])
                 vis_tools.grf_display(
                     arrow_viz["grf_lf_normal"],
                     msg.lfoot_pos,

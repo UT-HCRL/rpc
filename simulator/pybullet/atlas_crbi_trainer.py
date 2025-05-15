@@ -8,6 +8,9 @@ import math
 from tqdm import tqdm
 import shutil
 
+cwd = os.getcwd()
+sys.path.append(cwd)
+
 from util.python_utils import pybullet_util
 from util.python_utils import interpolation
 from util.python_utils import util
@@ -20,9 +23,6 @@ from scipy.spatial.transform import Rotation as R
 import torch
 import torch.utils.data as torch_utils
 from torch.utils.tensorboard import SummaryWriter
-
-cwd = os.getcwd()
-sys.path.append(cwd)
 
 ## Configs
 VIDEO_RECORD = False
@@ -107,21 +107,13 @@ def sample_one_step_boundary(nominal_lf_iso, nominal_rf_iso, swing_foot_side):
         mid_rf_vel = (final_rf_iso[0:3, 3] - initial_rf_iso[0:3, 3]) / swing_time
 
         # sample left foot
-        initial_lf_pos = nominal_lf_iso[0:3, 3] + np.random.uniform(
-            LFOOT_POS_DEV_LB, LFOOT_POS_DEV_UB
-        )
-        final_lf_pos = nominal_lf_iso[0:3, 3] + np.random.uniform(
-            LFOOT_POS_DEV_LB, LFOOT_POS_DEV_UB
-        )
+        initial_lf_pos = nominal_lf_iso[0:3, 3] + np.random.uniform(LFOOT_POS_DEV_LB, LFOOT_POS_DEV_UB)
+        final_lf_pos = nominal_lf_iso[0:3, 3] + np.random.uniform(LFOOT_POS_DEV_LB, LFOOT_POS_DEV_UB)
 
         while abs(initial_lf_pos[1] - nominal_rf_iso[1, 3]) < min_y_distance_btw_foot:
-            initial_lf_pos = nominal_lf_iso[0:3, 3] + np.random.uniform(
-                LFOOT_POS_DEV_LB, LFOOT_POS_DEV_UB
-            )
+            initial_lf_pos = nominal_lf_iso[0:3, 3] + np.random.uniform(LFOOT_POS_DEV_LB, LFOOT_POS_DEV_UB)
         while abs(final_lf_pos[1] - nominal_rf_iso[1, 3]) < min_y_distance_btw_foot:
-            final_lf_pos = nominal_lf_iso[0:3, 3] + np.random.uniform(
-                LFOOT_POS_DEV_LB, LFOOT_POS_DEV_UB
-            )
+            final_lf_pos = nominal_lf_iso[0:3, 3] + np.random.uniform(LFOOT_POS_DEV_LB, LFOOT_POS_DEV_UB)
 
         initial_lf_ea = np.random.uniform(FOOT_EA_LB, FOOT_EA_UB)
         initial_lf_rot = util.euler_to_rot(initial_lf_ea)
@@ -136,9 +128,7 @@ def sample_one_step_boundary(nominal_lf_iso, nominal_rf_iso, swing_foot_side):
         mid_lf_vel[2] = 0.0
 
         # sample base
-        initial_base_iso = interpolation.iso_interpolate(
-            initial_lf_iso, initial_rf_iso, 0.5
-        )
+        initial_base_iso = interpolation.iso_interpolate(initial_lf_iso, initial_rf_iso, 0.5)
         initial_base_iso[2, 3] = np.random.uniform(BASE_HEIGHT_LB, BASE_HEIGHT_UB)
 
         final_base_iso = interpolation.iso_interpolate(final_lf_iso, final_rf_iso, 0.5)
@@ -152,21 +142,13 @@ def sample_one_step_boundary(nominal_lf_iso, nominal_rf_iso, swing_foot_side):
         mid_lf_vel = (final_lf_iso[0:3, 3] - initial_lf_iso[0:3, 3]) / swing_time
 
         # sample right foot
-        initial_rf_pos = nominal_rf_iso[0:3, 3] + np.random.uniform(
-            RFOOT_POS_DEV_LB, RFOOT_POS_DEV_UB
-        )
-        final_rf_pos = nominal_rf_iso[0:3, 3] + np.random.uniform(
-            RFOOT_POS_DEV_LB, RFOOT_POS_DEV_UB
-        )
+        initial_rf_pos = nominal_rf_iso[0:3, 3] + np.random.uniform(RFOOT_POS_DEV_LB, RFOOT_POS_DEV_UB)
+        final_rf_pos = nominal_rf_iso[0:3, 3] + np.random.uniform(RFOOT_POS_DEV_LB, RFOOT_POS_DEV_UB)
 
         while abs(initial_rf_pos[1] - nominal_lf_iso[1, 3]) < min_y_distance_btw_foot:
-            initial_rf_pos = nominal_rf_iso[0:3, 3] + np.random.uniform(
-                RFOOT_POS_DEV_LB, RFOOT_POS_DEV_UB
-            )
+            initial_rf_pos = nominal_rf_iso[0:3, 3] + np.random.uniform(RFOOT_POS_DEV_LB, RFOOT_POS_DEV_UB)
         while abs(final_rf_pos[1] - nominal_lf_iso[1, 3]) < min_y_distance_btw_foot:
-            final_rf_pos = nominal_rf_iso[0:3, 3] + np.random.uniform(
-                RFOOT_POS_DEV_LB, RFOOT_POS_DEV_UB
-            )
+            final_rf_pos = nominal_rf_iso[0:3, 3] + np.random.uniform(RFOOT_POS_DEV_LB, RFOOT_POS_DEV_UB)
 
         initial_rf_ea = np.random.uniform(FOOT_EA_LB, FOOT_EA_UB)
         initial_rf_rot = util.euler_to_rot(initial_rf_ea)
@@ -181,9 +163,7 @@ def sample_one_step_boundary(nominal_lf_iso, nominal_rf_iso, swing_foot_side):
         mid_rf_vel[2] = 0.0
 
         # sample base
-        initial_base_iso = interpolation.iso_interpolate(
-            initial_lf_iso, initial_rf_iso, 0.5
-        )
+        initial_base_iso = interpolation.iso_interpolate(initial_lf_iso, initial_rf_iso, 0.5)
         initial_base_iso[2, 3] = np.random.uniform(BASE_HEIGHT_LB, BASE_HEIGHT_UB)
 
         final_base_iso = interpolation.iso_interpolate(final_lf_iso, final_rf_iso, 0.5)
@@ -318,12 +298,7 @@ def lowerbody_inverse_kinematics(
     ##left_leg ik
     T_w_lf = liegroup.RpToTrans(util.quat_to_rot(lf_quat), lf_pos)
     des_T_base_lf = np.dot(liegroup.TransInv(T_w_base), T_w_lf)
-    lf_initial_guess = np.array(
-        [
-            joint_pos[joint_name]
-            for joint_name in open_chain_joints_name_dict["left_leg"]
-        ]
-    )
+    lf_initial_guess = np.array([joint_pos[joint_name] for joint_name in open_chain_joints_name_dict["left_leg"]])
     lf_joint_pos_sol, lf_ik_success = robot_kinematics.IKinBody(
         joint_screws_in_ee_at_home["left_leg"],
         ee_SE3_at_home["left_leg"],
@@ -336,12 +311,7 @@ def lowerbody_inverse_kinematics(
     ##right_leg ik
     T_w_rf = liegroup.RpToTrans(util.quat_to_rot(rf_quat), rf_pos)
     des_T_base_rf = np.dot(liegroup.TransInv(T_w_base), T_w_rf)
-    rf_initial_guess = np.array(
-        [
-            joint_pos[joint_name]
-            for joint_name in open_chain_joints_name_dict["right_leg"]
-        ]
-    )
+    rf_initial_guess = np.array([joint_pos[joint_name] for joint_name in open_chain_joints_name_dict["right_leg"]])
     rf_joint_pos_sol, rf_ik_success = robot_kinematics.IKinBody(
         joint_screws_in_ee_at_home["right_leg"],
         ee_SE3_at_home["right_leg"],
@@ -354,9 +324,7 @@ def lowerbody_inverse_kinematics(
     return joint_pos, lf_ik_success, rf_ik_success
 
 
-def get_centroidal_rot_inertia_in_body(
-    robot_system, base_com_pos, base_com_quat, joint_pos
-):
+def get_centroidal_rot_inertia_in_body(robot_system, base_com_pos, base_com_quat, joint_pos):
     rot_w_base_com = util.quat_to_rot(np.copy(base_com_quat))
     rot_w_basejoint = np.dot(rot_w_base_com, rot_basejoint_to_basecom.transpose())
     base_joint_pos = base_com_pos - np.dot(rot_w_basejoint, pos_basejoint_to_basecom)
@@ -395,9 +363,7 @@ def generate_data_set(
 
     from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
 
-    robot_system = PinocchioRobotSystem(
-        cwd + "/robot_model/atlas/atlas.urdf", cwd + "/robot_model/atlas", False, False
-    )
+    robot_system = PinocchioRobotSystem(cwd + "/robot_model/atlas/atlas.urdf", cwd + "/robot_model/atlas", False, False)
 
     text = "{}".format(leg_side) + "#" + "{}".format(cpu_idx).zfill(2)
     with tqdm(
@@ -471,9 +437,7 @@ def generate_data_set(
                 )
 
                 if lf_ik_success and rf_ik_success:
-                    I_b = get_centroidal_rot_inertia_in_body(
-                        robot_system, base_pos, base_quat, joint_pos
-                    )
+                    I_b = get_centroidal_rot_inertia_in_body(robot_system, base_pos, base_quat, joint_pos)
 
                     base_quat = R.from_quat(base_quat)
                     lf_quat = R.from_quat(lf_quat)
@@ -636,15 +600,13 @@ if __name__ == "__main__":
     base_links_name_dict["right_leg"] = "pelvis"
 
     for leg in leg_list:
-        joint_screws_in_ee_at_home[leg], ee_SE3_at_home[leg] = (
-            robot_kinematics.get_kinematics_config(
-                robot,
-                joint_id,
-                link_id,
-                open_chain_joints_name_dict[leg],
-                base_links_name_dict[leg],
-                ee_links_name_dict[leg],
-            )
+        joint_screws_in_ee_at_home[leg], ee_SE3_at_home[leg] = robot_kinematics.get_kinematics_config(
+            robot,
+            joint_id,
+            link_id,
+            open_chain_joints_name_dict[leg],
+            base_links_name_dict[leg],
+            ee_links_name_dict[leg],
         )
 
     ##robot initial config setting
@@ -677,9 +639,7 @@ if __name__ == "__main__":
 
         if pybullet_util.is_key_triggered(keys, "1"):
             ## reset to nominal pose
-            pybullet_util.set_config(
-                robot, joint_id, nominal_base_pos, nominal_base_quat, nominal_joint_pos
-            )
+            pybullet_util.set_config(robot, joint_id, nominal_base_pos, nominal_base_quat, nominal_joint_pos)
 
         elif pybullet_util.is_key_triggered(keys, "2"):
             print("=" * 80)
@@ -763,9 +723,7 @@ if __name__ == "__main__":
                     __import__("ipdb").set_trace()
 
                 # visualize config
-                pybullet_util.set_config(
-                    robot, joint_id, base_pos, base_quat, joint_pos
-                )
+                pybullet_util.set_config(robot, joint_id, base_pos, base_quat, joint_pos)
                 if t < swing_time:
                     pbar.update(t)
                     time.sleep(dt)
@@ -854,9 +812,7 @@ if __name__ == "__main__":
                     __import__("ipdb").set_trace()
 
                 # visualize config
-                pybullet_util.set_config(
-                    robot, joint_id, base_pos, base_quat, joint_pos
-                )
+                pybullet_util.set_config(robot, joint_id, base_pos, base_quat, joint_pos)
                 if t < swing_time:
                     pbar.update(t)
                     time.sleep(dt)
@@ -888,9 +844,7 @@ if __name__ == "__main__":
 
             ## normalize training data
             input_mean, input_std, input_normalized_data = util.normalize_data(x_data)
-            output_mean, output_std, output_normalized_data = util.normalize_data(
-                y_data
-            )
+            output_mean, output_std, output_normalized_data = util.normalize_data(y_data)
 
             x_data_torch, y_data_torch = (
                 torch.from_numpy(np.array(input_normalized_data)).float(),
@@ -932,23 +886,15 @@ if __name__ == "__main__":
 
             ## test model
             ## normalizing test set
-            test_input_normalized_data = util.normalize(
-                x_data_test, input_mean, input_std
-            )
-            test_output_normalized_data = util.normalize(
-                y_data_test, output_mean, output_std
-            )
+            test_input_normalized_data = util.normalize(x_data_test, input_mean, input_std)
+            test_output_normalized_data = util.normalize(y_data_test, output_mean, output_std)
 
             test_x_data_torch, test_y_data_torch = (
                 torch.from_numpy(np.array(test_input_normalized_data)).float(),
                 torch.from_numpy(np.array(test_output_normalized_data)).float(),
             )
-            test_torch_dataset = torch_utils.TensorDataset(
-                test_x_data_torch, test_y_data_torch
-            )
-            test_data_loader = torch_utils.DataLoader(
-                dataset=test_torch_dataset, batch_size=BATCH_SIZE, shuffle=False
-            )
+            test_torch_dataset = torch_utils.TensorDataset(test_x_data_torch, test_y_data_torch)
+            test_data_loader = torch_utils.DataLoader(dataset=test_torch_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
             test_loss_idx = 0
             crbi_model.eval()
@@ -969,9 +915,7 @@ if __name__ == "__main__":
             # plt.show()
         elif pybullet_util.is_key_triggered(keys, "5"):
             print("=" * 80)
-            print(
-                "Pressed 5: generate data set with multiprocessing and training CRBI model"
-            )
+            print("Pressed 5: generate data set with multiprocessing and training CRBI model")
 
             ##################################################################
             """DATA Generation"""
@@ -1075,9 +1019,7 @@ if __name__ == "__main__":
                 torch.from_numpy(np.array(normalized_y_data_val)).float(),
             )
 
-            val_torch_dataset = torch_utils.TensorDataset(
-                x_data_val_torch, y_data_val_torch
-            )
+            val_torch_dataset = torch_utils.TensorDataset(x_data_val_torch, y_data_val_torch)
             val_data_loader = torch_utils.DataLoader(
                 dataset=val_torch_dataset,
                 batch_size=BATCH_SIZE,
@@ -1147,20 +1089,14 @@ if __name__ == "__main__":
             ##################################################################
             """Test Regressor"""
             ##################################################################
-            normalized_x_data_test = util.normalize(
-                x_data_test, mean_x_data, std_x_data
-            )
-            normalized_y_data_test = util.normalize(
-                y_data_test, mean_y_data, std_y_data
-            )
+            normalized_x_data_test = util.normalize(x_data_test, mean_x_data, std_x_data)
+            normalized_y_data_test = util.normalize(y_data_test, mean_y_data, std_y_data)
             x_data_test_torch, y_data_test_torch = (
                 torch.from_numpy(np.array(normalized_x_data_test)).float(),
                 torch.from_numpy(np.array(normalized_y_data_test)).float(),
             )
 
-            test_torch_dataset = torch_utils.TensorDataset(
-                x_data_test_torch, y_data_test_torch
-            )
+            test_torch_dataset = torch_utils.TensorDataset(x_data_test_torch, y_data_test_torch)
             test_data_loader = torch_utils.DataLoader(
                 dataset=test_torch_dataset,
                 batch_size=BATCH_SIZE,
@@ -1179,9 +1115,7 @@ if __name__ == "__main__":
                         test_loss += loss.item()
                     test_loss_per_epoch = test_loss / len(test_data_loader)
 
-                    writer.add_scalar(
-                        "test loss vs epoch", test_loss_per_epoch, epoch + 1
-                    )
+                    writer.add_scalar("test loss vs epoch", test_loss_per_epoch, epoch + 1)
 
             print("=" * 80)
             print("CRBI test done")
@@ -1200,9 +1134,7 @@ if __name__ == "__main__":
             with torch.no_grad():
                 for i, (b_x, b_y) in enumerate(test_data_loader2):
                     output = nn_crbi_model(b_x)
-                    gt_denormalized_output = util.denormalize(
-                        np.squeeze(b_y.numpy(), axis=0), mean_y_data, std_y_data
-                    )
+                    gt_denormalized_output = util.denormalize(np.squeeze(b_y.numpy(), axis=0), mean_y_data, std_y_data)
                     predict_denormalized_output = util.denormalize(
                         np.squeeze(output.numpy(), axis=0), mean_y_data, std_y_data
                     )
@@ -1214,9 +1146,7 @@ if __name__ == "__main__":
             ##plot
             fig, axes = plt.subplots(6, 1)
             for i in range(6):
-                axes[i].plot(
-                    iter_list, [gt_inertia[i] for gt_inertia in gt_inertia_list], "r"
-                )
+                axes[i].plot(iter_list, [gt_inertia[i] for gt_inertia in gt_inertia_list], "r")
                 axes[i].plot(
                     iter_list,
                     [predict_inertia[i] for predict_inertia in predict_inertia_list],

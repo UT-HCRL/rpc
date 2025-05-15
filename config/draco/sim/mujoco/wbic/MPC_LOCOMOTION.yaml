@@ -68,7 +68,7 @@ mpc_params:
 
 
 swing_foot:
-  height: 0.05
+  height: 0.10
   raibert_gain: 0.02
   high_speed_turning_gain: 1.0
   landing_foot_offset: [0.0, 0.0, 0.0]

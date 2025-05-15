@@ -90,6 +90,11 @@ message pnc_msg {
   repeated Pos des_rf_pos_traj = 53;
   repeated Euler des_lf_ori_traj = 54;
   repeated Euler des_rf_ori_traj = 55;
+
+  // commands from user
+  Pos vel_cmd = 56;
+  float yaw_rate_cmd = 57;
+  Euler des_ori = 58;
 }
 
 message rs_teleop_msg {

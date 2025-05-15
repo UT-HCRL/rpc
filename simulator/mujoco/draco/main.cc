@@ -31,10 +31,12 @@
 
 // rpc related headers
 #include "configuration.hpp"
+#include "controller/draco_controller/draco_control_architecture.hpp"
 #include "controller/draco_controller/draco_interface.hpp"
+#include "controller/draco_controller/draco_state_provider.hpp"
 #include "controller/robot_system/pinocchio_robot_system.hpp"
-#include "util/util.hpp"
 #include "mujoco_utils.hpp"
+#include "util/util.hpp"
 
 #define MUJOCO_PLUGIN_DIR "mujoco_plugin"
 
@@ -530,6 +532,10 @@ void PhysicsLoop(mj::Simulate &sim) {
   mjtNum syncSim = 0;
 
   int iter{0};
+  // bool finished_init = false;
+  // bool init_timer_started = false;
+  // double init_start_time;
+  // double init_duration = 4.5;
   //***************************************************
   // run until asked to exit (main simulation while loop)
   //***************************************************
@@ -633,6 +639,25 @@ void PhysicsLoop(mj::Simulate &sim) {
           // elapsed CPU and simulation time since last sync
           const auto elapsedCPU = startCPU - syncCPU;
           double elapsedSim = d->time - syncSim;
+
+          // if (sp->state_ == draco_states::kInitialize && !init_timer_started)
+          // {
+          //   init_timer_started = true;
+          //   init_start_time = d->time;
+          //   std::cout << "Init timer started" << std::endl;
+          // }
+
+          // if (!finished_init && d->time > init_start_time + init_duration) {
+          //   for (int i = 0; i < m->neq; ++i) {
+          //     if (m->eq_type[i] == mjEQ_WELD) {
+          //       d->eq_active[i] = 0; // disable weld
+          //     }
+          //   }
+          //   // apply change safely
+          //   mj_forward(m, d);
+          //   finished_init = true;
+          //   std::cout << "Disabled weld constraints" << std::endl;
+          // }
 
           // inject noise
           // if (sim.ctrl_noise_std) {
@@ -746,6 +771,7 @@ void PhysicsThread(mj::Simulate *sim, const char *filename) {
       draco_interface = new DracoInterface();
       draco_sensor_data = new DracoSensorData();
       draco_command = new DracoCommand();
+      // sp = DracoStateProvider::GetStateProvider();
       //**********************************************
 
       // Pass keystroke interrupt
@@ -759,10 +785,10 @@ void PhysicsThread(mj::Simulate *sim, const char *filename) {
           draco_interface->GetPinocchioModel()->GetJointNameAndIndexMap();
       pin_act_map_ =
           draco_interface->GetPinocchioModel()->GetActuatorNameAndIndexMap();
-          
-      mjc_utils::SetJointAndActuatorMaps(m, mj_qpos_map_, mj_qvel_map_, mj_act_map_,
-                              pin_jnt_map_,
-                              pin_act_map_);
+
+      mjc_utils::SetJointAndActuatorMaps(m, mj_qpos_map_, mj_qvel_map_,
+                                         mj_act_map_, pin_jnt_map_,
+                                         pin_act_map_);
       // ********************************************
 
       // Configure sensor (imu)
@@ -785,6 +811,13 @@ void PhysicsThread(mj::Simulate *sim, const char *filename) {
       //**********************************************
       SetInitialConfig(m, d, mj_qpos_map_);
       //**********************************************
+
+      // // Disable all weld equalities (or selectively the base weld)
+      // for (int i = 0; i < m->neq; ++i) {
+      //   if (m->eq_type[i] == mjEQ_WELD) {
+      //     d->eq_active[i] = 0; // disable weld
+      //   }
+      // }
 
       // lock the sim mutex
       const std::unique_lock<std::recursive_mutex> lock(sim->mtx);

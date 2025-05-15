@@ -62,16 +62,10 @@ void Initialize::OneStep() {
 void Initialize::LastVisit() {}
 
 bool Initialize::EndOfState() {
-  if (b_stay_here_) {
-    return false;
-  } else {
-    return (state_machine_time_ >= end_time_ + wait_time_) ? true : false;
-  }
+  return !b_stay_here_ && (state_machine_time_ >= end_time_ + wait_time_);
 }
 
-StateId Initialize::GetNextState() {
-  return g1_states::kDoubleSupportStandUp;
-}
+StateId Initialize::GetNextState() { return g1_states::kDoubleSupportStandUp; }
 
 void Initialize::SetParameters(const YAML::Node &node) {
   try {

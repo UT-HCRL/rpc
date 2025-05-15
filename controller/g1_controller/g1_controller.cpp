@@ -22,8 +22,7 @@
 #endif
 
 G1Controller::G1Controller(G1TCIContainer *tci_container,
-                                 PinocchioRobotSystem *robot,
-                                 const YAML::Node &cfg)
+                           PinocchioRobotSystem *robot, const YAML::Node &cfg)
     : tci_container_(tci_container), robot_(robot),
       joint_pos_cmd_(Eigen::VectorXd::Zero(g1::n_adof)),
       joint_vel_cmd_(Eigen::VectorXd::Zero(g1::n_adof)),
@@ -289,6 +288,13 @@ void G1Controller::GetCommand(void *command) {
   static_cast<G1Command *>(command)->joint_pos_cmd_ = joint_pos_cmd_;
   static_cast<G1Command *>(command)->joint_vel_cmd_ = joint_vel_cmd_;
   static_cast<G1Command *>(command)->joint_trq_cmd_ = joint_trq_cmd_;
+
+  //   std::cout << "joint pos command:\n" << joint_pos_cmd_ << std::endl;
+  //   std::cout << "joint vel command:\n" << joint_vel_cmd_ << std::endl;
+  //   std::cout << "joint trq command:\n" << joint_trq_cmd_ << std::endl;
+
+  //   if (sp_->state_ > g1_states_wbic::kDoubleSupportStandUp)
+  //     throw std::invalid_argument("test");
 
   joint_trq_cmd_prev_ = joint_trq_cmd_;
 

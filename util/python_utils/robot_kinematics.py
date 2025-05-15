@@ -7,9 +7,7 @@ from util.python_utils.util import *
 from util.python_utils.liegroup import *
 
 
-def get_kinematics_config(
-    robot, joint_id, link_id, open_chain_joints, base_link, ee_link
-):
+def get_kinematics_config(robot, joint_id, link_id, open_chain_joints, base_link, ee_link):
     joint_screws_in_ee = np.zeros((6, len(open_chain_joints)))
     ee_link_state = p.getLinkState(robot, link_id[ee_link])
     if link_id[base_link] == -1:
@@ -18,9 +16,7 @@ def get_kinematics_config(
         base_link_state = p.getLinkState(robot, link_id[base_link])
         base_pos, base_quat = base_link_state[0], base_link_state[1]
     T_w_b = RpToTrans(quat_to_rot(np.array(base_quat)), np.array(base_pos))
-    T_w_ee = RpToTrans(
-        quat_to_rot(np.array(ee_link_state[1])), np.array(ee_link_state[0])
-    )
+    T_w_ee = RpToTrans(quat_to_rot(np.array(ee_link_state[1])), np.array(ee_link_state[0]))
     T_b_ee = np.dot(TransInv(T_w_b), T_w_ee)
     for i, joint_name in enumerate(open_chain_joints):
         joint_info = p.getJointInfo(robot, joint_id[joint_name])
@@ -141,12 +137,10 @@ def JacobianBody(Blist, thetalist):
                   [-1.44321167, 2.94561275,  1.43306521, 0.3]
                   [-2.06639565, 1.82881722, -1.58868628, 0.4]])
     """
-    Jb = np.array(Blist).copy().astype(np.float)
+    Jb = np.array(Blist).copy().astype(float)
     T = np.eye(4)
     for i in range(len(thetalist) - 2, -1, -1):
-        T = np.dot(
-            T, MatrixExp6(VecTose3(np.array(Blist)[:, i + 1] * -thetalist[i + 1]))
-        )
+        T = np.dot(T, MatrixExp6(VecTose3(np.array(Blist)[:, i + 1] * -thetalist[i + 1])))
         Jb[:, i] = np.dot(Adjoint(T), np.array(Blist)[:, i])
     return Jb
 
@@ -176,9 +170,7 @@ def JacobianSpace(Slist, thetalist):
     Js = np.array(Slist).copy().astype(np.float)
     T = np.eye(4)
     for i in range(1, len(thetalist)):
-        T = np.dot(
-            T, MatrixExp6(VecTose3(np.array(Slist)[:, i - 1] * thetalist[i - 1]))
-        )
+        T = np.dot(T, MatrixExp6(VecTose3(np.array(Slist)[:, i - 1] * thetalist[i - 1])))
         Js[:, i] = np.dot(Adjoint(T), np.array(Slist)[:, i])
     return Js
 
@@ -276,20 +268,12 @@ def IKinBody(Blist, M, T, thetalist0, eomg=1.0e-2, ev=1.0e-4):
     i = 0
     maxiterations = 20
     Vb = se3ToVec(MatrixLog6(np.dot(TransInv(FKinBody(M, Blist, thetalist)), T)))
-    err = (
-        np.linalg.norm([Vb[0], Vb[1], Vb[2]]) > eomg
-        or np.linalg.norm([Vb[3], Vb[4], Vb[5]]) > ev
-    )
+    err = np.linalg.norm([Vb[0], Vb[1], Vb[2]]) > eomg or np.linalg.norm([Vb[3], Vb[4], Vb[5]]) > ev
     while err and i < maxiterations:
-        thetalist = thetalist + np.dot(
-            np.linalg.pinv(JacobianBody(Blist, thetalist)), Vb
-        )
+        thetalist = thetalist + np.dot(np.linalg.pinv(JacobianBody(Blist, thetalist)), Vb)
         i = i + 1
         Vb = se3ToVec(MatrixLog6(np.dot(TransInv(FKinBody(M, Blist, thetalist)), T)))
-        err = (
-            np.linalg.norm([Vb[0], Vb[1], Vb[2]]) > eomg
-            or np.linalg.norm([Vb[3], Vb[4], Vb[5]]) > ev
-        )
+        err = np.linalg.norm([Vb[0], Vb[1], Vb[2]]) > eomg or np.linalg.norm([Vb[3], Vb[4], Vb[5]]) > ev
     return (thetalist, not err)
 
 
@@ -341,19 +325,11 @@ def IKinSpace(Slist, M, T, thetalist0, eomg=1.0e-2, ev=1.0e-4):
     maxiterations = 20
     Tsb = FKinSpace(M, Slist, thetalist)
     Vs = np.dot(Adjoint(Tsb), se3ToVec(MatrixLog6(np.dot(TransInv(Tsb), T))))
-    err = (
-        np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > eomg
-        or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > ev
-    )
+    err = np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > eomg or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > ev
     while err and i < maxiterations:
-        thetalist = thetalist + np.dot(
-            np.linalg.pinv(JacobianSpace(Slist, thetalist)), Vs
-        )
+        thetalist = thetalist + np.dot(np.linalg.pinv(JacobianSpace(Slist, thetalist)), Vs)
         i = i + 1
         Tsb = FKinSpace(M, Slist, thetalist)
         Vs = np.dot(Adjoint(Tsb), se3ToVec(MatrixLog6(np.dot(TransInv(Tsb), T))))
-        err = (
-            np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > eomg
-            or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > ev
-        )
+        err = np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > eomg or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > ev
     return (thetalist, not err)

@@ -12,16 +12,17 @@ exp_data_location = '/tmp';
 
 b_include_lhand_task = false;
 
-d = dir(sprintf("%s/draco_controller_data*.mat", exp_data_location));
+d = dir(sprintf("%s/g1_controller_data*.mat", exp_data_location));
 [tmp, i] = max([d.datenum]);
 fprintf('loading %s \n', d(i).name)
 load(d(i).name)
+x = whos('-file', d(i).name)
 
 dd = dir("/tmp/draco_state_estimator_data*.mat");
 % dd = dir(sprintf("%s/draco_state_estimator_kf_data*.mat", exp_data_location));
 [tmp, i] = max([dd.datenum]);
 fprintf('loading %s \n', dd(i).name)
-load(dd(i).name, 'icp_est')
+% load(dd(i).name, 'icp_est')
 load(dd(i).name, 'joint_pos_act')
 load(dd(i).name, 'joint_vel_act')
 load(dd(i).name, 'b_lf_contact_touchdown')
@@ -33,13 +34,13 @@ load(dd(i).name, 'b_rf_contact')
 load(dd(i).name, 'act_rf_z_lfoot')
 load(dd(i).name, 'act_rf_z_rfoot')
 
-ddd = dir(sprintf("%s/draco_icp_data*.mat", exp_data_location));
-[tmp, i] = max([ddd.datenum]);
-fprintf('loading %s \n', ddd(i).name)
-load(ddd(i).name, 'des_icp')
+% ddd = dir(sprintf("%s/draco_icp_data*.mat", exp_data_location));
+% [tmp, i] = max([ddd.datenum]);
+% fprintf('loading %s \n', ddd(i).name)
+% load(ddd(i).name, 'des_icp')
 % load(ddd(i).name, 'act_icp')
-load(ddd(i).name, 'local_des_icp')
-load(ddd(i).name, 'local_act_icp')
+% load(ddd(i).name, 'local_des_icp')
+% load(ddd(i).name, 'local_act_icp')
 
 %%
 load_draco_label_names
@@ -74,47 +75,47 @@ num_fig = 1;
 %Icp task
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 figure(num_fig)
-num_fig = num_fig + 1;
-j = 0;
-for i = 1:2
-    ax(i) = subplot(2,1,i);
-        j = j + 1;
-        plot(wbc_time, des_icp(j, :), 'r', 'LineWidth', 3);
-        hold on
-        plot(wbc_time, icp_est(j, :), 'b', 'LineWidth', 2);
-        grid on
-        min_val = min([des_icp(j,:), icp_est(j,:)]);
-        max_val = max([des_icp(j,:), icp_est(j,:)]);
-        min_val = min_val - 0.1 * (max_val - min_val);
-        max_val = max_val + 0.1 *(max_val - min_val);
-        set_fig_opt()
-        plot_phase(time, state, min_val, max_val, phase_color)
-        xlabel('time')
-        ylabel(xy_label(j))
-    sgtitle('ICP XY Task', 'FontSize', 30)
-end
-linkaxes(ax, 'x')
-
-figure(num_fig)
-num_fig = num_fig + 1;
-j = 0;
-for i = 1:2
-    subplot(2,1,i);
-        j = j + 1;
-        plot(wbc_time, local_des_icp(j, :), 'r', 'LineWidth', 3);
-        hold on
-        plot(wbc_time, local_act_icp(j, :), 'b', 'LineWidth', 2);
-        grid on
-        min_val = min([local_des_icp(j,:), local_act_icp(j,:)]);
-        max_val = max([local_des_icp(j,:), local_act_icp(j,:)]);
-        min_val = min_val - 0.1 * (max_val - min_val);
-        max_val = max_val + 0.1 *(max_val - min_val);
-        set_fig_opt()
-        plot_phase(time, state, min_val, max_val, phase_color)
-        xlabel('time')
-        ylabel(xy_label(j))
-    sgtitle('ICP XY Task in LOCAL', 'FontSize', 30)
-end
+% num_fig = num_fig + 1;
+% j = 0;
+% for i = 1:2
+%     ax(i) = subplot(2,1,i);
+%         j = j + 1;
+%         plot(wbc_time, des_icp(j, :), 'r', 'LineWidth', 3);
+%         hold on
+%         plot(wbc_time, icp_est(j, :), 'b', 'LineWidth', 2);
+%         grid on
+%         min_val = min([des_icp(j,:), icp_est(j,:)]);
+%         max_val = max([des_icp(j,:), icp_est(j,:)]);
+%         min_val = min_val - 0.1 * (max_val - min_val);
+%         max_val = max_val + 0.1 *(max_val - min_val);
+%         set_fig_opt()
+%         plot_phase(time, state, min_val, max_val, phase_color)
+%         xlabel('time')
+%         ylabel(xy_label(j))
+%     sgtitle('ICP XY Task', 'FontSize', 30)
+% end
+% linkaxes(ax, 'x')
+% 
+% figure(num_fig)
+% num_fig = num_fig + 1;
+% j = 0;
+% for i = 1:2
+%     subplot(2,1,i);
+%         j = j + 1;
+%         plot(wbc_time, local_des_icp(j, :), 'r', 'LineWidth', 3);
+%         hold on
+%         plot(wbc_time, local_act_icp(j, :), 'b', 'LineWidth', 2);
+%         grid on
+%         min_val = min([local_des_icp(j,:), local_act_icp(j,:)]);
+%         max_val = max([local_des_icp(j,:), local_act_icp(j,:)]);
+%         min_val = min_val - 0.1 * (max_val - min_val);
+%         max_val = max_val + 0.1 *(max_val - min_val);
+%         set_fig_opt()
+%         plot_phase(time, state, min_val, max_val, phase_color)
+%         xlabel('time')
+%         ylabel(xy_label(j))
+%     sgtitle('ICP XY Task in LOCAL', 'FontSize', 30)
+% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %com xy task

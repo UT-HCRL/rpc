@@ -34,8 +34,8 @@
 #include "configuration.hpp"
 #include "controller/g1_controller/g1_interface.hpp"
 #include "controller/robot_system/pinocchio_robot_system.hpp"
-#include "util/util.hpp"
 #include "mujoco_utils.hpp"
+#include "util/util.hpp"
 
 #define MUJOCO_PLUGIN_DIR "mujoco_plugin"
 
@@ -240,7 +240,7 @@ void scanPluginLibraries() {
 //------------------------------------------- simulation
 //-------------------------------------------
 
-const char* Diverged(int disableflags, const mjData* d) {
+const char *Diverged(int disableflags, const mjData *d) {
   if (disableflags & mjDSBL_AUTORESET) {
     for (mjtWarning w : {mjWARN_BADQACC, mjWARN_BADQVEL, mjWARN_BADQPOS}) {
       if (d->warning[w].number > 0) {
@@ -442,8 +442,7 @@ bool CopySensorData() {
   mjtNum *imu_ang_vel = &d->sensordata[imu_ang_vel_adr_];
   Eigen::Vector3d imu_ang_vel_in_imu(imu_ang_vel[0], imu_ang_vel[1],
                                      imu_ang_vel[2]);
-  g1_sensor_data->imu_ang_vel_ =
-      world_Q_imu.normalized() * imu_ang_vel_in_imu;
+  g1_sensor_data->imu_ang_vel_ = world_Q_imu.normalized() * imu_ang_vel_in_imu;
 
   // imu linear acceleration
   const double grav_acc = 9.81;
@@ -451,8 +450,7 @@ bool CopySensorData() {
   Eigen::Vector3d imu_lin_acc_in_imu(imu_lin_acc[0], imu_lin_acc[1],
                                      imu_lin_acc[2] + grav_acc);
   world_Q_imu.normalized() * imu_lin_acc_in_imu * m->opt.timestep;
-  g1_sensor_data->imu_lin_acc_ =
-      world_Q_imu.normalized() * imu_lin_acc_in_imu;
+  g1_sensor_data->imu_lin_acc_ = world_Q_imu.normalized() * imu_lin_acc_in_imu;
   g1_sensor_data->imu_dvel_ =
       world_Q_imu.normalized() * imu_lin_acc_in_imu * m->opt.timestep;
   // std::cout << "-------------------------------------------------------"
@@ -486,8 +484,8 @@ void CopyCommand() {
 
     d->ctrl[mj_act_idx] =
         g1_command->joint_trq_cmd_[pin_act_idx] +
-        kp_[mj_act_idx] * (g1_command->joint_pos_cmd_[pin_act_idx] -
-                           d->qpos[mj_qpos_idx]) +
+        kp_[mj_act_idx] *
+            (g1_command->joint_pos_cmd_[pin_act_idx] - d->qpos[mj_qpos_idx]) +
         kd_[mj_act_idx] *
             (g1_command->joint_vel_cmd_[pin_act_idx] - d->qvel[mj_qvel_idx]);
   }
@@ -629,7 +627,7 @@ void PhysicsLoop(mj::Simulate &sim) {
 
             // run single step, let next iteration deal with timing
             mj_step(m, d);
-            const char* message = Diverged(m->opt.disableflags, d);
+            const char *message = Diverged(m->opt.disableflags, d);
             if (message) {
               sim.run = 0;
               mju::strcpy_arr(sim.load_error, message);
@@ -663,7 +661,7 @@ void PhysicsLoop(mj::Simulate &sim) {
 
               // call mj_step
               mj_step(m, d);
-              const char* message = Diverged(m->opt.disableflags, d);
+              const char *message = Diverged(m->opt.disableflags, d);
               if (message) {
                 sim.run = 0;
                 mju::strcpy_arr(sim.load_error, message);
@@ -732,16 +730,16 @@ void PhysicsThread(mj::Simulate *sim, const char *filename) {
           g1_interface->GetPinocchioModel()->GetJointNameAndIndexMap();
       pin_act_map_ =
           g1_interface->GetPinocchioModel()->GetActuatorNameAndIndexMap();
-          
-      mjc_utils::SetJointAndActuatorMaps(m, mj_qpos_map_, mj_qvel_map_, mj_act_map_,
-                              pin_jnt_map_,
-                              pin_act_map_);
+
+      mjc_utils::SetJointAndActuatorMaps(m, mj_qpos_map_, mj_qvel_map_,
+                                         mj_act_map_, pin_jnt_map_,
+                                         pin_act_map_);
       // ********************************************
 
       // Configure sensor (imu)
       // ********************************************
       mjc_utils::ConfigureSensors(m, imu_orientation_adr_, imu_ang_vel_adr_,
-                       imu_lin_acc_adr_, imu_lin_vel_adr_);
+                                  imu_lin_acc_adr_, imu_lin_vel_adr_);
       // ********************************************
 
       // Set YAML Node
@@ -837,7 +835,7 @@ int main(int argc, char **argv) {
   if (argc > 1) {
     filename = argv[1];
   } else {
-    filename = THIS_COM "robot_model/g1/wing_scene.xml";
+    filename = THIS_COM "robot_model/g1/scene.xml";
   }
 
   // start physics thread

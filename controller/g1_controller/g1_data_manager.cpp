@@ -157,6 +157,21 @@ void G1DataManager::SendData() {
     rf_ori_msg.set_z(des_ori(2));
     msg.add_des_rf_ori_traj()->CopyFrom(rf_ori_msg);
   }
+
+  g1::Pos vel_cmd_msg;
+  vel_cmd_msg.set_x(data_->x_vel_cmd_);
+  vel_cmd_msg.set_y(data_->y_vel_cmd_);
+  vel_cmd_msg.set_z(0.0);
+  msg.mutable_vel_cmd()->CopyFrom(vel_cmd_msg);
+
+  msg.set_yaw_rate_cmd(data_->yaw_rate_cmd_);
+
+  g1::Euler des_ori_msg;
+  des_ori_msg.set_x(data_->des_ori_(0));
+  des_ori_msg.set_y(data_->des_ori_(1));
+  des_ori_msg.set_z(data_->des_ori_(2));
+  msg.mutable_des_ori()->CopyFrom(des_ori_msg);
+
   // serialize msg in string type
   std::string encoded_msg;
   msg.SerializeToString(&encoded_msg);

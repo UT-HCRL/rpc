@@ -3,6 +3,7 @@
 #include "configuration.hpp"
 #include "controller/g1_controller/g1_control_architecture_wbic.hpp"
 #include "controller/g1_controller/g1_controller.hpp"
+#include "controller/g1_controller/g1_crbi/g1_composite_rigid_body_inertia.hpp"
 #include "controller/g1_controller/g1_definition.hpp"
 #include "controller/g1_controller/g1_state_machines_wbic/contact_transition_end.hpp"
 #include "controller/g1_controller/g1_state_machines_wbic/contact_transition_start.hpp"
@@ -65,18 +66,16 @@ G1ControlArchitecture_WBIC::G1ControlArchitecture_WBIC(
   //=============================================================
   YAML::Node cfg_mpc;
   if (test_env_name == "mujoco") {
-    cfg_mpc = YAML::LoadFile(
-        THIS_COM "config/g1/sim/mujoco/wbic/MPC_LOCOMOTION.yaml");
+    cfg_mpc = YAML::LoadFile(THIS_COM
+                             "config/g1/sim/mujoco/wbic/MPC_LOCOMOTION.yaml");
   } else if (test_env_name == "pybullet") {
-    cfg_mpc = YAML::LoadFile(
-        THIS_COM "config/g1/sim/pybullet/wbic/MPC_LOCOMOTION.yaml");
+    cfg_mpc = YAML::LoadFile(THIS_COM
+                             "config/g1/sim/pybullet/wbic/MPC_LOCOMOTION.yaml");
   } else if (test_env_name == "hw") {
-    cfg_mpc =
-        YAML::LoadFile(THIS_COM "config/g1/hw/wbic/MPC_LOCOMOTION.yaml");
+    cfg_mpc = YAML::LoadFile(THIS_COM "config/g1/hw/wbic/MPC_LOCOMOTION.yaml");
   } else {
-    std::cout
-        << "[G1ControlArchitecture_WBIC] Please check the test_env_name"
-        << '\n';
+    std::cout << "[G1ControlArchitecture_WBIC] Please check the test_env_name"
+              << '\n';
     assert(false);
   }
 
@@ -141,9 +140,11 @@ G1ControlArchitecture_WBIC::G1ControlArchitecture_WBIC(
                       "foot_half_width", temp_val);
   mpc_params_->foot_half_width_ = temp_val;
 
-  convex_mpc_locomotion_ = new ConvexMPCLocomotion(
-      sp_->servo_dt_, iterations_between_mpc, robot_, b_save_mpc_solution,
-      mpc_params_);
+  g1_crbi_model_ = new G1CompositeRigidBodyInertia();
+
+  convex_mpc_locomotion_ =
+      new ConvexMPCLocomotion(sp_->servo_dt_, iterations_between_mpc, robot_,
+                              b_save_mpc_solution, mpc_params_, g1_crbi_model_);
 #endif
 
   //=============================================================
@@ -196,22 +197,19 @@ G1ControlArchitecture_WBIC::G1ControlArchitecture_WBIC(
   locomotion_state_machine_container_[g1_states_wbic::kInitialize]
       ->SetParameters(cfg);
 
-  locomotion_state_machine_container_
-      [g1_states_wbic::kDoubleSupportStandUp] =
-          new DoubleSupportStandUp_WBIC(
-              g1_states_wbic::kDoubleSupportStandUp, robot_, this);
+  locomotion_state_machine_container_[g1_states_wbic::kDoubleSupportStandUp] =
+      new DoubleSupportStandUp_WBIC(g1_states_wbic::kDoubleSupportStandUp,
+                                    robot_, this);
   locomotion_state_machine_container_[g1_states_wbic::kDoubleSupportStandUp]
       ->SetParameters(cfg);
 
-  locomotion_state_machine_container_
-      [g1_states_wbic::kDoubleSupportBalance] =
-          new DoubleSupportBalance_WBIC(
-              g1_states_wbic::kDoubleSupportBalance, robot_, this);
+  locomotion_state_machine_container_[g1_states_wbic::kDoubleSupportBalance] =
+      new DoubleSupportBalance_WBIC(g1_states_wbic::kDoubleSupportBalance,
+                                    robot_, this);
 
-  locomotion_state_machine_container_
-      [g1_states_wbic::kDoubleSupportSwaying] =
-          new DoubleSupportSwaying_WBIC(
-              g1_states_wbic::kDoubleSupportSwaying, robot_, this);
+  locomotion_state_machine_container_[g1_states_wbic::kDoubleSupportSwaying] =
+      new DoubleSupportSwaying_WBIC(g1_states_wbic::kDoubleSupportSwaying,
+                                    robot_, this);
   locomotion_state_machine_container_[g1_states_wbic::kDoubleSupportSwaying]
       ->SetParameters(cfg);
 
@@ -219,21 +217,18 @@ G1ControlArchitecture_WBIC::G1ControlArchitecture_WBIC(
       [g1_states_wbic::kLFContactTransitionStart] =
           new ContactTransitionStart_WBIC(
               g1_states_wbic::kLFContactTransitionStart, robot_, this);
-  locomotion_state_machine_container_
-      [g1_states_wbic::kLFContactTransitionStart]
-          ->SetParameters(cfg);
+  locomotion_state_machine_container_[g1_states_wbic::kLFContactTransitionStart]
+      ->SetParameters(cfg);
 
-  locomotion_state_machine_container_
-      [g1_states_wbic::kLFContactTransitionEnd] =
-          new ContactTransitionEnd_WBIC(
-              g1_states_wbic::kLFContactTransitionEnd, robot_, this);
-  locomotion_state_machine_container_
-      [g1_states_wbic::kLFContactTransitionEnd]
-          ->SetParameters(cfg);
+  locomotion_state_machine_container_[g1_states_wbic::kLFContactTransitionEnd] =
+      new ContactTransitionEnd_WBIC(g1_states_wbic::kLFContactTransitionEnd,
+                                    robot_, this);
+  locomotion_state_machine_container_[g1_states_wbic::kLFContactTransitionEnd]
+      ->SetParameters(cfg);
 
-  locomotion_state_machine_container_
-      [g1_states_wbic::kLFSingleSupportSwing] = new SingleSupportSwing_WBIC(
-          g1_states_wbic::kLFSingleSupportSwing, robot_, this);
+  locomotion_state_machine_container_[g1_states_wbic::kLFSingleSupportSwing] =
+      new SingleSupportSwing_WBIC(g1_states_wbic::kLFSingleSupportSwing, robot_,
+                                  this);
   locomotion_state_machine_container_[g1_states_wbic::kLFSingleSupportSwing]
       ->SetParameters(cfg);
 
@@ -241,21 +236,18 @@ G1ControlArchitecture_WBIC::G1ControlArchitecture_WBIC(
       [g1_states_wbic::kRFContactTransitionStart] =
           new ContactTransitionStart_WBIC(
               g1_states_wbic::kRFContactTransitionStart, robot_, this);
-  locomotion_state_machine_container_
-      [g1_states_wbic::kRFContactTransitionStart]
-          ->SetParameters(cfg);
+  locomotion_state_machine_container_[g1_states_wbic::kRFContactTransitionStart]
+      ->SetParameters(cfg);
 
-  locomotion_state_machine_container_
-      [g1_states_wbic::kRFContactTransitionEnd] =
-          new ContactTransitionEnd_WBIC(
-              g1_states_wbic::kRFContactTransitionEnd, robot_, this);
-  locomotion_state_machine_container_
-      [g1_states_wbic::kRFContactTransitionEnd]
-          ->SetParameters(cfg);
+  locomotion_state_machine_container_[g1_states_wbic::kRFContactTransitionEnd] =
+      new ContactTransitionEnd_WBIC(g1_states_wbic::kRFContactTransitionEnd,
+                                    robot_, this);
+  locomotion_state_machine_container_[g1_states_wbic::kRFContactTransitionEnd]
+      ->SetParameters(cfg);
 
-  locomotion_state_machine_container_
-      [g1_states_wbic::kRFSingleSupportSwing] = new SingleSupportSwing_WBIC(
-          g1_states_wbic::kRFSingleSupportSwing, robot_, this);
+  locomotion_state_machine_container_[g1_states_wbic::kRFSingleSupportSwing] =
+      new SingleSupportSwing_WBIC(g1_states_wbic::kRFSingleSupportSwing, robot_,
+                                  this);
   locomotion_state_machine_container_[g1_states_wbic::kRFSingleSupportSwing]
       ->SetParameters(cfg);
 
@@ -327,9 +319,6 @@ void G1ControlArchitecture_WBIC::GetCommand(void *command) {
   upper_body_tm_->UseNominalUpperBodyJointPos(
       sp_->nominal_jpos_); // state independent upper body traj setting
 
-  // TODO: make it general
-  // tci_container_->task_map_["wbo_task"]->UpdateDesired(
-  // sp_->wbo_des_, Eigen::VectorXd::Zero(3), Eigen::VectorXd::Zero(3));
   controller_->GetCommand(command); // get control command
 
   if (locomotion_state_machine_container_[loco_state_]->EndOfState()) {
