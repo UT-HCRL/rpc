@@ -469,7 +469,6 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         }
         if(cost_mask_[3]) {
             for(size_t i = 0; i < N; i++){
-                // std::cout << "Setting the frame references for the " << i << "th frame" << std::endl;
                 for (const auto& frame_name : frame_targets_) {
                     frame_residuals_[i][frame_name.first]->set_reference(desired_frames[i][frame_name.first]);
                 }
@@ -485,19 +484,26 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         xs.push_back(xs_out[0]);
         problem_->set_x0(xs[0]);
 
-        fddp_->solve(xs, us, max_iter_);
-
-        for (size_t i = 0; i < N; ++i) {
-            std::cout << "Iteration " << i << " frame references:" << std::endl;
-            for (const auto& frame_name : frame_targets_) {
-            const auto& frame_residual = frame_residuals_[i][frame_name.first];
-            const auto& reference = frame_residual->get_reference();
-            std::cout << "  Frame: " << frame_name.first 
-                  << ", Position: " << reference.translation().transpose() 
-                  << ", Rotation (RPY): " << reference.rotation().eulerAngles(0, 1, 2).transpose() 
-                  << std::endl;
+        if(cost_mask_[3]) {
+            for(size_t i = 0; i < N; i++){
+                for (const auto& frame_name : frame_targets_) {
+                    frame_residuals_[i][frame_name.first]->set_reference(desired_frames[i][frame_name.first]);
+                }
             }
         }
+        fddp_->solve(xs, us, max_iter_);
+
+        // for (size_t i = 0; i < N; ++i) {
+        //     std::cout << "Iteration " << i << " frame references:" << std::endl;
+        //     for (const auto& frame_name : frame_targets_) {
+        //     const auto& frame_residual = frame_residuals_[i][frame_name.first];
+        //     const auto& reference = frame_residual->get_reference();
+        //     std::cout << "  Frame: " << frame_name.first 
+        //           << ", Position: " << reference.translation().transpose() 
+        //           << ", Rotation (RPY): " << reference.rotation().eulerAngles(0, 1, 2).transpose() 
+        //           << std::endl;
+        //     }
+        // }
 
     }
     

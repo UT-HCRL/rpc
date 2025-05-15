@@ -107,13 +107,11 @@ void TrackPlan::Compute() {
   com_ref = robot_->GetRobotComPos();
 
 
-  std::unordered_map<std::string, pinocchio::SE3> desired_frames;
-  desired_frames.reserve(1);
-  Eigen::Isometry3d torso = robot_->GetLinkIsometry("torso_link");
-  Eigen::Vector3d torso_pos = torso.translation();
-  Eigen::Vector3d torso_rot = torso.rotation().eulerAngles(0, 1, 2);
-  pinocchio::SE3 current_pose = pinocchio::SE3(Eigen::AngleAxisd(torso_rot[0], Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(torso_rot[1], Eigen::Vector3d::UnitY()) * Eigen::AngleAxisd(torso_rot[2], Eigen::Vector3d::UnitZ()), torso_pos);
-  desired_frames["torso_link"] = current_pose;
+  // Eigen::Isometry3d torso = robot_->GetLinkIsometry("torso_link");
+  // Eigen::Vector3d torso_pos = torso.translation();
+  // Eigen::Vector3d torso_rot = torso.rotation().eulerAngles(0, 1, 2);
+  // pinocchio::SE3 current_pose = pinocchio::SE3(Eigen::AngleAxisd(torso_rot[0], Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(torso_rot[1], Eigen::Vector3d::UnitY()) * Eigen::AngleAxisd(torso_rot[2], Eigen::Vector3d::UnitZ()), torso_pos);
+  // desired_frames["torso_link"] = current_pose;
 
   // std::unordered_map<std::string, pinocchio::SE3> desired_frames2;
   // desired_frames2.reserve(1);
@@ -122,11 +120,6 @@ void TrackPlan::Compute() {
   // Eigen::Vector3d torso_rot2 = torso2.rotation().eulerAngles(0, 1, 2) + Eigen::Vector3d(0.05, -0.05, 0.1); // Slightly modified rotation
   // pinocchio::SE3 current_pose2 = pinocchio::SE3(Eigen::AngleAxisd(torso_rot2[0], Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(torso_rot2[1], Eigen::Vector3d::UnitY()) * Eigen::AngleAxisd(torso_rot2[2], Eigen::Vector3d::UnitZ()), torso_pos2);
   // desired_frames2["torso_link"] = current_pose2;
-
-  std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames_vec;
-  desired_frames_vec.resize(2);
-  desired_frames_vec[0] = desired_frames;
-  desired_frames_vec[1] = desired_frames;
 
   mpc_utils::MPCData data_out;
 
@@ -139,6 +132,22 @@ void TrackPlan::Compute() {
 
   while (run_threads_) {
     double controller_time = sp_->current_time_ - state_machine_start_time_;
+
+    std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames_vec;
+    desired_frames_vec.resize(g1_mpc_->getNhorizon());
+
+    for(int i=0; i<g1_mpc_->getNhorizon(); i++){
+      std::unordered_map<std::string, pinocchio::SE3> desired_frames;
+      
+      for(const auto& frame_name : g1_mpc_->getTargetFrameNames()) {
+        pinocchio::SE3 temp_pose;
+        temp_pose.setIdentity();
+        const double t = controller_time + i * g1_mpc_->getDt();
+        temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
+        desired_frames[frame_name] = temp_pose;
+      }
+      desired_frames_vec[i] = desired_frames;
+    }
 
     xs_out[0] << robot_->GetQ(), robot_->GetQdot();
 
