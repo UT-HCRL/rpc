@@ -58,7 +58,7 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
     max_iter_ = 100;
     //###############################################
 
-    frame_residuals_.resize(N_horizon_);
+    frame_residuals_.resize(N_horizon_ + 1);
 
     pinocchio::urdf::buildModel(robot_path, pinocchio::JointModelFreeFlyer(), model_full_);
 
@@ -136,6 +136,16 @@ void HumanoidMulticontactTracker::loadContactFrames(){
 
     setFrames(contact_frames);
 
+    for(const auto& frame_name : contact_frames){
+        double w_tang = 0;
+        double w_norm = 0;
+
+        util::ReadParameter(params_["running_costs"]["contact_frames"][frame_name], "wt", w_tang);
+        util::ReadParameter(params_["running_costs"]["contact_frames"][frame_name], "wn", w_norm);
+
+        contact_weights_[frame_name] = mpc_utils::from2DValues(w_tang, w_norm);
+
+    }
 }
 
 void HumanoidMulticontactTracker::loadRegularizationWeights() {
@@ -192,6 +202,12 @@ void HumanoidMulticontactTracker::loadTrackingFramesWeights(){
         double w_frame;
         util::ReadParameter(params_["running_costs"]["tracking_frames"], frame_name, w_frame);
         frame_targets_[frame_name] = w_frame;
+    }
+    for (const auto& frame_name : track_frame_names_) {
+        double w_frame;
+        std::string frame_name_terminal = frame_name + "_terminal";
+        util::ReadParameter(params_["terminal_costs"]["tracking_frames"], frame_name, w_frame);
+        frame_targets_terminal_[frame_name] = w_frame;
     }
 }
 
@@ -261,6 +277,7 @@ void HumanoidMulticontactTracker::addCoMCost(const double com_tracking_weight = 
 void HumanoidMulticontactTracker::addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase = mpc_utils::Phase::Running, const int horizon_index){
 
     auto& cost_model = (phase == mpc_utils::Phase::Running) ? running_cost_model_[horizon_index] : terminal_cost_model_;
+    double frame_cost_weight = (phase == mpc_utils::Phase::Running) ? frame_targets_[frame_name] : frame_targets_terminal_[frame_name];
 
     pinocchio::Data data_full_(model_full_);
     Eigen::VectorXd q = x0_.head(state_->get_nq());
@@ -280,7 +297,7 @@ void HumanoidMulticontactTracker::addFrameTrackingCost(const std::string& frame_
     frame_residuals_[horizon_index][frame_name] = frame_residual_;
     
     std::shared_ptr<crocoddyl::CostModelAbstract> goal_tracking_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, frame_residuals_[horizon_index][frame_name]);
-    cost_model->addCost("frame_"+frame_name, goal_tracking_cost, frame_targets_[frame_name]);
+    cost_model->addCost("frame_"+frame_name, goal_tracking_cost, frame_cost_weight);
 }
 
 void HumanoidMulticontactTracker::addXBoundCost(const double x_bound_weight = 50000.0, const mpc_utils::Phase phase = mpc_utils::Phase::Running, const int horizon_index) {
@@ -321,7 +338,7 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
 
         std::string frame_name = frame_names[i];
         std::shared_ptr<crocoddyl::ContactModelAbstract> support_contact_model6D =
-        std::make_shared<crocoddyl::ContactModel6D>(state_, model_full_.getFrameId(frame_name), pinocchio::SE3::Identity(), pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), Eigen::Vector2d(10., 50.0)); //NOTE: this croc version doesn't have LOCAL_WORLD_ALIGNED
+        std::make_shared<crocoddyl::ContactModel6D>(state_, model_full_.getFrameId(frame_name), pinocchio::SE3::Identity(), pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), contact_weights_[frame_name]);
         if(horizon_index == 0) contact_model->addContact(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact", support_contact_model6D);
 
         //TODO: add hand contact rotation if needed
@@ -394,7 +411,7 @@ std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMu
     }
     if (cost_mask_[3]) {
         for (const auto& frame : frame_targets_) {
-            addFrameTrackingCost(frame.first, mpc_utils::Phase::Terminal);
+            addFrameTrackingCost(frame.first, mpc_utils::Phase::Terminal, N_horizon_);
         }
     }
     if (cost_mask_[4]) {

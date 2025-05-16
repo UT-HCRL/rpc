@@ -87,8 +87,10 @@ class HumanoidMulticontactTracker{
         double dt_;
         int N_horizon_;
         int max_iter_;
-        std::unordered_map<std::string, mpc_utils::Weights> cost_weights_;
+        std::unordered_map<std::string, mpc_utils::Weights> cost_weights_; //FIXME: maybe unused, remove
+        std::unordered_map<std::string, mpc_utils::Weights2D> contact_weights_;
         std::unordered_map<std::string, double> frame_targets_;
+        std::unordered_map<std::string, double> frame_targets_terminal_; //Used for terminal cost frame tracking
     
         std::vector<int> cost_mask_;
 

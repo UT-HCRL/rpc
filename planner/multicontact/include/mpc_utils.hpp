@@ -11,9 +11,14 @@ namespace mpc_utils {
     enum class Phase { Running, Terminal };
 
     using Weights = Eigen::Matrix<double, 6, 1>;
+    using Weights2D = Eigen::Matrix<double, 2, 1>;
 
     inline Weights fromValues(double wp0, double wp1, double wp2, double wo1, double wo2, double wo3) {
         return Weights(wp0, wp1, wp2, wo1, wo2, wo3);
+    }
+
+    inline Weights2D from2DValues(double wp0, double wp1) {
+        return Weights2D(wp0, wp1);
     }
 
     inline void printWeights(std::unordered_map<std::string, mpc_utils::Weights> gains){

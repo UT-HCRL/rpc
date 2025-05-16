@@ -147,15 +147,22 @@ running_costs:
   xBound:
     w: 0.1
   CoM:
-    w: 10000.0
+    w: 100.0
   tracking_frames:
-    torso_link: 1000.0
-    left_ankle_roll_link: 100.0
-    right_ankle_roll_link: 100.0
-    left_knee_link: 10.0
-    right_knee_link: 10.0
-    left_rubber_hand: 1.0
-    right_rubber_hand: 1.0
+    torso_link: 200.0
+    left_ankle_roll_link: 1000.0
+    right_ankle_roll_link: 1000.0
+    left_knee_link: 1000.0
+    right_knee_link: 1000.0
+    left_rubber_hand: 100.0
+    right_rubber_hand: 100.0
+  contact_frames:
+    l_foot_contact:
+      wt: 10.0
+      wn: 50.0
+    r_foot_contact:
+      wt: 10.0
+      wn: 50.0
 
 terminal_costs:
   xReg:
@@ -170,4 +177,12 @@ terminal_costs:
   xBound:
     w: 0.01
   CoM:
-    w: 100.0
+    w: 10.0
+  tracking_frames:
+    torso_link: 2000.0
+    left_ankle_roll_link: 100.0
+    right_ankle_roll_link: 100.0
+    left_knee_link: 10.0
+    right_knee_link: 10.0
+    left_rubber_hand: 10.0
+    right_rubber_hand: 10.0
