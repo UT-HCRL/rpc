@@ -64,8 +64,234 @@ namespace mpc_utils {
         std::vector<double> uReg_costs;
         std::vector<double> xBound_costs;
         std::vector<double> com_costs;
+        std::unordered_map<std::string, std::vector<Eigen::Vector3d>> frame_des_pos;
+        std::unordered_map<std::string, std::vector<Eigen::Vector3d>> frame_des_ori;
         std::unordered_map<std::string, std::vector<double>> frame_costs;
         std::unordered_map<std::string, std::vector<double>> contact_costs;
     };
+
+    inline std::pair<bool, Eigen::MatrixXd> calcDARE_old(const Eigen::Ref<const Eigen::MatrixXd>& A,const Eigen::Ref<const Eigen::MatrixXd>& B,const Eigen::Ref<const Eigen::MatrixXd>& Q,const Eigen::Ref<const Eigen::MatrixXd>& R){
+        
+        const int n = A.rows();
+        const int m = B.cols();
+        assert(A.cols() == n && Q.rows() == n && Q.cols() == n);
+        assert(B.rows() == n && R.rows() == m && R.cols() == m);
+
+        // Precompute B * R^-1 * B^T using LDLT for better stability
+        Eigen::LDLT<Eigen::MatrixXd> R_ldlt(R);
+        if (R_ldlt.info() != Eigen::Success) {
+            std::cerr << "[DARE] ERROR: R is not positive definite.\n";
+            return {false, Eigen::MatrixXd()};
+        }
+        const Eigen::MatrixXd BRBt = B * R_ldlt.solve(B.transpose());
+
+        // Initialization
+        Eigen::MatrixXd Ak = A;
+        Eigen::MatrixXd Gk = BRBt;
+        Eigen::MatrixXd Hk = Q;
+
+        Eigen::MatrixXd I = Eigen::MatrixXd::Identity(n, n);
+        Eigen::MatrixXd V, Ak_next, Gk_next, Hk_next;
+
+        constexpr int max_iter = 100;
+        constexpr double tol = 1e-6;
+
+        double rel_change = 1e9;
+        int iter = 0;
+        bool converged = false;
+
+        while (iter < max_iter && rel_change > tol) {
+            // V = (I + Gk * Hk)^-1
+            V = (I + Gk * Hk).inverse();  // Sherman-Morrison if Gk*Hk is low-rank ??
+
+            Ak_next = Ak * V * Ak;
+            Gk_next = Gk + Ak * V * Gk * Ak.transpose();
+            Hk_next = Hk + Ak.transpose() * Hk * V * Ak;
+
+            // Use Frobenius norm for performance
+            rel_change = (Hk_next - Hk).norm() / (Hk_next.norm() + 1e-12);  // add epsilon for safety
+
+            Ak = Ak_next;
+            Gk = Gk_next;
+            Hk = Hk_next;
+            iter++;
+        }
+
+        if (rel_change <= tol) {
+            converged = true;
+            if (iter < max_iter) {
+                std::cout << "[DARE] Riccati solver converged in " << iter << " iterations.\n";
+            } else {
+                std::cerr << "[DARE] WARNING: Riccati solver reached max iterations. Rel. change = " << rel_change << "\n";
+            }
+        } else {
+            std::cerr << "[DARE] WARNING: Riccati solver did not converge. Rel. change = " << rel_change << "\n";
+        }
+        
+        // Eigen::MatrixXd K = (R + B.transpose() * Hk * B).inverse() * (B.transpose() * Hk * Ak);
+
+        return {converged, Hk};
+    }
+
+    inline bool calcDARE(Eigen::MatrixXd A, Eigen::MatrixXd B, Eigen::MatrixXd Q, Eigen::MatrixXd R, Eigen::MatrixXd& K){
+        
+        // Based on "Structure-Preserving Algorithms for Periodic Discrete-Time Algebraic Riccati Equations" [https://www.tandfonline.com/doi/full/10.1080/00207170410001714988#d1e289]
+        Eigen::MatrixXd Ak = A;
+        Eigen::MatrixXd Ak_nxt;
+        Eigen::MatrixXd Gk = B * R.inverse() * B.transpose();
+        Eigen::MatrixXd Gk_nxt;
+        // Eigen::MatrixXd Hk = (K.size() > 0) ? K : Q;
+        Eigen::MatrixXd Hk = Q;
+        Eigen::MatrixXd Hk_nxt; // H converges quadratically to P
+
+        // Check for NaN values in the initial matrices
+        if (A.hasNaN() || B.hasNaN() || Q.hasNaN() || R.hasNaN() || Gk.hasNaN() || Hk.hasNaN()) {
+            std::cerr << "[DARE] ERROR: Input matrices contain NaN values.\n";
+            return false;
+        }
+
+        // Check if Q and R are positive definite
+        Eigen::LLT<Eigen::MatrixXd> Q_llt(Q);
+        Eigen::LLT<Eigen::MatrixXd> R_llt(R);
+
+        if (Q_llt.info() != Eigen::Success) {
+            std::cerr << "[DARE] ERROR: Q is not positive definite.\n";
+            return false;
+        }
+
+        if (R_llt.info() != Eigen::Success) {
+            std::cerr << "[DARE] ERROR: R is not positive definite.\n";
+            return false;
+        }
+
+        Eigen::MatrixXd V;  // This is computed once to speed up computation, instead of recomputing three times
+
+        int max_iter = 100;
+        double tol = 1e-6;
+        int curr_iter = 0;
+
+        int rws = Ak.rows();
+        int cls = Ak.cols();
+
+        double norm = 1000;
+
+        bool converged = false;
+
+        while(curr_iter < max_iter && norm >= tol){
+            
+            // Compute next matrixes
+            V = (Eigen::MatrixXd::Identity(rws, cls) + Gk * Hk).inverse();
+            Ak_nxt = Ak * V *Ak;
+            Gk_nxt = Gk + Ak * V * Gk * Ak.transpose();
+            Hk_nxt = Hk + Ak.transpose() * Hk * V * Ak;
+
+            // Update norm
+            // norm = (Hk_nxt - Hk).lpNorm<Eigen::Infinity>() / Hk_nxt.lpNorm<Eigen::Infinity>();
+            norm = (Hk_nxt - Hk).norm() / Hk_nxt.norm(); //Froebenius should be faster
+            
+            // Update Old
+            Ak = Ak_nxt;
+            Gk = Gk_nxt;
+            Hk = Hk_nxt;
+            curr_iter++;
+
+        }
+
+        if (curr_iter >= max_iter && norm > tol) {
+            std::cerr << "[DARE] WARNING: Riccati solver did not converge (norm = " << norm << ")\n";
+        }else{
+            K = Hk;
+            converged = true;
+        }
+
+        return converged;
+
+    }
+
+    inline std::pair<bool, Eigen::MatrixXd> calcDARE_cholensky(Eigen::MatrixXd A, Eigen::MatrixXd B, Eigen::MatrixXd Q, Eigen::MatrixXd R){
+
+        Eigen::MatrixXd Ak = A;
+        Eigen::MatrixXd Gk = B * R.llt().solve(B.transpose());
+        Eigen::MatrixXd Hk;
+        Eigen::MatrixXd Hk_nxt = Q;
+        Eigen::MatrixXd V;
+        Eigen::MatrixXd V1;
+        Eigen::MatrixXd V2;
+
+        int rws = Ak.rows();
+        int cls = Ak.cols();
+        int max_iter = 100;
+        double tol = 1e-6;
+        int curr_iter = 0;
+
+        double norm = 1000;
+        bool converged = false;
+        
+        do{
+
+            Hk = Hk_nxt;
+
+            V = (Eigen::MatrixXd::Identity(rws, cls) + Gk * Hk);
+            auto V_solver = V.llt();
+            V1 = V_solver.solve(Ak);
+            V2 = V_solver.solve(Gk.transpose()).transpose();
+
+            Gk += Ak * V2 * Ak.transpose();
+            Hk_nxt = Hk + V1.transpose() * Hk * Ak;
+            Ak *= V1;
+            
+            norm = (Hk_nxt - Hk).norm() / Hk_nxt.norm(); //Froebenius should be faster
+            curr_iter++;
+
+        }while(curr_iter < max_iter || norm >= tol);
+
+        if (curr_iter >= max_iter && norm > tol) {
+            std::cerr << "[DARE] WARNING: Riccati solver did not converge (norm = " << norm << ")\n";
+        }else{
+            converged = true;
+        }
+
+        return {converged, Hk_nxt};
+    }
+
+    //NOTE: these are defined here even if its a simple division, to enable future less naive implementations
+    inline void normalize_weights(double& w, const int N){
+        if (w < 0.0) {
+            throw std::invalid_argument("Weight must be non-negative");
+        }
+        if (N <= 0) {
+            throw std::invalid_argument("Number of weights must be positive");
+        }
+        double alpha = 0.2;
+        w = w / pow(N, alpha);
+    }
+
+    inline void normalize_weights(Weights& w, const int N){
+        
+        if ((w.array() < 0.0).all()) {
+            throw std::invalid_argument("Weight must be non-negative");
+        }
+        
+        if (N <= 0) {
+            throw std::invalid_argument("Number of weights must be positive");
+        }
+        
+        double alpha = 0.2;
+        w = w / pow(N, alpha);
+    }
+    
+    inline void normalize_weights(Eigen::VectorXd& w, const int N){ //TODO: template fun
+        
+        if ((w.array() < 0.0).all()) {
+            throw std::invalid_argument("Weight must be non-negative");
+        }
+        
+        if (N <= 0) {
+            throw std::invalid_argument("Number of weights must be positive");
+        }
+        
+        double alpha = 0.2;
+        w = w / pow(N, alpha);
+    }
 
 } // namespace mpc_utils

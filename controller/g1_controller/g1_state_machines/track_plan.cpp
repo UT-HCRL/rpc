@@ -44,7 +44,7 @@ TrackPlan::TrackPlan(const StateId state_id,
   g1_mpc_ = std::make_unique<HumanoidMulticontactTracker>(r_file_path, gains);
   // g1_mpc_->printModel();
 
-  std::string file_path = THIS_COM "data_example/g1_test.pkl";
+  std::string file_path = THIS_COM "data_example/g1_sca_step_over_knee_knocker_kin.pkl";
   pkl_reader_ = std::make_unique<pkl_utils::PickleReader>(file_path, pkl_utils::PickleType::BEZIER);
 
   if (!pkl_reader_->isReady()) {
@@ -106,21 +106,6 @@ void TrackPlan::Compute() {
   Eigen::Vector3d com_ref;
   com_ref = robot_->GetRobotComPos();
 
-
-  // Eigen::Isometry3d torso = robot_->GetLinkIsometry("torso_link");
-  // Eigen::Vector3d torso_pos = torso.translation();
-  // Eigen::Vector3d torso_rot = torso.rotation().eulerAngles(0, 1, 2);
-  // pinocchio::SE3 current_pose = pinocchio::SE3(Eigen::AngleAxisd(torso_rot[0], Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(torso_rot[1], Eigen::Vector3d::UnitY()) * Eigen::AngleAxisd(torso_rot[2], Eigen::Vector3d::UnitZ()), torso_pos);
-  // desired_frames["torso_link"] = current_pose;
-
-  // std::unordered_map<std::string, pinocchio::SE3> desired_frames2;
-  // desired_frames2.reserve(1);
-  // Eigen::Isometry3d torso2 = robot_->GetLinkIsometry("torso_link");
-  // Eigen::Vector3d torso_pos2 = torso2.translation() + Eigen::Vector3d(0.1, 0.2, 0.3); // Slightly offset position
-  // Eigen::Vector3d torso_rot2 = torso2.rotation().eulerAngles(0, 1, 2) + Eigen::Vector3d(0.05, -0.05, 0.1); // Slightly modified rotation
-  // pinocchio::SE3 current_pose2 = pinocchio::SE3(Eigen::AngleAxisd(torso_rot2[0], Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(torso_rot2[1], Eigen::Vector3d::UnitY()) * Eigen::AngleAxisd(torso_rot2[2], Eigen::Vector3d::UnitZ()), torso_pos2);
-  // desired_frames2["torso_link"] = current_pose2;
-
   mpc_utils::MPCData data_out;
 
   #ifndef B_USE_ZMQ
@@ -152,7 +137,7 @@ void TrackPlan::Compute() {
     xs_out[0] << robot_->GetQ(), robot_->GetQdot();
 
     auto start_time = std::chrono::high_resolution_clock::now();
-    g1_mpc_->solveOneStep(xs_out, us_out, data_out, com_ref, desired_frames_vec);
+    g1_mpc_->solveOneStep(xs_out, us_out, data_out, com_ref, desired_frames_vec, desired_frames_vec[0]["left_rubber_hand"]);
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
@@ -167,6 +152,22 @@ void TrackPlan::Compute() {
       dm->data_->uReg_costs_ = data_out.uReg_costs;
       dm->data_->xBound_costs_ = data_out.xBound_costs;
       dm->data_->com_costs_ = data_out.com_costs;
+      dm->data_->torso_des_pos_ = data_out.frame_des_pos["torso_link"];
+      dm->data_->torso_des_ori_ = data_out.frame_des_ori["torso_link"];
+      dm->data_->left_ankle_roll_des_pos_ = data_out.frame_des_pos["L_ankle_roll_link"];
+      dm->data_->left_ankle_roll_des_ori_ = data_out.frame_des_ori["L_ankle_roll_link"];
+      dm->data_->right_ankle_roll_des_pos_ = data_out.frame_des_pos["R_ankle_roll_link"];
+      dm->data_->right_ankle_roll_des_ori_ = data_out.frame_des_ori["R_ankle_roll_link"];
+      dm->data_->left_knee_des_pos_ = data_out.frame_des_pos["L_knee_link"];
+      dm->data_->left_knee_des_ori_ = data_out.frame_des_ori["L_knee_link"];
+      dm->data_->right_knee_des_pos_ = data_out.frame_des_pos["R_knee_link"];
+      dm->data_->right_knee_des_ori_ = data_out.frame_des_ori["R_knee_link"];
+      dm->data_->left_rubber_hand_des_pos_ = data_out.frame_des_pos["left_rubber_hand"];
+      dm->data_->left_rubber_hand_des_ori_ = data_out.frame_des_ori["left_rubber_hand"];
+      dm->data_->right_rubber_hand_des_pos_ = data_out.frame_des_pos["R_rubber_hand_link"];
+      dm->data_->right_rubber_hand_des_ori_ = data_out.frame_des_ori["R_rubber_hand_link"];
+
+      // dm->data_->frame_curr_pose_ = data_out.frame_curr_pose;
     #endif
 
     #ifndef B_USE_ZMQ
@@ -180,6 +181,8 @@ void TrackPlan::Compute() {
     data_out.com_costs.clear();
     data_out.frame_costs.clear();
     data_out.contact_costs.clear();
+    data_out.frame_des_pos.clear();
+    data_out.frame_des_ori.clear();
 
     {
       std::lock_guard<std::mutex> lock(data_mutex_);

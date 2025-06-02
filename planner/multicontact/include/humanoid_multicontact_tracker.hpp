@@ -34,6 +34,7 @@ class HumanoidMulticontactTracker{
         void loadBoundWeights();
         void loadCoMWeights();
         void loadTrackingFramesWeights();
+        void loadMPCParams();
 
         void setInitialJointConfiguration(const Eigen::VectorXd& q0);
         void setFrames(const std::vector<std::string>& frame_names);
@@ -56,8 +57,12 @@ class HumanoidMulticontactTracker{
         void addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase, const int horizon_index = 0);
 
         void initializeSolver();
-        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.), std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {});
+        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.), std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {}, const pinocchio::SE3 fake_val = pinocchio::SE3(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0., 0., 0.)));
         std::vector<std::string> getTargetFrameNames() const {return track_frame_names_;}
+        
+        // Auxiliary functions for DARE computation
+        void computeDARE(const std::vector<Eigen::VectorXd>& xs_out, const std::vector<Eigen::VectorXd>& us_out, const Eigen::Vector3d& desired_com);
+
 
     private:
 
@@ -89,6 +94,7 @@ class HumanoidMulticontactTracker{
         int max_iter_;
         std::unordered_map<std::string, mpc_utils::Weights> cost_weights_; //FIXME: maybe unused, remove
         std::unordered_map<std::string, mpc_utils::Weights2D> contact_weights_;
+        std::unordered_map<std::string, mpc_utils::Weights2D> terminal_contact_weights_;
         std::unordered_map<std::string, double> frame_targets_;
         std::unordered_map<std::string, double> frame_targets_terminal_; //Used for terminal cost frame tracking
     
@@ -137,5 +143,8 @@ class HumanoidMulticontactTracker{
         bool enable_callbacks_;
         std::shared_ptr<CostRecorderCallback> cost_callback_;
         //#################
+
+        //### DARE TEMP VARIABLES ###
+        Eigen::MatrixXd K_DARE_;
 
 };

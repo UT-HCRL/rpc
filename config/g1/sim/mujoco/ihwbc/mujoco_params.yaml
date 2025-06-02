@@ -1,85 +1,85 @@
 actuator_gains:
   left_hip_pitch_joint:
-    kp: 0.8
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   left_hip_roll_joint:
-    kp: 0.8
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   left_hip_yaw_joint:
-    kp: 0.8
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   left_knee_joint:
-    kp: 0.8
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   left_ankle_pitch_joint:
-    kp: 0.1
-    kd: 0.001
+    kp: 0.0
+    kd: 0.0
   left_ankle_roll_joint:
-    kp: 0.08
-    kd: 0.001
+    kp: 0.0
+    kd: 0.0
   right_hip_pitch_joint:
-    kp: 0.8
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   right_hip_roll_joint:
-    kp: 0.8
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   right_hip_yaw_joint:
-    kp: 0.8
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   right_knee_joint:
-    kp: 0.8
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   right_ankle_pitch_joint:
-    kp: 0.08
-    kd: 0.001
+    kp: 0.0
+    kd: 0.0
   right_ankle_roll_joint:
-    kp: 0.08
-    kd: 0.001
+    kp: 0.0
+    kd: 0.0
   waist_yaw_joint:
-    kp: 0.8
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   left_shoulder_pitch_joint:
-    kp: 0.4
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   left_shoulder_roll_joint:
-    kp: 0.4
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   left_shoulder_yaw_joint:
-    kp: 0.4
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   left_elbow_joint:
-    kp: 0.4
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   left_wrist_roll_joint:
-    kp: 1.0
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   left_wrist_pitch_joint:
-    kp: 1.0
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   left_wrist_yaw_joint:
-    kp: 1.0
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   right_shoulder_pitch_joint:
-    kp: 0.4
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   right_shoulder_roll_joint:
-    kp: 0.4
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   right_shoulder_yaw_joint:
-    kp: 0.4
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   right_elbow_joint:
-    kp: 0.4
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   right_wrist_roll_joint:
-    kp: 1.0
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   right_wrist_pitch_joint:
-    kp: 1.0
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
   right_wrist_yaw_joint:
-    kp: 1.0
-    kd: 0.01
+    kp: 0.0
+    kd: 0.0
 
 initial_config:
   base_pos_x: 0.

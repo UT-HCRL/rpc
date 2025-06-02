@@ -99,8 +99,22 @@ public:
   std::vector<double> uReg_costs_;
   std::vector<double> xBound_costs_;
   std::vector<double> com_costs_;
-  // std::unordered_map<std::string, std::vector<double>> frame_costs;
-  // std::unordered_map<std::string, std::vector<double>> contact_costs;
+
+  // MPC Frame Desired Pose:
+  std::vector<Eigen::Vector3d> torso_des_pos_;
+  std::vector<Eigen::Vector3d> torso_des_ori_;
+  std::vector<Eigen::Vector3d> left_ankle_roll_des_pos_;
+  std::vector<Eigen::Vector3d> left_ankle_roll_des_ori_;
+  std::vector<Eigen::Vector3d> right_ankle_roll_des_pos_;
+  std::vector<Eigen::Vector3d> right_ankle_roll_des_ori_;
+  std::vector<Eigen::Vector3d> left_knee_des_pos_;
+  std::vector<Eigen::Vector3d> left_knee_des_ori_;
+  std::vector<Eigen::Vector3d> right_knee_des_pos_;
+  std::vector<Eigen::Vector3d> right_knee_des_ori_;
+  std::vector<Eigen::Vector3d> left_rubber_hand_des_pos_;
+  std::vector<Eigen::Vector3d> left_rubber_hand_des_ori_;
+  std::vector<Eigen::Vector3d> right_rubber_hand_des_pos_;
+  std::vector<Eigen::Vector3d> right_rubber_hand_des_ori_;
 
 };
 

@@ -205,6 +205,13 @@ async def main():
         mpc_com_costs = await SceneChannel(
             True, "com_costs", "json", "com_costs", [f"N_{i}" for i in range(2)]
         ).add_chan(server)
+        mpc_torso_des_pos = await SceneChannel(
+            True, "torso_des_pos", "json", "torso_des_pos", [f"N_{i}_{axis}" for i in range(2) for axis in ["x", "y", "z"]]
+        ).add_chan(server)
+        mpc_left_hand_des_pos = await SceneChannel(
+            True, "left_rubber_hand_des_pos", "json", "left_rubber_hand_des_pos", [f"N_{i}_{axis}" for i in range(2) for axis in ["x", "y", "z"]]
+        ).add_chan(server)
+
 
         for scn in range(len(xyz_scene_names)):
             await sceneinitman(xyz_scene_names[scn], server)
@@ -440,6 +447,31 @@ async def main():
                     }
                 ).encode("utf8"),
             )
+
+            torso_data = {}
+            for i, pos in enumerate(msg.torso_des_pos):
+                torso_data[f"N_{i}_x"] = pos.x
+                torso_data[f"N_{i}_y"] = pos.y
+                torso_data[f"N_{i}_z"] = pos.z
+
+            await server.send_message(
+                mpc_torso_des_pos,
+                now,
+                json.dumps(torso_data).encode("utf8"),
+            )
+
+            left_hand_data = {}
+            for i, pos in enumerate(msg.left_rubber_hand_des_pos):
+                left_hand_data[f"N_{i}_x"] = pos.x
+                left_hand_data[f"N_{i}_y"] = pos.y
+                left_hand_data[f"N_{i}_z"] = pos.z
+                
+            await server.send_message(
+                mpc_left_hand_des_pos,
+                now,
+                json.dumps(left_hand_data).encode("utf8"),
+            )
+
 
             for idx in range(STEP_MAX):
                 rf = "proj_rf" + str(idx)

@@ -102,6 +102,22 @@ message pnc_msg {
   repeated float ureg_costs = 62;
   repeated float xbound_costs = 63;
   repeated float com_costs = 64;
+
+  // mpc frame tracking
+  repeated Pos torso_des_pos = 65;
+  repeated Euler torso_des_ori = 66;
+  repeated Pos left_ankle_roll_des_pos = 67;
+  repeated Euler left_ankle_roll_des_ori = 68;
+  repeated Pos right_ankle_roll_des_pos = 69;
+  repeated Euler right_ankle_roll_des_ori = 70;
+  repeated Pos left_knee_des_pos = 71;
+  repeated Euler left_knee_des_ori = 72;
+  repeated Pos right_knee_des_pos = 73;
+  repeated Euler right_knee_des_ori = 74;
+  repeated Pos left_rubber_hand_des_pos = 75;
+  repeated Euler left_rubber_hand_des_ori = 76;
+  repeated Pos right_rubber_hand_des_pos = 77;
+  repeated Euler right_rubber_hand_des_ori = 78;
 }
 
 message rs_teleop_msg {
