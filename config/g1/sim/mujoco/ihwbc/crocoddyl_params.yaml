@@ -1,6 +1,8 @@
 contact_frames:
   - l_foot_contact
   - r_foot_contact
+  - left_rubber_hand
+  - right_rubber_hand
 
 joint_names:
   - base_pos_x
@@ -89,7 +91,7 @@ initial_config:
   right_two_joint: 0.
 
 #          [   Reg,   xBound,   CoM,    Frames,    Contacts    ]
-cost_mask: [    1,      1,       1,        1,          1       ]
+cost_mask: [    1,      1,       0,        1,          1       ]
 
 tracking_frames:
   - torso_link
@@ -104,54 +106,88 @@ running_costs:
   xReg:
     w: 0.001
     state_w:
-      base_pos: [100.0, 100.0, 100.0]
-      base_rot: [10.0, 10.0, 10.0]
-      joint_pos: 1000.0
+      base_pos: [10.0, 10.0, 10.0]
+      base_rot: [0.0, 0.0, 0.0]
+      joint_pos: 200.0
       joint_vel: 100.0
   uReg:
-    w: 0.01
+    w: 0.02
   xBound:
-    w: 1.0
+    w: 0.001
   CoM:
     w: 0.0
   tracking_frames:
-    torso_link: 20000.0
-    left_ankle_roll_link: 40000.0
-    right_ankle_roll_link: 40000.0
-    left_knee_link: 40000.0
-    right_knee_link: 40000.0
-    left_rubber_hand: 10000.0
-    right_rubber_hand: 10000.0
+    torso_link: 
+      pos: 80.0
+      rot: 0.0
+    left_ankle_roll_link: 
+      pos: 80.0
+      rot: 0.0
+    right_ankle_roll_link: 
+      pos: 80.0
+      rot: 0.0
+    left_knee_link: 
+      pos: 300.0
+      rot: 0.0
+    right_knee_link: 
+      pos: 300.0
+      rot: 0.0
+    left_rubber_hand: 
+      pos: 80.0
+      rot: 0.0
+    right_rubber_hand: 
+      pos: 80.0
+      rot: 0.0
   contact_frames:
     l_foot_contact:
-      wt: 10.0
+      wt: 20.0
       wn: 50.0
     r_foot_contact:
-      wt: 10.0
+      wt: 20.0
+      wn: 50.0
+    left_rubber_hand:
+      wt: 20.0
+      wn: 50.0
+    right_rubber_hand:
+      wt: 20.0
       wn: 50.0
 
 terminal_costs:
   xReg:
     w: 0.01
     state_w:
-      base_pos: [300.0, 80.0, 350.0]
-      base_rot: [600.0, 200.0, 600.0]
-      joint_pos: 10.0
-      joint_vel: 20.0
+      base_pos: [100.0, 80.0, 100.0]
+      base_rot: [10.0, 10.0, 10.0]
+      joint_pos: 0.0
+      joint_vel: 50.0
   uReg:
-    w: 1.0 #0.01
+    w: 1.0
   xBound:
-    w: 30.0
+    w: 300.0
   CoM:
-    w: 0.0
+    w: 1000.0
   tracking_frames:
-    torso_link: 4000.0
-    left_ankle_roll_link: 1000.0
-    right_ankle_roll_link: 1000.0
-    left_knee_link: 10.0
-    right_knee_link: 10.0
-    left_rubber_hand: 10.0
-    right_rubber_hand: 10.0
+    torso_link:
+      pos: 1000.0
+      rot: 0.0
+    left_ankle_roll_link:
+      pos: 1000.0
+      rot: 0.0
+    right_ankle_roll_link:
+      pos: 1000.0
+      rot: 0.0
+    left_knee_link:
+      pos: 900.0
+      rot: 0.0
+    right_knee_link:
+      pos: 900.0
+      rot: 0.0
+    left_rubber_hand:
+      pos: 1000.0
+      rot: 0.0
+    right_rubber_hand:
+      pos: 1000.0
+      rot: 0.0
 
 mpc:
   dt: 0.02

@@ -104,20 +104,38 @@ message pnc_msg {
   repeated float com_costs = 64;
 
   // mpc frame tracking
-  repeated Pos torso_des_pos = 65;
-  repeated Euler torso_des_ori = 66;
-  repeated Pos left_ankle_roll_des_pos = 67;
-  repeated Euler left_ankle_roll_des_ori = 68;
-  repeated Pos right_ankle_roll_des_pos = 69;
-  repeated Euler right_ankle_roll_des_ori = 70;
-  repeated Pos left_knee_des_pos = 71;
-  repeated Euler left_knee_des_ori = 72;
-  repeated Pos right_knee_des_pos = 73;
-  repeated Euler right_knee_des_ori = 74;
-  repeated Pos left_rubber_hand_des_pos = 75;
-  repeated Euler left_rubber_hand_des_ori = 76;
-  repeated Pos right_rubber_hand_des_pos = 77;
-  repeated Euler right_rubber_hand_des_ori = 78;
+  Pos torso_des_pos = 65;
+  Pos left_ankle_roll_des_pos = 66;
+  Pos right_ankle_roll_des_pos = 67;
+  Pos left_knee_des_pos = 68;
+  Pos right_knee_des_pos = 69;
+  Pos left_rubber_hand_des_pos = 70;
+  Pos right_rubber_hand_des_pos = 71;
+
+  //mpc frame costs
+  repeated float left_hand_frame_costs = 72;
+  repeated float right_hand_frame_costs = 73;
+  repeated float left_ankle_frame_costs = 74;
+  repeated float right_ankle_frame_costs = 75;
+  repeated float left_knee_frame_costs = 76;
+  repeated float right_knee_frame_costs = 77;
+  repeated float torso_link_frame_costs = 78;
+
+  // mpc contact costs
+  repeated float left_hand_contact_costs = 79;
+  repeated float right_hand_contact_costs = 80;
+  repeated float left_foot_contact_costs = 81;
+  repeated float right_foot_contact_costs = 82;
+
+  // current pos
+  Pos torso_curr_pos = 83;
+  Pos left_ankle_roll_curr_pos = 84;
+  Pos right_ankle_roll_curr_pos = 85;
+  Pos left_knee_curr_pos = 86;
+  Pos right_knee_curr_pos = 87;
+  Pos left_rubber_hand_curr_pos = 88;
+  Pos right_rubber_hand_curr_pos = 89;
+
 }
 
 message rs_teleop_msg {

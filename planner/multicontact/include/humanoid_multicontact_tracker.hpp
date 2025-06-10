@@ -56,8 +56,17 @@ class HumanoidMulticontactTracker{
         void addRegularizationCosts(const Eigen::VectorXd& xreg_weights, const double xreg_weight, const double ureg_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase, const int horizon_index = 0);
 
+        void removeContactCosts(const std::vector<std::string>& frame_names);
+        void deactivateContacts(const std::vector<std::string>& frame_names);
+        void activateContacts(const std::vector<std::string>& frame_names, pinocchio::SE3 contact_pose);
+
+        std::vector<std::vector<std::map<std::string, pinocchio::Force>>> const getForceFromSolver();
+        std::vector<std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>>> const getEigenForceFromSolver();
+        
+        double getCostValue(const std::string& cost_name, const int horizon_index) const;
+
         void initializeSolver();
-        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.), std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {}, const pinocchio::SE3 fake_val = pinocchio::SE3(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0., 0., 0.)));
+        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.), std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {}, const pinocchio::SE3 fake_val = pinocchio::SE3(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0., 0., 0.)), bool contact_trigger = false);
         std::vector<std::string> getTargetFrameNames() const {return track_frame_names_;}
         
         // Auxiliary functions for DARE computation
@@ -95,8 +104,8 @@ class HumanoidMulticontactTracker{
         std::unordered_map<std::string, mpc_utils::Weights> cost_weights_; //FIXME: maybe unused, remove
         std::unordered_map<std::string, mpc_utils::Weights2D> contact_weights_;
         std::unordered_map<std::string, mpc_utils::Weights2D> terminal_contact_weights_;
-        std::unordered_map<std::string, double> frame_targets_;
-        std::unordered_map<std::string, double> frame_targets_terminal_; //Used for terminal cost frame tracking
+        std::unordered_map<std::string, mpc_utils::Weights2D> frame_targets_;
+        std::unordered_map<std::string, mpc_utils::Weights2D> frame_targets_terminal_; //Used for terminal cost frame tracking
     
         std::vector<int> cost_mask_;
 
@@ -117,7 +126,7 @@ class HumanoidMulticontactTracker{
         std::shared_ptr<crocoddyl::ActivationModelAbstract> xreg_activation_;
 
         std::vector<std::shared_ptr<crocoddyl::CostModelSum>> running_cost_model_;
-        std::shared_ptr<crocoddyl::ContactModelMultiple> running_contact_models_;
+        std::vector<std::shared_ptr<crocoddyl::ContactModelMultiple>> running_contact_models_;
 
         std::shared_ptr<crocoddyl::CostModelSum> terminal_cost_model_;
         std::shared_ptr<crocoddyl::ContactModelMultiple> terminal_contact_models_;

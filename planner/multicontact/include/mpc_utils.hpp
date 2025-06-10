@@ -12,6 +12,7 @@ namespace mpc_utils {
 
     using Weights = Eigen::Matrix<double, 6, 1>;
     using Weights2D = Eigen::Matrix<double, 2, 1>;
+    using Vector6d = Eigen::Matrix<double, 6, 1>;
 
     inline Weights fromValues(double wp0, double wp1, double wp2, double wo1, double wo2, double wo3) {
         return Weights(wp0, wp1, wp2, wo1, wo2, wo3);
@@ -60,14 +61,29 @@ namespace mpc_utils {
 
     struct MPCData{
         int total_iterations;
-        std::vector<double> xReg_costs;
+        std::vector<double> xReg_costs; 
         std::vector<double> uReg_costs;
         std::vector<double> xBound_costs;
         std::vector<double> com_costs;
+        std::vector<double> left_hand_frame_costs;
+        std::vector<double> right_hand_frame_costs;
+        std::vector<double> left_ankle_frame_costs;
+        std::vector<double> right_ankle_frame_costs;
+        std::vector<double> left_knee_frame_costs;
+        std::vector<double> right_knee_frame_costs;
+        std::vector<double> torso_link_frame_costs; //TODO: this could be a map between string and vector<double> to store costs for each frame
         std::unordered_map<std::string, std::vector<Eigen::Vector3d>> frame_des_pos;
         std::unordered_map<std::string, std::vector<Eigen::Vector3d>> frame_des_ori;
+        std::unordered_map<std::string, Eigen::Vector3d> frame_ref_pos;
+        std::unordered_map<std::string, Eigen::Vector3d> frame_ref_ori;
         std::unordered_map<std::string, std::vector<double>> frame_costs;
-        std::unordered_map<std::string, std::vector<double>> contact_costs;
+        std::vector<double> left_hand_contact_costs;
+        std::vector<double> right_hand_contact_costs;
+        std::vector<double> left_foot_contact_costs;
+        std::vector<double> right_foot_contact_costs;
+
+        std::unordered_map<std::string, Eigen::Vector3d> frame_current_pos;
+
     };
 
     inline std::pair<bool, Eigen::MatrixXd> calcDARE_old(const Eigen::Ref<const Eigen::MatrixXd>& A,const Eigen::Ref<const Eigen::MatrixXd>& B,const Eigen::Ref<const Eigen::MatrixXd>& Q,const Eigen::Ref<const Eigen::MatrixXd>& R){
@@ -252,6 +268,14 @@ namespace mpc_utils {
         }
 
         return {converged, Hk_nxt};
+    }
+
+    inline Vector6d fromPinocchioForce(const pinocchio::Force& pinocchio_force) {
+
+        Vector6d eigen_force;
+        eigen_force.head<3>() = pinocchio_force.linear();
+        eigen_force.tail<3>() = pinocchio_force.angular();
+        return eigen_force;
     }
 
     //NOTE: these are defined here even if its a simple division, to enable future less naive implementations

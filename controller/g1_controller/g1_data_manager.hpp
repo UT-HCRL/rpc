@@ -99,22 +99,37 @@ public:
   std::vector<double> uReg_costs_;
   std::vector<double> xBound_costs_;
   std::vector<double> com_costs_;
+  std::vector<double> torso_link_frame_costs_;
+  std::vector<double> left_hand_frame_costs_;
+  std::vector<double> right_hand_frame_costs_;
+  std::vector<double> left_ankle_frame_costs_;
+  std::vector<double> right_ankle_frame_costs_;
+  std::vector<double> left_knee_frame_costs_;
+  std::vector<double> right_knee_frame_costs_;
 
   // MPC Frame Desired Pose:
-  std::vector<Eigen::Vector3d> torso_des_pos_;
-  std::vector<Eigen::Vector3d> torso_des_ori_;
-  std::vector<Eigen::Vector3d> left_ankle_roll_des_pos_;
-  std::vector<Eigen::Vector3d> left_ankle_roll_des_ori_;
-  std::vector<Eigen::Vector3d> right_ankle_roll_des_pos_;
-  std::vector<Eigen::Vector3d> right_ankle_roll_des_ori_;
-  std::vector<Eigen::Vector3d> left_knee_des_pos_;
-  std::vector<Eigen::Vector3d> left_knee_des_ori_;
-  std::vector<Eigen::Vector3d> right_knee_des_pos_;
-  std::vector<Eigen::Vector3d> right_knee_des_ori_;
-  std::vector<Eigen::Vector3d> left_rubber_hand_des_pos_;
-  std::vector<Eigen::Vector3d> left_rubber_hand_des_ori_;
-  std::vector<Eigen::Vector3d> right_rubber_hand_des_pos_;
-  std::vector<Eigen::Vector3d> right_rubber_hand_des_ori_;
+  Eigen::Vector3d torso_des_pos_;
+  Eigen::Vector3d left_ankle_roll_des_pos_;
+  Eigen::Vector3d right_ankle_roll_des_pos_;
+  Eigen::Vector3d left_knee_des_pos_;
+  Eigen::Vector3d right_knee_des_pos_;
+  Eigen::Vector3d left_rubber_hand_des_pos_;
+  Eigen::Vector3d right_rubber_hand_des_pos_;
+
+  // MPC Frame Current Pose:
+  Eigen::Vector3d torso_curr_pos_;
+  Eigen::Vector3d left_ankle_roll_curr_pos_;
+  Eigen::Vector3d right_ankle_roll_curr_pos_;
+  Eigen::Vector3d left_knee_curr_pos_;
+  Eigen::Vector3d right_knee_curr_pos_;
+  Eigen::Vector3d left_rubber_hand_curr_pos_;
+  Eigen::Vector3d right_rubber_hand_curr_pos_;
+
+  // MPC Contact Costs:
+  std::vector<double> left_hand_contact_costs_;
+  std::vector<double> right_hand_contact_costs_;
+  std::vector<double> left_foot_contact_costs_;
+  std::vector<double> right_foot_contact_costs_;
 
 };
 

@@ -833,13 +833,13 @@ int main(int argc, char **argv) {
   auto sim =
       std::make_unique<mj::Simulate>(std::make_unique<mj::GlfwAdapter>(), &cam,
                                      &opt, &pert, /* is_passive = */ false);
-
+  
   const char *filename = nullptr;
 
   if (argc > 1) {
     filename = argv[1];
   } else {
-    filename = THIS_COM "robot_model/g1/wing_scene.xml";
+    filename = THIS_COM "robot_model/g1/knee_knocker_scene.xml";
   }
 
   // start physics thread

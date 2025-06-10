@@ -44,7 +44,7 @@ TrackPlan::TrackPlan(const StateId state_id,
   g1_mpc_ = std::make_unique<HumanoidMulticontactTracker>(r_file_path, gains);
   // g1_mpc_->printModel();
 
-  std::string file_path = THIS_COM "data_example/g1_sca_step_over_knee_knocker_kin.pkl";
+  std::string file_path = THIS_COM "data_example/g1_step_over_knee_knocker_latest.pkl";
   pkl_reader_ = std::make_unique<pkl_utils::PickleReader>(file_path, pkl_utils::PickleType::BEZIER);
 
   if (!pkl_reader_->isReady()) {
@@ -89,7 +89,7 @@ void TrackPlan::OneStep() {
       new_q_dot = mpc_q_dot_;
       new_tau = mpc_tau_;
       has_new_data_ = false;
-      ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(new_q.tail(g1_mpc_->getQ0Size()), new_q_dot.tail(g1_mpc_->getQ0Size()), new_tau);  //FIXME: remove hardcoded magic numbers
+      ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(new_q.tail(g1_mpc_->getQ0Size()), new_q_dot.tail(g1_mpc_->getQ0Size()), new_tau);
       
     }
   }
@@ -106,6 +106,8 @@ void TrackPlan::Compute() {
   Eigen::Vector3d com_ref;
   com_ref = robot_->GetRobotComPos();
 
+  bool remove_contact = false;
+
   mpc_utils::MPCData data_out;
 
   #ifndef B_USE_ZMQ
@@ -119,9 +121,9 @@ void TrackPlan::Compute() {
     double controller_time = sp_->current_time_ - state_machine_start_time_;
 
     std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames_vec;
-    desired_frames_vec.resize(g1_mpc_->getNhorizon());
+    desired_frames_vec.resize(g1_mpc_->getNhorizon() +1);
 
-    for(int i=0; i<g1_mpc_->getNhorizon(); i++){
+    for(int i=0; i<g1_mpc_->getNhorizon() + 1; i++){
       std::unordered_map<std::string, pinocchio::SE3> desired_frames;
       
       for(const auto& frame_name : g1_mpc_->getTargetFrameNames()) {
@@ -137,35 +139,79 @@ void TrackPlan::Compute() {
     xs_out[0] << robot_->GetQ(), robot_->GetQdot();
 
     auto start_time = std::chrono::high_resolution_clock::now();
-    g1_mpc_->solveOneStep(xs_out, us_out, data_out, com_ref, desired_frames_vec, desired_frames_vec[0]["left_rubber_hand"]);
+    if(controller_time >= 3.0 && !remove_contact){ //FIXME: this should become a switching condition from the forces
+      remove_contact = true;
+      g1_mpc_->solveOneStep(xs_out, us_out, data_out, com_ref, desired_frames_vec, desired_frames_vec[0]["left_rubber_hand"], true);
+    }else if(controller_time >= 6.0 && remove_contact){
+      std::cout<<"SHOULD BE NEW STEP NOW \n";
+      exit(23);
+      g1_mpc_->solveOneStep(xs_out, us_out, data_out, com_ref, desired_frames_vec, desired_frames_vec[0]["left_rubber_hand"], false);
+    }else{
+      g1_mpc_->solveOneStep(xs_out, us_out, data_out, com_ref, desired_frames_vec, desired_frames_vec[0]["left_rubber_hand"], false);
+    }
+   
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
     #if B_USE_ZMQ
       G1DataManager *dm = G1DataManager::GetDataManager();
       dm->data_->total_iterations_ = data_out.total_iterations;
+      
       dm->data_->xReg_costs_.resize(data_out.xReg_costs.size());
-      dm->data_->uReg_costs_.resize(data_out.uReg_costs.size());
-      dm->data_->xBound_costs_.resize(data_out.xBound_costs.size());
-      dm->data_->com_costs_.resize(data_out.com_costs.size());
       dm->data_->xReg_costs_ = data_out.xReg_costs;
+      
+      dm->data_->uReg_costs_.resize(data_out.uReg_costs.size());
       dm->data_->uReg_costs_ = data_out.uReg_costs;
+      
+      dm->data_->xBound_costs_.resize(data_out.xBound_costs.size());
       dm->data_->xBound_costs_ = data_out.xBound_costs;
+
+      dm->data_->com_costs_.resize(data_out.com_costs.size());
       dm->data_->com_costs_ = data_out.com_costs;
-      dm->data_->torso_des_pos_ = data_out.frame_des_pos["torso_link"];
-      dm->data_->torso_des_ori_ = data_out.frame_des_ori["torso_link"];
-      dm->data_->left_ankle_roll_des_pos_ = data_out.frame_des_pos["L_ankle_roll_link"];
-      dm->data_->left_ankle_roll_des_ori_ = data_out.frame_des_ori["L_ankle_roll_link"];
-      dm->data_->right_ankle_roll_des_pos_ = data_out.frame_des_pos["R_ankle_roll_link"];
-      dm->data_->right_ankle_roll_des_ori_ = data_out.frame_des_ori["R_ankle_roll_link"];
-      dm->data_->left_knee_des_pos_ = data_out.frame_des_pos["L_knee_link"];
-      dm->data_->left_knee_des_ori_ = data_out.frame_des_ori["L_knee_link"];
-      dm->data_->right_knee_des_pos_ = data_out.frame_des_pos["R_knee_link"];
-      dm->data_->right_knee_des_ori_ = data_out.frame_des_ori["R_knee_link"];
-      dm->data_->left_rubber_hand_des_pos_ = data_out.frame_des_pos["left_rubber_hand"];
-      dm->data_->left_rubber_hand_des_ori_ = data_out.frame_des_ori["left_rubber_hand"];
-      dm->data_->right_rubber_hand_des_pos_ = data_out.frame_des_pos["R_rubber_hand_link"];
-      dm->data_->right_rubber_hand_des_ori_ = data_out.frame_des_ori["R_rubber_hand_link"];
+
+      dm->data_->torso_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("torso_link", controller_time);
+      dm->data_->right_knee_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("right_knee_link", controller_time);
+      dm->data_->left_knee_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("left_knee_link", controller_time);
+      dm->data_->right_ankle_roll_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("right_ankle_roll_link", controller_time);
+      dm->data_->left_ankle_roll_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("left_ankle_roll_link", controller_time);
+      dm->data_->left_rubber_hand_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("left_rubber_hand", controller_time);
+      dm->data_->right_rubber_hand_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("right_rubber_hand", controller_time);
+
+      dm->data_->torso_curr_pos_ = data_out.frame_current_pos["torso_link"];
+      dm->data_->left_ankle_roll_curr_pos_ = data_out.frame_current_pos["left_ankle_roll_link"];
+      dm->data_->right_ankle_roll_curr_pos_ = data_out.frame_current_pos["right_ankle_roll_link"];
+      dm->data_->left_knee_curr_pos_ = data_out.frame_current_pos["left_knee_link"];
+      dm->data_->right_knee_curr_pos_ = data_out.frame_current_pos["right_knee_link"];
+      dm->data_->left_rubber_hand_curr_pos_ = data_out.frame_current_pos["left_rubber_hand"];
+      dm->data_->right_rubber_hand_curr_pos_ = data_out.frame_current_pos["right_rubber_hand"];
+
+      dm->data_->left_hand_frame_costs_.resize(data_out.left_hand_frame_costs.size());
+      dm->data_->right_hand_frame_costs_.resize(data_out.right_hand_frame_costs.size());
+      dm->data_->left_hand_frame_costs_ = data_out.left_hand_frame_costs;
+      dm->data_->right_hand_frame_costs_ = data_out.right_hand_frame_costs;
+
+      dm->data_->left_ankle_frame_costs_.resize(data_out.left_ankle_frame_costs.size());
+      dm->data_->right_ankle_frame_costs_.resize(data_out.right_ankle_frame_costs.size());
+      dm->data_->left_ankle_frame_costs_ = data_out.left_ankle_frame_costs;
+      dm->data_->right_ankle_frame_costs_ = data_out.right_ankle_frame_costs;
+
+      dm->data_->left_knee_frame_costs_.resize(data_out.left_knee_frame_costs.size());
+      dm->data_->right_knee_frame_costs_.resize(data_out.right_knee_frame_costs.size());
+      dm->data_->left_knee_frame_costs_ = data_out.left_knee_frame_costs;
+      dm->data_->right_knee_frame_costs_ = data_out.right_knee_frame_costs;
+
+      dm->data_->torso_link_frame_costs_.resize(data_out.torso_link_frame_costs.size());
+      dm->data_->torso_link_frame_costs_ = data_out.torso_link_frame_costs;
+
+      dm->data_->left_hand_contact_costs_.resize(data_out.left_hand_contact_costs.size());
+      dm->data_->right_hand_contact_costs_.resize(data_out.right_hand_contact_costs.size());
+      dm->data_->left_hand_contact_costs_ = data_out.left_hand_contact_costs;
+      dm->data_->right_hand_contact_costs_ = data_out.right_hand_contact_costs;
+
+      dm->data_->left_foot_contact_costs_.resize(data_out.left_foot_contact_costs.size());
+      dm->data_->right_foot_contact_costs_.resize(data_out.right_foot_contact_costs.size());
+      dm->data_->left_foot_contact_costs_ = data_out.left_foot_contact_costs;
+      dm->data_->right_foot_contact_costs_ = data_out.right_foot_contact_costs;
 
       // dm->data_->frame_curr_pose_ = data_out.frame_curr_pose;
     #endif
@@ -180,9 +226,21 @@ void TrackPlan::Compute() {
     data_out.xBound_costs.clear();
     data_out.com_costs.clear();
     data_out.frame_costs.clear();
-    data_out.contact_costs.clear();
     data_out.frame_des_pos.clear();
     data_out.frame_des_ori.clear();
+    data_out.frame_ref_pos.clear();
+    data_out.frame_ref_ori.clear();
+    data_out.left_hand_frame_costs.clear();
+    data_out.right_hand_frame_costs.clear();
+    data_out.left_ankle_frame_costs.clear();
+    data_out.right_ankle_frame_costs.clear();
+    data_out.left_knee_frame_costs.clear();
+    data_out.right_knee_frame_costs.clear();
+    data_out.torso_link_frame_costs.clear();
+    data_out.left_hand_contact_costs.clear();
+    data_out.right_hand_contact_costs.clear();
+    data_out.left_foot_contact_costs.clear();
+    data_out.right_foot_contact_costs.clear();
 
     {
       std::lock_guard<std::mutex> lock(data_mutex_);
@@ -255,14 +313,6 @@ void logToFile(std::ofstream& f_duration, std::ofstream& f_iterations, std::ofst
       for (const auto& frame : data_out.frame_costs) {
         f_costs << frame.first << ": ";
         for (const auto& cost : frame.second) {
-          f_costs << cost << " ";
-        }
-        f_costs << std::endl;
-      }
-
-      for (const auto& contact : data_out.contact_costs) {
-        f_costs << contact.first << ": ";
-        for (const auto& cost : contact.second) {
           f_costs << cost << " ";
         }
         f_costs << std::endl;

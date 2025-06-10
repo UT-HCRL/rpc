@@ -75,8 +75,8 @@ MPCData parseBlock(const std::vector<std::string>& lines, int num_iter) {
     };
 
     parseLabeledLine(lines[4], data.frame_costs);
-    parseLabeledLine(lines[5], data.contact_costs);
-    parseLabeledLine(lines[6], data.contact_costs);
+    // parseLabeledLine(lines[5], data.contact_costs);
+    // parseLabeledLine(lines[6], data.contact_costs);
 
     return data;
 }
@@ -125,12 +125,12 @@ void printMPCData(const std::vector<MPCData>& data_out) {
             std::cout << "\n";
         }
 
-        std::cout << "Contact Costs:\n";
-        for (const auto& [key, values] : data.contact_costs) {
-            std::cout << "  " << key << ": ";
-            for (const auto& v : values) std::cout << v << " ";
-            std::cout << "\n";
-        }
+        // std::cout << "Contact Costs:\n";
+        // for (const auto& [key, values] : data.contact_costs) {
+        //     std::cout << "  " << key << ": ";
+        //     for (const auto& v : values) std::cout << v << " ";
+        //     std::cout << "\n";
+        // }
 
         std::cout << "-----------------------------\n";
     }

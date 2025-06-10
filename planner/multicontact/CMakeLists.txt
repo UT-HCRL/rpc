@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(crocoddyl REQUIRED)
+find_package(OpenMP REQUIRED)
 
 set(sources src/humanoid_multicontact_tracker.cpp)
 
@@ -19,6 +20,7 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} 
     PUBLIC crocoddyl::crocoddyl
+    PUBLIC OpenMP::OpenMP_CXX
     PUBLIC rpc-util
 )
 

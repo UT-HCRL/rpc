@@ -22,7 +22,7 @@
     <mesh file="meshes/navy_door_765x1450_collision_7.obj"/>
   </asset>
   <worldbody>
-    <body name="navy_door_765x1450" pos="0.3 0 0">
+    <body name="navy_door_765x1450" pos="0.32 0 0">
       <geom mesh="navy_door_765x1450_0" material="0.615686_0.811765_0.929412_0.000000_0.000000" class="visual" euler="0 0 1.57"/>
       <geom mesh="navy_door_765x1450_1" material="0.498039_0.498039_0.498039_0.000000_0.000000" class="visual" euler="0 0 1.57"/>
       <geom mesh="navy_door_765x1450_collision_0" rgba="0.7527953103855858 0.18414577896470308 0.13306204457553372 1" class="collision" euler="0 0 1.57"/>

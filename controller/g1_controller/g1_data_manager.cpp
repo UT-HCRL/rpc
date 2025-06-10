@@ -197,124 +197,119 @@ void G1DataManager::SendData()
     msg.add_xbound_costs(data_->xBound_costs_[i]);
   for (int i(0); i < data_->com_costs_.size(); i++)
     msg.add_com_costs(data_->com_costs_[i]);
+  for (int i(0); i < data_->left_hand_frame_costs_.size(); i++)
+    msg.add_left_hand_frame_costs(data_->left_hand_frame_costs_[i]);
+  for (int i(0); i < data_->right_hand_frame_costs_.size(); i++)
+    msg.add_right_hand_frame_costs(data_->right_hand_frame_costs_[i]);
+  for (int i(0); i < data_->left_ankle_frame_costs_.size(); i++)
+    msg.add_left_ankle_frame_costs(data_->left_ankle_frame_costs_[i]);
+  for (int i(0); i < data_->right_ankle_frame_costs_.size(); i++)
+    msg.add_right_ankle_frame_costs(data_->right_ankle_frame_costs_[i]);
+  for (int i(0); i < data_->left_knee_frame_costs_.size(); i++)
+    msg.add_left_knee_frame_costs(data_->left_knee_frame_costs_[i]);
+  for (int i(0); i < data_->right_knee_frame_costs_.size(); i++)
+    msg.add_right_knee_frame_costs(data_->right_knee_frame_costs_[i]);
+  for (int i(0); i < data_->torso_link_frame_costs_.size(); i++)
+    msg.add_torso_link_frame_costs(data_->torso_link_frame_costs_[i]);
+  for (int i(0); i < data_->left_hand_contact_costs_.size(); i++)
+    msg.add_left_hand_contact_costs(data_->left_hand_contact_costs_[i]);
+  for (int i(0); i < data_->right_hand_contact_costs_.size(); i++)
+    msg.add_right_hand_contact_costs(data_->right_hand_contact_costs_[i]);
+  for (int i(0); i < data_->left_foot_contact_costs_.size(); i++)
+    msg.add_left_foot_contact_costs(data_->left_foot_contact_costs_[i]);
+  for (int i(0); i < data_->right_foot_contact_costs_.size(); i++)
+    msg.add_right_foot_contact_costs(data_->right_foot_contact_costs_[i]);
 
   // =============================================================
   // MPC Desired Poses
   // =============================================================
-  for(int i(0); i < data_->torso_des_pos_.size(); i++)
-  {
-    g1::Pos torso_des_pos_msg;
-    torso_des_pos_msg.set_x(data_->torso_des_pos_[i](0));
-    torso_des_pos_msg.set_y(data_->torso_des_pos_[i](1));
-    torso_des_pos_msg.set_z(data_->torso_des_pos_[i](2));
-    msg.add_torso_des_pos()->CopyFrom(torso_des_pos_msg);
-  }
-  for(int i(0); i < data_->torso_des_ori_.size(); i++)
-  {
-    g1::Euler torso_des_ori_msg;
-    torso_des_ori_msg.set_x(data_->torso_des_ori_[i](0));
-    torso_des_ori_msg.set_y(data_->torso_des_ori_[i](1));
-    torso_des_ori_msg.set_z(data_->torso_des_ori_[i](2));
-    msg.add_torso_des_ori()->CopyFrom(torso_des_ori_msg);
-  }
-  for(int i(0); i < data_->left_ankle_roll_des_pos_.size(); i++)
-  {
-    g1::Pos left_ankle_roll_des_pos_msg;
-    left_ankle_roll_des_pos_msg.set_x(data_->left_ankle_roll_des_pos_[i](0));
-    left_ankle_roll_des_pos_msg.set_y(data_->left_ankle_roll_des_pos_[i](1));
-    left_ankle_roll_des_pos_msg.set_z(data_->left_ankle_roll_des_pos_[i](2));
-    msg.add_left_ankle_roll_des_pos()->CopyFrom(left_ankle_roll_des_pos_msg);
-  }
-  for(int i(0); i < data_->left_ankle_roll_des_ori_.size(); i++)
-  {
-    g1::Euler left_ankle_roll_des_ori_msg;
-    left_ankle_roll_des_ori_msg.set_x(data_->left_ankle_roll_des_ori_[i](0));
-    left_ankle_roll_des_ori_msg.set_y(data_->left_ankle_roll_des_ori_[i](1));
-    left_ankle_roll_des_ori_msg.set_z(data_->left_ankle_roll_des_ori_[i](2));
-    msg.add_left_ankle_roll_des_ori()->CopyFrom(left_ankle_roll_des_ori_msg);
-  }
-  for(int i(0); i < data_->right_ankle_roll_des_pos_.size(); i++)
-  {
-    g1::Pos right_ankle_roll_des_pos_msg;
-    right_ankle_roll_des_pos_msg.set_x(data_->right_ankle_roll_des_pos_[i](0));
-    right_ankle_roll_des_pos_msg.set_y(data_->right_ankle_roll_des_pos_[i](1));
-    right_ankle_roll_des_pos_msg.set_z(data_->right_ankle_roll_des_pos_[i](2));
-    msg.add_right_ankle_roll_des_pos()->CopyFrom(right_ankle_roll_des_pos_msg);
-  }
-  for(int i(0); i < data_->right_ankle_roll_des_ori_.size(); i++)
-  {
-    g1::Euler right_ankle_roll_des_ori_msg;
-    right_ankle_roll_des_ori_msg.set_x(data_->right_ankle_roll_des_ori_[i](0));
-    right_ankle_roll_des_ori_msg.set_y(data_->right_ankle_roll_des_ori_[i](1));
-    right_ankle_roll_des_ori_msg.set_z(data_->right_ankle_roll_des_ori_[i](2));
-    msg.add_right_ankle_roll_des_ori()->CopyFrom(right_ankle_roll_des_ori_msg);
-  }
-  for(int i(0); i < data_->left_knee_des_pos_.size(); i++)
-  {
-    g1::Pos left_knee_des_pos_msg;
-    left_knee_des_pos_msg.set_x(data_->left_knee_des_pos_[i](0));
-    left_knee_des_pos_msg.set_y(data_->left_knee_des_pos_[i](1));
-    left_knee_des_pos_msg.set_z(data_->left_knee_des_pos_[i](2));
-    msg.add_left_knee_des_pos()->CopyFrom(left_knee_des_pos_msg);
-  }
-  for(int i(0); i < data_->left_knee_des_ori_.size(); i++)
-  {
-    g1::Euler left_knee_des_ori_msg;
-    left_knee_des_ori_msg.set_x(data_->left_knee_des_ori_[i](0));
-    left_knee_des_ori_msg.set_y(data_->left_knee_des_ori_[i](1));
-    left_knee_des_ori_msg.set_z(data_->left_knee_des_ori_[i](2));
-    msg.add_left_knee_des_ori()->CopyFrom(left_knee_des_ori_msg);
-  }
-  for(int i(0); i < data_->right_knee_des_pos_.size(); i++)
-  {
-    g1::Pos right_knee_des_pos_msg;
-    right_knee_des_pos_msg.set_x(data_->right_knee_des_pos_[i](0));
-    right_knee_des_pos_msg.set_y(data_->right_knee_des_pos_[i](1));
-    right_knee_des_pos_msg.set_z(data_->right_knee_des_pos_[i](2));
-    msg.add_right_knee_des_pos()->CopyFrom(right_knee_des_pos_msg);
-  }
-  for(int i(0); i < data_->right_knee_des_ori_.size(); i++)
-  {
-    g1::Euler right_knee_des_ori_msg;
-    right_knee_des_ori_msg.set_x(data_->right_knee_des_ori_[i](0));
-    right_knee_des_ori_msg.set_y(data_->right_knee_des_ori_[i](1));
-    right_knee_des_ori_msg.set_z(data_->right_knee_des_ori_[i](2));
-    msg.add_right_knee_des_ori()->CopyFrom(right_knee_des_ori_msg);
-  }
-  for(int i(0); i < data_->left_rubber_hand_des_pos_.size(); i++)
-  {
-    g1::Pos left_rubber_hand_des_pos_msg;
-    left_rubber_hand_des_pos_msg.set_x(data_->left_rubber_hand_des_pos_[i](0));
-    left_rubber_hand_des_pos_msg.set_y(data_->left_rubber_hand_des_pos_[i](1));
-    left_rubber_hand_des_pos_msg.set_z(data_->left_rubber_hand_des_pos_[i](2));
-    msg.add_left_rubber_hand_des_pos()->CopyFrom(left_rubber_hand_des_pos_msg);
-  }
-  for(int i(0); i < data_->left_rubber_hand_des_ori_.size(); i++)
-  {
-    g1::Euler left_rubber_hand_des_ori_msg;
-    left_rubber_hand_des_ori_msg.set_x(data_->left_rubber_hand_des_ori_[i](0));
-    left_rubber_hand_des_ori_msg.set_y(data_->left_rubber_hand_des_ori_[i](1));
-    left_rubber_hand_des_ori_msg.set_z(data_->left_rubber_hand_des_ori_[i](2));
-    msg.add_left_rubber_hand_des_ori()->CopyFrom(left_rubber_hand_des_ori_msg);
-  }
-  for(int i(0); i < data_->right_rubber_hand_des_pos_.size(); i++)
-  {
-    g1::Pos right_rubber_hand_des_pos_msg;
-    right_rubber_hand_des_pos_msg.set_x(data_->right_rubber_hand_des_pos_[i](0));
-    right_rubber_hand_des_pos_msg.set_y(data_->right_rubber_hand_des_pos_[i](1));
-    right_rubber_hand_des_pos_msg.set_z(data_->right_rubber_hand_des_pos_[i](2));
-    msg.add_right_rubber_hand_des_pos()->CopyFrom(right_rubber_hand_des_pos_msg);
-  }
-  for(int i(0); i < data_->right_rubber_hand_des_ori_.size(); i++)
-  {
-    g1::Euler right_rubber_hand_des_ori_msg;
-    right_rubber_hand_des_ori_msg.set_x(data_->right_rubber_hand_des_ori_[i](0));
-    right_rubber_hand_des_ori_msg.set_y(data_->right_rubber_hand_des_ori_[i](1));
-    right_rubber_hand_des_ori_msg.set_z(data_->right_rubber_hand_des_ori_[i](2));
-    msg.add_right_rubber_hand_des_ori()->CopyFrom(right_rubber_hand_des_ori_msg);
-  }
+  g1::Pos torso_des_pos_msg;
+  torso_des_pos_msg.set_x(data_->torso_des_pos_(0));
+  torso_des_pos_msg.set_y(data_->torso_des_pos_(1));
+  torso_des_pos_msg.set_z(data_->torso_des_pos_(2));
+  msg.mutable_torso_des_pos()->CopyFrom(torso_des_pos_msg);
   
+  g1::Pos left_ankle_roll_des_pos_msg;
+  left_ankle_roll_des_pos_msg.set_x(data_->left_ankle_roll_des_pos_(0));
+  left_ankle_roll_des_pos_msg.set_y(data_->left_ankle_roll_des_pos_(1));
+  left_ankle_roll_des_pos_msg.set_z(data_->left_ankle_roll_des_pos_(2));
+  msg.mutable_left_ankle_roll_des_pos()->CopyFrom(left_ankle_roll_des_pos_msg);
+  
+  g1::Pos right_ankle_roll_des_pos_msg;
+  right_ankle_roll_des_pos_msg.set_x(data_->right_ankle_roll_des_pos_(0));
+  right_ankle_roll_des_pos_msg.set_y(data_->right_ankle_roll_des_pos_(1));
+  right_ankle_roll_des_pos_msg.set_z(data_->right_ankle_roll_des_pos_(2));
+  msg.mutable_right_ankle_roll_des_pos()->CopyFrom(right_ankle_roll_des_pos_msg);
+  
+  g1::Pos left_knee_des_pos_msg;
+  left_knee_des_pos_msg.set_x(data_->left_knee_des_pos_(0));
+  left_knee_des_pos_msg.set_y(data_->left_knee_des_pos_(1));
+  left_knee_des_pos_msg.set_z(data_->left_knee_des_pos_(2));
+  msg.mutable_left_knee_des_pos()->CopyFrom(left_knee_des_pos_msg);
+  
+  g1::Pos right_knee_des_pos_msg;
+  right_knee_des_pos_msg.set_x(data_->right_knee_des_pos_(0));
+  right_knee_des_pos_msg.set_y(data_->right_knee_des_pos_(1));
+  right_knee_des_pos_msg.set_z(data_->right_knee_des_pos_(2));
+  msg.mutable_right_knee_des_pos()->CopyFrom(right_knee_des_pos_msg);
+  
+  g1::Pos left_rubber_hand_des_pos_msg;
+  left_rubber_hand_des_pos_msg.set_x(data_->left_rubber_hand_des_pos_(0));
+  left_rubber_hand_des_pos_msg.set_y(data_->left_rubber_hand_des_pos_(1));
+  left_rubber_hand_des_pos_msg.set_z(data_->left_rubber_hand_des_pos_(2));
+  msg.mutable_left_rubber_hand_des_pos()->CopyFrom(left_rubber_hand_des_pos_msg);
+  
+  g1::Pos right_rubber_hand_des_pos_msg;
+  right_rubber_hand_des_pos_msg.set_x(data_->right_rubber_hand_des_pos_(0));
+  right_rubber_hand_des_pos_msg.set_y(data_->right_rubber_hand_des_pos_(1));
+  right_rubber_hand_des_pos_msg.set_z(data_->right_rubber_hand_des_pos_(2));
+  msg.mutable_right_rubber_hand_des_pos()->CopyFrom(right_rubber_hand_des_pos_msg);
   // =============================================================
+
+  // =============================================================
+  // MPC Current Poses
+  // =============================================================
+  g1::Pos torso_curr_pos_msg;
+  torso_curr_pos_msg.set_x(data_->torso_curr_pos_(0));
+  torso_curr_pos_msg.set_y(data_->torso_curr_pos_(1));
+  torso_curr_pos_msg.set_z(data_->torso_curr_pos_(2));
+  msg.mutable_torso_curr_pos()->CopyFrom(torso_curr_pos_msg);
+  
+  g1::Pos left_ankle_roll_curr_pos_msg;
+  left_ankle_roll_curr_pos_msg.set_x(data_->left_ankle_roll_curr_pos_(0));
+  left_ankle_roll_curr_pos_msg.set_y(data_->left_ankle_roll_curr_pos_(1));
+  left_ankle_roll_curr_pos_msg.set_z(data_->left_ankle_roll_curr_pos_(2));
+  msg.mutable_left_ankle_roll_curr_pos()->CopyFrom(left_ankle_roll_curr_pos_msg);
+  
+  g1::Pos right_ankle_roll_curr_pos_msg;
+  right_ankle_roll_curr_pos_msg.set_x(data_->right_ankle_roll_curr_pos_(0));
+  right_ankle_roll_curr_pos_msg.set_y(data_->right_ankle_roll_curr_pos_(1));
+  right_ankle_roll_curr_pos_msg.set_z(data_->right_ankle_roll_curr_pos_(2));
+  msg.mutable_right_ankle_roll_curr_pos()->CopyFrom(right_ankle_roll_curr_pos_msg);
+  
+  g1::Pos left_knee_curr_pos_msg;
+  left_knee_curr_pos_msg.set_x(data_->left_knee_curr_pos_(0));
+  left_knee_curr_pos_msg.set_y(data_->left_knee_curr_pos_(1));
+  left_knee_curr_pos_msg.set_z(data_->left_knee_curr_pos_(2));
+  msg.mutable_left_knee_curr_pos()->CopyFrom(left_knee_curr_pos_msg);
+  
+  g1::Pos right_knee_curr_pos_msg;
+  right_knee_curr_pos_msg.set_x(data_->right_knee_curr_pos_(0));
+  right_knee_curr_pos_msg.set_y(data_->right_knee_curr_pos_(1));
+  right_knee_curr_pos_msg.set_z(data_->right_knee_curr_pos_(2));
+  msg.mutable_right_knee_curr_pos()->CopyFrom(right_knee_curr_pos_msg);
+  
+  g1::Pos left_rubber_hand_curr_pos_msg;
+  left_rubber_hand_curr_pos_msg.set_x(data_->left_rubber_hand_curr_pos_(0));
+  left_rubber_hand_curr_pos_msg.set_y(data_->left_rubber_hand_curr_pos_(1));
+  left_rubber_hand_curr_pos_msg.set_z(data_->left_rubber_hand_curr_pos_(2));
+  msg.mutable_left_rubber_hand_curr_pos()->CopyFrom(left_rubber_hand_curr_pos_msg);
+  
+  g1::Pos right_rubber_hand_curr_pos_msg;
+  right_rubber_hand_curr_pos_msg.set_x(data_->right_rubber_hand_curr_pos_(0));
+  right_rubber_hand_curr_pos_msg.set_y(data_->right_rubber_hand_curr_pos_(1));
+  right_rubber_hand_curr_pos_msg.set_z(data_->right_rubber_hand_curr_pos_(2));
+  msg.mutable_right_rubber_hand_curr_pos()->CopyFrom(right_rubber_hand_curr_pos_msg);
 
   // serialize msg in string type
   std::string encoded_msg;
