@@ -9,15 +9,11 @@ cwd = os.getcwd()
 sys.path.append(cwd)
 sys.path.append(cwd + "/build")
 
-# NEED TO GET THIS BACK --- FIX LATER
-from util.python_utils.util import rot_to_quat, quat_to_rot
-
 from plot.data_saver import *
 import pinocchio as pin
 import json
 import argparse
 from scipy.spatial.transform import Rotation as R
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--b_use_plotjuggler", type=bool, default=False)
@@ -29,9 +25,6 @@ parser.add_argument(
 )
 parser.add_argument("--hw_or_sim", choices=["hw", "sim"], default="sim")
 args = parser.parse_args()
-
-# Set max number of planned footstep visuals
-STEP_MAX = 20
 
 if args.visualizer == "meshcat":
     from pinocchio.visualize import MeshcatVisualizer
@@ -47,21 +40,10 @@ elif args.visualizer == "foxglove":
     from foxglove_schemas_protobuf.SceneUpdate_pb2 import SceneUpdate
     from foxglove_schemas_protobuf.FrameTransform_pb2 import FrameTransform
     from mcap_protobuf.schema import build_file_descriptor_set
-    import footstep_planner as fp
-    from watchdog.observers import Observer
 
     # local tools to manage Foxglove scenes
     from plot.foxglove_utils import SceneChannel, ShapeScene
     from UI.visualization_toolbox import update_robot_transform
-
-    # load parameters that can be controlled / changed and start Control Parameters server
-    param_store = foxglove_ctrl.load_params_store()
-    step_listener = foxglove_ctrl.Listener(param_store)
-    th_slow = threading.Thread(
-        target=asyncio.run, args=([foxglove_ctrl.run(step_listener)])
-    )
-    th_slow.start()
-    time.sleep(20.0)  # give some time for state estimator to publish data
 
     scene_schema = b64encode(
         build_file_descriptor_set(SceneUpdate).SerializeToString()
@@ -94,38 +76,6 @@ pnc_path = (
     "config/" + args.robot + "/" + args.hw_or_sim + "/" + env + "/" + wbc + "/pnc.yaml"
 )
 
-grf_names = ["lfoot_rf_cmd", "rfoot_rf_cmd"]
-# "lfoot_rf_normal_filt", "rfoot_rf_normal_filt"]
-
-xyz_scene_names = [
-    "torso_ori_weight",
-    "lf_pos_weight",
-    "lf_pos_kp",
-    "lf_pos_kd",
-    "lf_ori_weight",
-    "rf_pos_weight",
-    "rf_ori_weight",
-]
-xyz_scenes = []
-
-
-def foot_dimensions():
-    with open(pnc_path, "r") as pnc_stream:
-        try:
-            pnc_cfg = yaml.safe_load(pnc_stream)
-            foot_half_length = pnc_cfg["wbc"]["contact"]["foot_half_length"]
-            foot_half_width = pnc_cfg["wbc"]["contact"]["foot_half_width"]
-        except yaml.YAMLError as exc:
-            print(exc)
-    return foot_half_length, foot_half_width
-
-
-async def sceneinitman(name, server):
-    x = await SceneChannel(True, name, "json", name, ["x", "y", "z"]).add_chan(server)
-    xyz_scenes.append([x, name])
-    return x
-
-
 async def main():
     async with FoxgloveServer(
         "0.0.0.0",
@@ -133,6 +83,7 @@ async def main():
         "Visualization server",
         capabilities=["parameters", "parametersSubscribe"],
     ) as server:
+        
         tf_chan_id = await SceneChannel(
             False,
             "transforms",
@@ -140,176 +91,76 @@ async def main():
             FrameTransform.DESCRIPTOR.full_name,
             frame_schema,
         ).add_chan(server)
-        normS_chan_id = await SceneChannel(
-            False,
-            "normal_viz",
-            "protobuf",
-            SceneUpdate.DESCRIPTOR.full_name,
-            scene_schema,
-        ).add_chan(server)
-        grfs_chan_id = await SceneChannel(
-            True,
-            "GRFs",
-            "json",
-            "normal",
-            [
-                "lfoot_rf_cmd_x",
-                "rfoot_rf_cmd_x",
-                "lfoot_rf_cmd_y",
-                "rfoot_rf_cmd_y",
-                "lfoot_rf_cmd_z",
-                "rfoot_rf_cmd_z",
-                "lfoot_rf_normal_filt",
-                "rfoot_rf_normal_filt",
-            ],
-        ).add_chan(server)
-        icpS_chan_id = await SceneChannel(
-            False, "icp_viz", "protobuf", SceneUpdate.DESCRIPTOR.full_name, scene_schema
-        ).add_chan(server)
-        icp_est_chan_id = await SceneChannel(
-            True, "icp_est", "json", "icp_est", ["x", "y"]
-        ).add_chan(server)
-        icp_des_chan_id = await SceneChannel(
-            True, "icp_des", "json", "icp_des", ["x", "y"]
-        ).add_chan(server)
-        # proj_footstepS_chan_id = await SceneChannel(
-        #     False,
-        #     "proj_footstep_viz",
-        #     "protobuf",
-        #     SceneUpdate.DESCRIPTOR.full_name,
-        #     scene_schema,
-        # ).add_chan(server)
-        b_ft_contact_chan_id = await SceneChannel(
-            True, "b_ft_contact", "json", "b_ft_contact", ["b_lfoot", "b_rfoot"]
-        ).add_chan(server)
-        lf_pos_chan_id = await SceneChannel(
-            True, "lf_pos", "json", "lf_pos", ["x", "y", "z"]
-        ).add_chan(server)
-        rf_pos_chan_id = await SceneChannel(
-            True, "rf_pos", "json", "rf_pos", ["x", "y", "z"]
-        ).add_chan(server)
+
+        mpc_horizon = 2 #FIXME: can this be dynamic or should we load the horizon from yaml?
 
         # MPC costs
         mpc_tot_iter = await SceneChannel(
             True, "total_iterations", "json", "total_iterations", ["value"]
         ).add_chan(server)
         mpc_xreg_costs = await SceneChannel(
-            True, "xreg_costs", "json", "xreg_costs", [f"N_{i}" for i in range(2)] #FIXME: can this be dynamic or should we load the horizon from yaml?
+            True, "xreg_costs", "json", "xreg_costs", [f"N_{i}" for i in range(mpc_horizon)] 
         ).add_chan(server)
         mpc_ureg_costs = await SceneChannel(
-            True, "ureg_costs", "json", "ureg_costs", [f"N_{i}" for i in range(2)]
+            True, "ureg_costs", "json", "ureg_costs", [f"N_{i}" for i in range(mpc_horizon)]
         ).add_chan(server)
         mpc_xbound_costs = await SceneChannel(
-            True, "xbound_costs", "json", "xbound_costs", [f"N_{i}" for i in range(2)]
+            True, "xbound_costs", "json", "xbound_costs", [f"N_{i}" for i in range(mpc_horizon)]
         ).add_chan(server)
         mpc_com_costs = await SceneChannel(
-            True, "com_costs", "json", "com_costs", [f"N_{i}" for i in range(2)]
+            True, "com_costs", "json", "com_costs", [f"N_{i}" for i in range(mpc_horizon)]
         ).add_chan(server)
+        mpc_left_hand_contact_costs = await SceneChannel(
+            True, "left_hand_contact_costs", "json", "left_hand_contact_costs", [f"N_{i}" for i in range(mpc_horizon)]
+        ).add_chan(server)
+        mpc_right_hand_contact_costs = await SceneChannel(
+            True, "right_hand_contact_costs", "json", "right_hand_contact_costs", [f"N_{i}" for i in range(mpc_horizon)]
+        ).add_chan(server)
+        mpc_left_foot_contact_costs = await SceneChannel(
+            True, "left_foot_contact_costs", "json", "left_foot_contact_costs", [f"N_{i}" for i in range(mpc_horizon)]
+        ).add_chan(server)
+        mpc_right_foot_contact_costs = await SceneChannel(
+            True, "right_foot_contact_costs", "json", "right_foot_contact_costs", [f"N_{i}" for i in range(mpc_horizon)]
+        ).add_chan(server)
+
+        # MPC desired positions
         mpc_torso_des_pos = await SceneChannel(
-            True, "torso_des_pos", "json", "torso_des_pos", [f"N_{i}_{axis}" for i in range(2) for axis in ["x", "y", "z"]]
+            True, "torso_des_pos", "json", "torso_des_pos", [f"N_0_{axis}" for axis in ["x", "y", "z"]]
+        ).add_chan(server)
+        mpc_right_hand_des_pos = await SceneChannel(
+            True, "right_rubber_hand_des_pos", "json", "right_rubber_hand_des_pos", [f"N_0_{axis}" for axis in ["x", "y", "z"]]
         ).add_chan(server)
         mpc_left_hand_des_pos = await SceneChannel(
-            True, "left_rubber_hand_des_pos", "json", "left_rubber_hand_des_pos", [f"N_{i}_{axis}" for i in range(2) for axis in ["x", "y", "z"]]
+            True, "left_rubber_hand_des_pos", "json", "left_rubber_hand_des_pos", [f"N_0_{axis}" for axis in ["x", "y", "z"]]
         ).add_chan(server)
-
-
-        for scn in range(len(xyz_scene_names)):
-            await sceneinitman(xyz_scene_names[scn], server)
-
-        # STEP_MAX available footstep plans
-        hfoot_length, hfoot_width = foot_dimensions()
-        x = 2 * hfoot_length
-        y = 2 * hfoot_width
-        msgs, size, color = [], {}, {}
-        proj_footstep_chan_ids = []
-        proj_footstep_viz_chan_ids = []
-        proj_foot_pos, proj_foot_ori = {}, {}  # Stores step position
-        proj_feet = []
-        for i in range(STEP_MAX):
-            rf = "proj_rf" + str(i)
-            lf = "proj_lf" + str(i)
-            msgs.append(rf)
-            msgs.append(lf)
-            size[rf], size[lf] = [x, y, 0.001], [x, y, 0.001]
-            color[rf] = [1, 0, 0, 1]
-            color[lf] = [0.1, 0.5, 1, 1]
-            proj_foot_pos[rf], proj_foot_pos[lf] = [0, 0, 0], [0, 0.184, 0]
-            proj_foot_ori[rf], proj_foot_ori[lf] = [0, 0, 0, 0], [0, 0, 0, 0]
-            if i < 10:
-                name = "projected_footsteps_0" + str(i)
-            else:
-                name = "projected_footsteps_" + str(i)
-            # Add a channel for projected footstep data
-            foot_scene = await SceneChannel(
-                True,
-                name,
-                "json",
-                name,
-                [
-                    "rf_pos_x",
-                    "rf_pos_y",
-                    "rf_pos_z",
-                    "rf_ori_x",
-                    "rf_ori_y",
-                    "rf_ori_z",
-                    "rf_ori_q",
-                    "lf_pos_x",
-                    "lf_pos_y",
-                    "lf_pos_z",
-                    "lf_ori_x",
-                    "lf_ori_y",
-                    "lf_ori_z",
-                    "lf_ori_q",
-                ],
-            ).add_chan(server)
-            proj_footstep_chan_ids.append(foot_scene)
-
-            # Add a channel for projected footstep visual elements
-            proj_footstep_viz_chan_id = await SceneChannel(
-                False,
-                name + "_viz",
-                "protobuf",
-                SceneUpdate.DESCRIPTOR.full_name,
-                scene_schema,
-            ).add_chan(server)
-            proj_footstep_viz_chan_ids.append(proj_footstep_viz_chan_id)
-            # add footstep visual elements
-            proj_footsteps = ShapeScene()
-            proj_footsteps.add_shape(rf, "cubes", [1, 0, 0, 1], [x, y, 0.001])
-            proj_footsteps.add_shape(lf, "cubes", [0.1, 0.5, 1, 1], [x, y, 0.001])
-            proj_feet.append(proj_footsteps)
-
-        arrows_scene = ShapeScene()
-        arrows_scene.add_shape(
-            "lfoot_rf_cmd", "arrows", [0, 0, 1, 0.5], [0.03, 0.1, 0.08]
-        )  # blue arrow
-        arrows_scene.add_shape(
-            "rfoot_rf_cmd", "arrows", [0, 0, 1, 0.5], [0.03, 0.1, 0.08]
-        )  # blue arrow
-        arrows_scene.add_shape(
-            "lfoot_rf_normal_filt", "arrows", [0.2, 0.2, 0.2, 0.5], [0.03, 0.1, 0.08]
-        )  # grey arrow
-        arrows_scene.add_shape(
-            "rfoot_rf_normal_filt", "arrows", [0.2, 0.2, 0.2, 0.5], [0.03, 0.1, 0.08]
-        )  # grey arrow
-
-        # add visual icp spheres
-        icp_spheres = ShapeScene()
-        icp_spheres.add_shape("est_icp", "spheres", [1, 0, 1, 1], [0.03, 0.03, 0.03])
-        icp_spheres.add_shape("des_icp", "spheres", [0, 1, 0, 1], [0.03, 0.03, 0.03])
+        
+        # MPC frame costs
+        mpc_right_hand_frame_costs = await SceneChannel(
+            True, "right_hand_frame_costs", "json", "right_hand_frame_costs", [f"N_{i}" for i in range(mpc_horizon)]
+        ).add_chan(server)
+        mpc_left_hand_frame_costs = await SceneChannel(
+            True, "left_hand_frame_costs", "json", "left_hand_frame_costs", [f"N_{i}" for i in range(mpc_horizon)]
+        ).add_chan(server)
+        mpc_left_ankle_frame_costs = await SceneChannel(
+            True, "left_ankle_frame_costs", "json", "left_ankle_frame_costs", [f"N_{i}" for i in range(mpc_horizon)]
+        ).add_chan(server)
+        mpc_right_ankle_frame_costs = await SceneChannel(
+            True, "right_ankle_frame_costs", "json", "right_ankle_frame_costs", [f"N_{i}" for i in range(mpc_horizon)]
+        ).add_chan(server)
+        mpc_left_knee_frame_costs = await SceneChannel(
+            True, "left_knee_frame_costs", "json", "left_knee_frame_costs", [f"N_{i}" for i in range(mpc_horizon)]
+        ).add_chan(server)
+        mpc_right_knee_frame_costs = await SceneChannel(
+            True, "right_knee_frame_costs", "json", "right_knee_frame_costs", [f"N_{i}" for i in range(mpc_horizon)]
+        ).add_chan(server)
+        mpc_torso_link_frame_costs = await SceneChannel(
+            True, "torso_link_frame_costs", "json", "torso_link_frame_costs", [f"N_{i}" for i in range(mpc_horizon)]
+        ).add_chan(server)
 
         # Send the FrameTransform every frame to update the model's position
         transform = FrameTransform()
 
         print("foxglove websocket initiated")
-
-        # Clear experiment_data to start new footstep planning
-        fp.remove_yaml_files(fp.WATCHED_DIR)
-        # Initialization for footstep planning  -- interrupts upon yaml creation
-        event_handler = fp.yamlHandler()
-        observer = Observer()
-        observer.schedule(event_handler, path=fp.WATCHED_DIR, recursive=False)
-        observer.start()
 
         while True:
             tasks = []  # Scenes to synchronously update
@@ -317,7 +168,6 @@ async def main():
             # receive msg trough socket
             encoded_msg = socket.recv()
             msg.ParseFromString(encoded_msg)
-            check_if_kf_estimator(msg.kf_base_joint_pos, msg.est_base_joint_pos)
 
             await asyncio.sleep(0.01)
             now = time.time_ns()
@@ -335,63 +185,7 @@ async def main():
             vis_q[3:7] = np.array(base_ori)  # quaternion [x,y,z,w]
             vis_q[7:] = np.array(msg.joint_positions)
 
-            # send 2 pairs of icp x & y as topics to foxglove
-            await server.send_message(
-                icp_est_chan_id,
-                now,
-                json.dumps(
-                    {
-                        "x": list(msg.est_icp)[0],
-                        "y": list(msg.est_icp)[1],
-                    }
-                ).encode("utf8"),
-            )
-            await server.send_message(
-                icp_des_chan_id,
-                now,
-                json.dumps(
-                    {
-                        "x": list(msg.des_icp)[0],
-                        "y": list(msg.des_icp)[1],
-                    }
-                ).encode("utf8"),
-            )
-
-            await server.send_message(
-                b_ft_contact_chan_id,
-                now,
-                json.dumps(
-                    {
-                        "b_lfoot": msg.b_lfoot,
-                        "b_rfoot": msg.b_rfoot,
-                    }
-                ).encode("utf8"),
-            )
-
-            await server.send_message(
-                lf_pos_chan_id,
-                now,
-                json.dumps(
-                    {
-                        "x": list(msg.lfoot_pos)[0],
-                        "y": list(msg.lfoot_pos)[1],
-                        "z": list(msg.lfoot_pos)[2],
-                    }
-                ).encode("utf8"),
-            )
-
-            await server.send_message(
-                rf_pos_chan_id,
-                now,
-                json.dumps(
-                    {
-                        "x": list(msg.rfoot_pos)[0],
-                        "y": list(msg.rfoot_pos)[1],
-                        "z": list(msg.rfoot_pos)[2],
-                    }
-                ).encode("utf8"),
-            )
-
+            # TODO: Create a dictionary to shorten the code avoiding repetition of await
             await server.send_message(
                 mpc_tot_iter,
                 now,
@@ -448,91 +242,143 @@ async def main():
                 ).encode("utf8"),
             )
 
-            torso_data = {}
-            for i, pos in enumerate(msg.torso_des_pos):
-                torso_data[f"N_{i}_x"] = pos.x
-                torso_data[f"N_{i}_y"] = pos.y
-                torso_data[f"N_{i}_z"] = pos.z
+            await server.send_message(
+                mpc_left_hand_contact_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.left_hand_contact_costs[i] for i in range(len(msg.left_hand_contact_costs))},
+                    }
+                ).encode("utf8")
+            )
+
+            await server.send_message(
+                mpc_left_foot_contact_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.left_foot_contact_costs[i] for i in range(len(msg.left_foot_contact_costs))},
+                    }
+                ).encode("utf8")
+            )
+
+            await server.send_message(
+                mpc_right_foot_contact_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.right_foot_contact_costs[i] for i in range(len(msg.right_foot_contact_costs))},
+                    }
+                ).encode("utf8")
+            )
+
+            await server.send_message(
+                mpc_right_hand_contact_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.right_hand_contact_costs[i] for i in range(len(msg.right_hand_contact_costs))},
+                    }
+                ).encode("utf8")
+            )
+
+            await server.send_message(
+                mpc_right_hand_frame_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.right_hand_frame_costs[i] for i in range(len(msg.right_hand_frame_costs))},
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                mpc_left_hand_frame_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.left_hand_frame_costs[i] for i in range(len(msg.left_hand_frame_costs))},
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                mpc_left_ankle_frame_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.left_ankle_frame_costs[i] for i in range(len(msg.left_ankle_frame_costs))},
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                mpc_right_ankle_frame_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.right_ankle_frame_costs[i] for i in range(len(msg.right_ankle_frame_costs))},
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                mpc_left_knee_frame_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.left_knee_frame_costs[i] for i in range(len(msg.left_knee_frame_costs))},
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                mpc_right_knee_frame_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.right_knee_frame_costs[i] for i in range(len(msg.right_knee_frame_costs))},
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                mpc_torso_link_frame_costs,
+                now,
+                json.dumps(
+                    {
+                        **{f"N_{i}": msg.torso_link_frame_costs[i] for i in range(len(msg.torso_link_frame_costs))},
+                    }
+                ).encode("utf8"),
+            )
 
             await server.send_message(
                 mpc_torso_des_pos,
                 now,
-                json.dumps(torso_data).encode("utf8"),
-            )
-
-            left_hand_data = {}
-            for i, pos in enumerate(msg.left_rubber_hand_des_pos):
-                left_hand_data[f"N_{i}_x"] = pos.x
-                left_hand_data[f"N_{i}_y"] = pos.y
-                left_hand_data[f"N_{i}_z"] = pos.z
-                
-            await server.send_message(
-                mpc_left_hand_des_pos,
-                now,
-                json.dumps(left_hand_data).encode("utf8"),
-            )
-
-
-            for idx in range(STEP_MAX):
-                rf = "proj_rf" + str(idx)
-                lf = "proj_lf" + str(idx)
-                r_pos = proj_foot_pos[rf]
-                l_pos = proj_foot_pos[lf]
-                r_ori = proj_foot_ori[rf]
-                l_ori = proj_foot_ori[lf]
-                await server.send_message(
-                    proj_footstep_chan_ids[idx],
-                    now,
-                    json.dumps(
-                        {
-                            "rf_pos_x": r_pos[0],
-                            "rf_pos_y": r_pos[1],
-                            "rf_pos_z": r_pos[2],
-                            "rf_ori_x": r_ori[1],
-                            "rf_ori_y": r_ori[2],
-                            "rf_ori_z": r_ori[3],
-                            "rf_ori_q": r_ori[0],
-                            "lf_pos_x": l_pos[0],
-                            "lf_pos_y": l_pos[1],
-                            "lf_pos_z": l_pos[2],
-                            "lf_ori_x": l_ori[1],
-                            "lf_ori_y": l_ori[2],
-                            "lf_ori_z": l_ori[3],
-                            "lf_ori_q": l_ori[0],
-                        }
-                    ).encode("utf8"),
-                )
-
-            for scn in xyz_scenes:
-                await server.send_message(
-                    scn[0],
-                    now,
-                    json.dumps(
-                        {
-                            "x": list(getattr(msg, scn[1]))[0],
-                            "y": list(getattr(msg, scn[1]))[1],
-                            "z": list(getattr(msg, scn[1]))[2],
-                        }
-                    ).encode("utf8"),
-                )
-
-            # send 2 pairs of l & r norm data as topics to foxglove
-            await server.send_message(
-                grfs_chan_id,
-                now,
                 json.dumps(
                     {
-                        "lfoot_rf_cmd_x": list(msg.lfoot_rf_cmd)[3],
-                        "rfoot_rf_cmd_x": list(msg.rfoot_rf_cmd)[3],
-                        "lfoot_rf_cmd_y": list(msg.lfoot_rf_cmd)[4],
-                        "rfoot_rf_cmd_y": list(msg.rfoot_rf_cmd)[4],
-                        "lfoot_rf_cmd_z": list(msg.lfoot_rf_cmd)[5],
-                        "rfoot_rf_cmd_z": list(msg.rfoot_rf_cmd)[5],
-                        "lfoot_rf_normal_filt": msg.lfoot_rf_normal_filt,
-                        "rfoot_rf_normal_filt": msg.rfoot_rf_normal_filt,
+                        "N_0_x": msg.torso_des_pos.x,
+                        "N_0_y": msg.torso_des_pos.y,
+                        "N_0_z": msg.torso_des_pos.z,
                     }
                 ).encode("utf8"),
             )
+            
+            for hand, channel in [
+                (msg.right_rubber_hand_des_pos, mpc_right_hand_des_pos),
+                (msg.left_rubber_hand_des_pos, mpc_left_hand_des_pos),
+            ]:
+                await server.send_message(
+                    channel,
+                    now,
+                    json.dumps(
+                        {
+                            "N_0_x": hand.x,
+                            "N_0_y": hand.y,
+                            "N_0_z": hand.z,
+                        }
+                    ).encode("utf8"),
+                )
 
             # update mesh positions
             pin.forwardKinematics(model, data, vis_q)
@@ -546,132 +392,7 @@ async def main():
                 transform.translation.Clear()
 
             Ry = R.from_euler("y", -np.pi / 2).as_matrix()
-            # update GRF arrows
-            for obj in grf_names:
-                transform.parent_frame_id = "world"
-                transform.child_frame_id = obj
-                transform.timestamp.FromNanoseconds(now)
-                # show aligned at the center of respective foot sole
-                if obj in ["lfoot_rf_cmd", "lfoot_rf_normal_filt"]:
-                    R_foot = R.from_quat(msg.lfoot_ori).as_matrix()
-                    transform.translation.x = msg.lfoot_pos[0]
-                    transform.translation.y = msg.lfoot_pos[1]
-                else:
-                    R_foot = R.from_quat(msg.rfoot_ori).as_matrix()
-                    transform.translation.x = msg.rfoot_pos[0]
-                    transform.translation.y = msg.rfoot_pos[1]
 
-                # rotate transform since arrow points in +x direction
-                q_cmd_arrow = rot_to_quat(Ry)
-                transform.rotation.x = q_cmd_arrow[0]
-                transform.rotation.y = q_cmd_arrow[1]
-                transform.rotation.z = q_cmd_arrow[2]
-                transform.rotation.w = q_cmd_arrow[3]
-
-                if obj in ["lfoot_rf_cmd", "rfoot_rf_cmd"]:
-                    force_dir = np.array(list(getattr(msg, obj))[3:])
-                    force_norm = np.linalg.norm(force_dir)
-
-                    # compute axis and angle of rotation to align z with force direction
-                    force_dir /= force_norm
-                    rot_ang = np.arccos(force_dir.dot(np.array([0, 0, 1])))
-                    rot_ax = np.cross(force_dir, np.array([0, 0, 1]))
-                    rot_ax /= np.linalg.norm(rot_ax)
-                    ax_hat = np.array(
-                        [
-                            [0, -rot_ax[2], rot_ax[1]],
-                            [rot_ax[2], 0, -rot_ax[0]],
-                            [-rot_ax[1], rot_ax[0], 0],
-                        ]
-                    )
-                    R_rot_force = (
-                        np.eye(3)
-                        + np.sin(rot_ang) * ax_hat
-                        + (1 - np.cos(rot_ang)) * ax_hat @ ax_hat
-                    )
-                    quat_force = rot_to_quat(R_rot_force)
-
-                    # force scale
-                    force_magnitude = force_norm / 1200.0
-                else:
-                    force_magnitude = getattr(msg, obj)
-                    R_foot_arrow_up_local = R_foot @ Ry
-                    q_cmd_arrow = rot_to_quat(R_foot_arrow_up_local)
-                    transform.rotation.x = q_cmd_arrow[0]
-                    transform.rotation.y = q_cmd_arrow[1]
-                    transform.rotation.z = q_cmd_arrow[2]
-                    transform.rotation.w = q_cmd_arrow[3]
-                    quat_force = np.array(
-                        [0, 0, 0, 1]
-                    )  # we can only measure Fz for now
-
-                    # force scale
-                    force_magnitude = force_magnitude / 1200.0
-                arrows_scene.scale(obj, quat_force, force_magnitude, now)
-                tasks.append(
-                    server.send_message(tf_chan_id, now, transform.SerializeToString())
-                )
-                await server.send_message(
-                    normS_chan_id, now, arrows_scene.serialized_msg(obj)
-                )
-
-            # update icp values on the grid
-            for obj in ["est_icp", "des_icp"]:
-                transform.parent_frame_id = "world"
-                transform.child_frame_id = obj
-                transform.timestamp.FromNanoseconds(now)
-                transform.translation.x = list(getattr(msg, obj))[0]
-                transform.translation.y = list(getattr(msg, obj))[1]
-                icp_spheres.update(obj, now)
-                tasks.append(
-                    server.send_message(tf_chan_id, now, transform.SerializeToString())
-                )
-                tasks.append(
-                    server.send_message(
-                        icpS_chan_id, now, icp_spheres.serialized_msg(obj)
-                    )
-                )
-
-            # Update projected footsteps
-            update = fp.sd.steps_to_update()
-            for obj in msgs:
-                if obj in update:
-                    stepnum = int("".join(filter(lambda i: i.isdigit(), obj)))
-                    yaml = fp.sd.yaml_num
-                    setattr(
-                        fp.sd,
-                        obj[5] + "f_steps_taken",
-                        getattr(fp.sd, obj[5] + "f_steps_taken") + 1,
-                    )
-                    proj_foot_pos[obj] = getattr(fp, obj[5] + "foot_contact_pos")[yaml][
-                        update[obj]
-                    ]
-                    proj_foot_ori[obj] = getattr(fp, obj[5] + "foot_contact_ori")[yaml][
-                        update[obj]
-                    ]
-                    transform.parent_frame_id = "world"
-                    transform.child_frame_id = obj
-                    transform.timestamp.FromNanoseconds(now)
-                    transform.translation.x = proj_foot_pos[obj][0]
-                    transform.translation.y = proj_foot_pos[obj][1]
-                    transform.translation.z = proj_foot_pos[obj][2]
-                    transform.rotation.x = proj_foot_ori[obj][1]
-                    transform.rotation.y = proj_foot_ori[obj][2]
-                    transform.rotation.z = proj_foot_ori[obj][3]
-                    transform.rotation.w = proj_foot_ori[obj][0]
-                    proj_feet[stepnum].update(obj, now)
-                    tasks.append(
-                        server.send_message(
-                            tf_chan_id, now, transform.SerializeToString()
-                        )
-                    )
-                    tasks.append(
-                        server.send_message(
-                            proj_footstep_viz_chan_ids[stepnum],
-                            now,
-                            proj_feet[stepnum].serialized_msg(obj),
-                        )
-                    )
 
             await asyncio.gather(*tasks)
 
@@ -757,42 +478,87 @@ if args.visualizer != "none":
         viz.loadViewerModel(rootNodeName=args.robot)
 
         # add other visualizations to viewer
-        com_des_viz, com_des_model = vis_tools.add_sphere(
-            viz.viewer, "com_des", color=[0.0, 0.0, 1.0, 0.5]
+        left_hand_viz, left_hand_model = vis_tools.add_sphere(
+            viz.viewer, "left_hand_des", color=[1.0, 0.0, 0.0, 0.4]
         )
-        com_des_viz_q = pin.neutral(com_des_model)
+        left_hand_q = pin.neutral(left_hand_model)
 
-        com_viz, com_model = vis_tools.add_sphere(
-            viz.viewer, "com", color=[1.0, 0.0, 0.0, 0.5]
+        right_hand_viz, right_hand_model = vis_tools.add_sphere(
+            viz.viewer, "right_hand_des", color=[1.0, 0.0, 0.0, 0.4]
         )
-        com_viz_q = pin.neutral(com_model)
+        right_hand_q = pin.neutral(right_hand_model)
 
-        com_proj_viz, com_proj_model = vis_tools.add_sphere(
-            viz.viewer, "com_proj", color=[0.0, 0.0, 1.0, 0.3]
+        left_hand_ref_viz, left_hand_ref_model = vis_tools.add_sphere(
+            viz.viewer, "left_hand_ref", color=[1.0, 0.0, 0.0, 0.4]
         )
-        com_proj_viz_q = pin.neutral(com_proj_model)
+        left_hand_ref_q = pin.neutral(left_hand_ref_model)
 
-        icp_viz, icp_model = vis_tools.add_sphere(
-            viz.viewer, "icp", color=vis_tools.violet
+        right_hand_ref_viz, right_hand_ref_model = vis_tools.add_sphere(
+            viz.viewer, "right_hand_ref", color=[1.0, 0.0, 0.0, 0.4]
         )
-        icp_viz_q = pin.neutral(icp_model)
+        right_hand_ref_q = pin.neutral(right_hand_ref_model)
 
-        icp_des_viz, icp_des_model = vis_tools.add_sphere(
-            viz.viewer, "icp_des", color=[0.0, 1.0, 0.0, 0.3]
+        torso_des_viz, torso_des_model = vis_tools.add_sphere(
+            viz.viewer, "torso_des_pos", color=[1.0, 0.0, 0.0, 0.4]
         )
-        icp_des_viz_q = pin.neutral(icp_des_model)
+        torso_des_q = pin.neutral(torso_des_model)
 
-        cmp_des_viz, cmp_des_model = vis_tools.add_sphere(
-            viz.viewer, "cmp_des", color=[0.0, 0.75, 0.75, 0.3]
+        left_ankle_ref_viz, left_ankle_ref_model = vis_tools.add_sphere(
+            viz.viewer, "left_ankle_roll_des_pos", color=[1.0, 0.0, 0.0, 0.4]
         )
-        cmp_des_viz_q = pin.neutral(cmp_des_model)
+        left_ankle_ref_q = pin.neutral(left_ankle_ref_model)
 
-        # add arrows visualizers to viewer
-        arrow_viz = meshcat.Visualizer(window=viz.viewer.window)
-        vis_tools.add_arrow(arrow_viz, "grf_lf", color=[0, 0, 1])
-        vis_tools.add_arrow(arrow_viz, "grf_rf", color=[1, 0, 0])
-        vis_tools.add_arrow(arrow_viz, "grf_lf_normal", color=[0.2, 0.2, 0.2, 0.2])
-        vis_tools.add_arrow(arrow_viz, "grf_rf_normal", color=[0.2, 0.2, 0.2, 0.2])
+        right_ankle_ref_viz, right_ankle_ref_model = vis_tools.add_sphere(
+            viz.viewer, "right_ankle_roll_des_pos", color=[1.0, 0.0, 0.0, 0.4]
+        )
+        right_ankle_ref_q = pin.neutral(right_ankle_ref_model)
+
+        left_knee_ref_viz, left_knee_ref_model = vis_tools.add_sphere(
+            viz.viewer, "left_knee_des_pos", color=[1.0, 0.0, 0.0, 0.4]
+        )
+        left_knee_ref_q = pin.neutral(left_knee_ref_model)
+
+        right_knee_ref_viz, right_knee_ref_model = vis_tools.add_sphere(
+            viz.viewer, "right_knee_des_pos", color=[1.0, 0.0, 0.0, 0.4]
+        )
+        right_knee_ref_q = pin.neutral(right_knee_ref_model)
+
+        # Current values
+        left_hand_curr_viz, left_hand_curr_model = vis_tools.add_sphere(
+            viz.viewer, "left_rubber_hand_curr_pos", color=[0.0, 0.0, 1.0, 0.4]
+        )
+        left_hand_curr_q = pin.neutral(left_hand_curr_model)
+
+        right_hand_curr_viz, right_hand_curr_model = vis_tools.add_sphere(
+            viz.viewer, "right_rubber_hand_curr_pos", color=[0.0, 0.0, 1.0, 0.4]
+        )
+        right_hand_curr_q = pin.neutral(right_hand_curr_model)
+
+        torso_curr_viz, torso_curr_model = vis_tools.add_sphere(
+            viz.viewer, "torso_curr_pos", color=[0.0, 0.0, 1.0, 0.4]
+        )
+        torso_curr_q = pin.neutral(torso_curr_model)
+
+        left_ankle_curr_viz, left_ankle_curr_model = vis_tools.add_sphere(
+            viz.viewer, "left_ankle_roll_curr_pos", color=[0.0, 0.0, 1.0, 0.4]
+        )
+        left_ankle_curr_q = pin.neutral(left_ankle_curr_model)
+
+        right_ankle_curr_viz, right_ankle_curr_model = vis_tools.add_sphere(
+            viz.viewer, "right_ankle_roll_curr_pos", color=[0.0, 0.0, 1.0, 0.4]
+        )
+        right_ankle_curr_q = pin.neutral(right_ankle_curr_model)
+
+        left_knee_curr_viz, left_knee_curr_model = vis_tools.add_sphere(
+            viz.viewer, "left_knee_curr_pos", color=[0.0, 0.0, 1.0, 0.4]
+        )
+        left_knee_curr_q = pin.neutral(left_knee_curr_model)
+
+        right_knee_curr_viz, right_knee_curr_model = vis_tools.add_sphere(
+            viz.viewer, "right_knee_curr_pos", color=[0.0, 0.0, 1.0, 0.4]
+        )
+        right_knee_curr_q = pin.neutral(right_knee_curr_model)
+
 
 
 def process_data_saver(visualize_type):
@@ -889,7 +655,6 @@ def process_data_saver(visualize_type):
 
     data_saver.advance()
 
-
 while True:
     # print("\nFLAG_B1")
     # receive msg through socket
@@ -915,85 +680,66 @@ while True:
             process_data_saver("meshcat")
 
             # update visualizer viewers
-            com_des_viz_q[0] = msg.des_com_pos[0]
-            com_des_viz_q[1] = msg.des_com_pos[1]
-            com_des_viz_q[2] = msg.des_com_pos[2]
-
-            com_viz_q[0] = msg.act_com_pos[0]
-            com_viz_q[1] = msg.act_com_pos[1]
-            com_viz_q[2] = msg.act_com_pos[2]
-
-            com_proj_viz_q[0] = msg.des_com_pos[0]
-            com_proj_viz_q[1] = msg.des_com_pos[1]
-
-            icp_viz_q[0] = msg.est_icp[0]
-            icp_viz_q[1] = msg.est_icp[1]
-            icp_viz_q[2] = 0.0
-
-            icp_des_viz_q[0] = msg.des_icp[0]
-            icp_des_viz_q[1] = msg.des_icp[1]
-            icp_des_viz_q[2] = 0.0
-
-            cmp_des_viz_q[0] = msg.des_cmp[0]
-            cmp_des_viz_q[1] = msg.des_cmp[1]
-            cmp_des_viz_q[2] = 0.0
-
             viz.display(vis_q)
-            com_des_viz.display(com_des_viz_q)
-            com_viz.display(com_viz_q)
-            com_proj_viz.display(com_proj_viz_q)
-            icp_viz.display(icp_viz_q)
-            icp_des_viz.display(icp_des_viz_q)
-            cmp_des_viz.display(cmp_des_viz_q)
 
-            # plot GRFs
-            if msg.phase != 1:
-                vis_tools.grf_display(
-                    arrow_viz["grf_lf"], msg.lfoot_pos, msg.lfoot_ori, msg.lfoot_rf_cmd
-                )
-                vis_tools.grf_display(
-                    arrow_viz["grf_rf"], msg.rfoot_pos, msg.rfoot_ori, msg.rfoot_rf_cmd
-                )
+            if hasattr(msg, "right_rubber_hand_curr_pos") and msg.right_rubber_hand_curr_pos:
+                right_hand_curr_q[:3] = np.array([msg.right_rubber_hand_curr_pos.x, msg.right_rubber_hand_curr_pos.y, msg.right_rubber_hand_curr_pos.z])
+                right_hand_curr_viz.display(right_hand_curr_q)
 
-                # add sensed normal force
-                l_force_local = quat_to_rot(msg.lfoot_ori) @ np.array(
-                    [0.0, 0.0, msg.lfoot_rf_normal_filt]
+            if hasattr(msg, "left_rubber_hand_curr_pos") and msg.left_rubber_hand_curr_pos:
+                left_hand_curr_q[:3] = np.array([msg.left_rubber_hand_curr_pos.x, msg.left_rubber_hand_curr_pos.y, msg.left_rubber_hand_curr_pos.z])
+                left_hand_curr_viz.display(left_hand_curr_q)
+
+            if hasattr(msg, "torso_curr_pos") and msg.torso_curr_pos:
+                torso_curr_q[:3] = np.array([msg.torso_curr_pos.x, msg.torso_curr_pos.y, msg.torso_curr_pos.z])
+                torso_curr_viz.display(torso_curr_q)
+
+            if hasattr(msg, "left_ankle_roll_curr_pos") and msg.left_ankle_roll_curr_pos:
+                left_ankle_curr_q[:3] = np.array([msg.left_ankle_roll_curr_pos.x, msg.left_ankle_roll_curr_pos.y, msg.left_ankle_roll_curr_pos.z])
+                left_ankle_curr_viz.display(left_ankle_curr_q)
+
+            if hasattr(msg, "right_ankle_roll_curr_pos") and msg.right_ankle_roll_curr_pos:
+                right_ankle_curr_q[:3] = np.array([msg.right_ankle_roll_curr_pos.x, msg.right_ankle_roll_curr_pos.y, msg.right_ankle_roll_curr_pos.z])
+                right_ankle_curr_viz.display(right_ankle_curr_q)
+
+            if hasattr(msg, "left_knee_curr_pos") and msg.left_knee_curr_pos:
+                left_knee_curr_q[:3] = np.array([msg.left_knee_curr_pos.x, msg.left_knee_curr_pos.y, msg.left_knee_curr_pos.z])
+                left_knee_curr_viz.display(left_knee_curr_q)
+
+            if hasattr(msg, "right_knee_curr_pos") and msg.right_knee_curr_pos:
+                right_knee_curr_q[:3] = np.array([msg.right_knee_curr_pos.x, msg.right_knee_curr_pos.y, msg.right_knee_curr_pos.z])
+                right_knee_curr_viz.display(right_knee_curr_q)
+
+            if hasattr(msg, "right_rubber_hand_des_pos") and msg.right_rubber_hand_des_pos:
+                right_hand_q[:3] = np.array([msg.right_rubber_hand_des_pos.x, msg.right_rubber_hand_des_pos.y, msg.right_rubber_hand_des_pos.z])
+                right_hand_viz.display(right_hand_q)
+
+            if hasattr(msg, "left_rubber_hand_des_pos") and msg.left_rubber_hand_des_pos:
+                left_hand_q[:3] = np.array([msg.left_rubber_hand_des_pos.x, msg.left_rubber_hand_des_pos.y, msg.left_rubber_hand_des_pos.z])
+                left_hand_viz.display(left_hand_q)
+            
+            if hasattr(msg, "torso_des_pos") and msg.torso_des_pos:
+                torso_des_q[:3] = np.array([msg.torso_des_pos.x, msg.torso_des_pos.y, msg.torso_des_pos.z])
+                torso_des_viz.display(torso_des_q)
+
+            if hasattr(msg, "left_ankle_roll_des_pos") and msg.left_ankle_roll_des_pos:
+                left_ankle_ref_q[:3] = np.array([msg.left_ankle_roll_des_pos.x, msg.left_ankle_roll_des_pos.y, msg.left_ankle_roll_des_pos.z])
+                left_ankle_ref_viz.display(left_ankle_ref_q)
+            
+            if hasattr(msg, "right_ankle_roll_des_pos") and msg.right_ankle_roll_des_pos:
+                right_ankle_ref_q[:3] = np.array([msg.right_ankle_roll_des_pos.x, msg.right_ankle_roll_des_pos.y, msg.right_ankle_roll_des_pos.z])
+                right_ankle_ref_viz.display(right_ankle_ref_q)
+
+            if hasattr(msg, "left_knee_des_pos") and msg.left_knee_des_pos:
+                left_knee_ref_q[:3] = np.array(
+                    [msg.left_knee_des_pos.x, msg.left_knee_des_pos.y, msg.left_knee_des_pos.z]
                 )
-                r_force_local = quat_to_rot(msg.rfoot_ori) @ np.array(
-                    [0.0, 0.0, msg.rfoot_rf_normal_filt]
-                )
-                lfoot_rf_normal = np.array(
-                    [
-                        0.0,
-                        0.0,
-                        0.0,
-                        l_force_local[0],
-                        l_force_local[1],
-                        l_force_local[2],
-                    ]
-                )
-                rfoot_rf_normal = np.array(
-                    [
-                        0.0,
-                        0.0,
-                        0.0,
-                        r_force_local[0],
-                        r_force_local[1],
-                        r_force_local[2],
-                    ]
-                )
-                vis_tools.grf_display(
-                    arrow_viz["grf_lf_normal"],
-                    msg.lfoot_pos,
-                    msg.lfoot_ori,
-                    lfoot_rf_normal,
-                )
-                vis_tools.grf_display(
-                    arrow_viz["grf_rf_normal"],
-                    msg.rfoot_pos,
-                    msg.rfoot_ori,
-                    rfoot_rf_normal,
-                )
+                left_knee_ref_viz.display(left_knee_ref_q)
+            
+            if hasattr(msg, "right_knee_des_pos") and msg.right_knee_des_pos:
+                right_knee_ref_q[:3] = np.array([msg.right_knee_des_pos.x, msg.right_knee_des_pos.y, msg.right_knee_des_pos.z])
+                right_knee_ref_viz.display(right_knee_ref_q)
+            
         elif args.visualizer == "foxglove":
             # webbrowser.open('https://app.foxglove.dev/view?ds=foxglove-websocket&ds.url=ws%3A%2F%2Flocalhost%3A8765')
             th_fast = threading.Thread(target=asyncio.run(main()), args=())
