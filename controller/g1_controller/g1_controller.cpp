@@ -340,6 +340,19 @@ void G1Controller::_SaveData() {
       tci_container_->task_map_["lf_ori_task"]->CurrentPos();
   dm->data_->rfoot_ori_ =
       tci_container_->task_map_["rf_ori_task"]->CurrentPos();
+  dm->data_->lhand_pos_ =
+      robot_->GetLinkIsometry(g1_link::left_wrist_yaw_link).translation();
+  dm->data_->rhand_pos_ = robot_->GetLinkIsometry(g1_link::right_wrist_yaw_link).translation();
+
+  Eigen::Quaterniond temp_l_ori(robot_->GetLinkIsometry(g1_link::left_wrist_yaw_link).linear());
+  Eigen::VectorXd lhand_ori(4);
+  lhand_ori << temp_l_ori.normalized().coeffs();
+  dm->data_->lhand_ori_ = lhand_ori;
+
+  Eigen::Quaterniond temp_r_ori(robot_->GetLinkIsometry(g1_link::right_wrist_yaw_link).linear());
+  Eigen::VectorXd rhand_ori(4);
+  rhand_ori << temp_r_ori.normalized().coeffs();
+  dm->data_->rhand_ori_ = rhand_ori;
 
   Eigen::MatrixXd rot = Eigen::MatrixXd::Zero(6, 6);
   rot.topLeftCorner<3, 3>() =

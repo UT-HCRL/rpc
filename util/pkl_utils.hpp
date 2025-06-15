@@ -8,7 +8,8 @@ namespace pkl_utils {
     enum class PickleType {
         DICT,
         LIST,
-        BEZIER
+        BEZIER,
+        COMPOSITE
     };
 
     class BezierCurve {
@@ -171,5 +172,20 @@ namespace pkl_utils {
         std::unordered_map<std::string, std::shared_ptr<CompositeBezierCurve>> bezier_curves_map_;
     };
 
+    static const Vector3d get_com_des_pos(const std::vector<Vector3d>& com_des, const double& t, const double& dt, const double& epsilon = 1e-6) {
+        if (com_des.empty()) {
+            throw std::invalid_argument("com_des cannot be empty");
+        }
+        if (t < 0) {
+            throw std::out_of_range("t can't be nefative");
+        }
+
+        int index = static_cast<int>(t / dt + epsilon);
+        if (index < 0 || index >= static_cast<int>(com_des.size())) {
+            throw std::out_of_range("Time t out of bounds for CoM trajectory");
+        }
+
+        return com_des.at(index);
+    }
 
 } // namespace pkl_utils

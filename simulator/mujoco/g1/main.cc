@@ -320,6 +320,28 @@ void SetYamlNode(YAML::Node &node) {
   }
 }
 
+void SetLowActuatorGains(const std::unordered_map<std::string, int> &mj_act_map){
+  kp_.clear();
+  kp_.resize(mj_act_map.size());
+  kd_.clear();
+  kd_.resize(mj_act_map.size());
+
+
+  try {
+    double tmp;
+    for (const auto &[mj_act_name, mj_act_idx] : mj_act_map) {
+      util::ReadParameter(cfg_["actuator_gains"][mj_act_name], "kp", tmp);
+      kp_[mj_act_idx] = tmp/100.0;
+      util::ReadParameter(cfg_["actuator_gains"][mj_act_name], "kd", tmp);
+      kd_[mj_act_idx] = tmp/100.0;
+    }
+  } catch (const std::runtime_error &ex) {
+    std::cerr << "Error Reading Parameter [" << ex.what() << "] at file: ["
+              << __FILE__ << "]" << std::endl;
+  }
+
+}
+
 void SetActuatorGains(const std::unordered_map<std::string, int> &mj_act_map) {
   kp_.clear();
   kp_.resize(mj_act_map.size());
@@ -662,6 +684,12 @@ void PhysicsLoop(mj::Simulate &sim) {
 
               // inject noise
               // sim.InjectNoise(); //NOTE: uncomment if needed
+
+              if(sim.reset_gains_ == true){
+                // reset gains
+                SetLowActuatorGains(mj_act_map_);
+                sim.reset_gains_ = false;
+              }
 
               // call mj_step
               mj_step(m, d);

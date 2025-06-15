@@ -44,15 +44,16 @@ TrackPlan::TrackPlan(const StateId state_id,
   g1_mpc_ = std::make_unique<HumanoidMulticontactTracker>(r_file_path, gains);
   // g1_mpc_->printModel();
 
-  std::string file_path = THIS_COM "data_example/g1_step_over_knee_knocker_latest.pkl";
-  pkl_reader_ = std::make_unique<pkl_utils::PickleReader>(file_path, pkl_utils::PickleType::BEZIER);
+  std::string file_path = THIS_COM "data_example/g1_step_over_knee_knocker_latest_fix.pkl";
+  pkl_reader_ = std::make_unique<pkl_utils::PickleReader>(file_path, pkl_utils::PickleType::COMPOSITE);
 
   if (!pkl_reader_->isReady()) {
   std::cerr << "Failed to open the file." << std::endl;
   }
 
   pkl_reader_->parse();
-  // bezier_curves_ = pkl_reader_->getCompositeBezierCurves();
+
+  std::cout << " before getCompositeBezierCurves\n";
   std::vector<pkl_utils::CompositeBezierCurve> bezier_curves = pkl_reader_->getCompositeBezierCurves();
   std::vector<std::shared_ptr<pkl_utils::CompositeBezierCurve>> bezier_curves_ptrs;
   // Convert to pointers
@@ -62,7 +63,21 @@ TrackPlan::TrackPlan(const StateId state_id,
 
   std::vector<std::string> target_names = g1_mpc_->getTargetFrameNames();
   bezier_curves_mgr_ = std::make_unique<pkl_utils::BezierCurvesManager>(bezier_curves_ptrs, target_names);
-  pkl_reader_.reset();  //NOTE: I need this otherwise on ctrl+c I get sigfault due to pybind scope
+  std::cout<<"Getting CoM from PickleReader\n";
+  com_des_ =  pkl_reader_->getCoM();
+
+  // for(const auto& com : com_des_) {
+  //   std::cout << "CoM : " << com << std::endl;
+  // }
+
+  try {
+    pkl_reader_.reset(); //NOTE: I need this otherwise on ctrl+c I get sigfault due to pybind scope 
+  } catch (const std::exception& e) {
+    std::cerr << "Exception caught while resetting pkl_reader_: " << e.what() << std::endl;
+  } catch (...) {
+    std::cerr << "Unknown exception caught while resetting pkl_reader_" << std::endl;
+  }
+
 }
 
 TrackPlan::~TrackPlan() {
@@ -119,21 +134,29 @@ void TrackPlan::Compute() {
 
   while (run_threads_) {
     double controller_time = sp_->current_time_ - state_machine_start_time_;
+    // std::cout << "controller time: " <<controller_time <<std::endl;
 
     std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames_vec;
+    std::vector<Eigen::Vector3d> desired_com_vec;
     desired_frames_vec.resize(g1_mpc_->getNhorizon() +1);
+    desired_com_vec.resize(g1_mpc_->getNhorizon() + 1);
 
     for(int i=0; i<g1_mpc_->getNhorizon() + 1; i++){
       std::unordered_map<std::string, pinocchio::SE3> desired_frames;
+      const double t = controller_time + i * g1_mpc_->getDt();
       
       for(const auto& frame_name : g1_mpc_->getTargetFrameNames()) {
         pinocchio::SE3 temp_pose;
         temp_pose.setIdentity();
-        const double t = controller_time + i * g1_mpc_->getDt();
         temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
         desired_frames[frame_name] = temp_pose;
       }
       desired_frames_vec[i] = desired_frames;
+
+      // std::cout << "Desired CoM at time " << t << ": " <<pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt()) << std::endl;
+
+      desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt());
+
     }
 
     xs_out[0] << robot_->GetQ(), robot_->GetQdot();
@@ -141,13 +164,13 @@ void TrackPlan::Compute() {
     auto start_time = std::chrono::high_resolution_clock::now();
     if(controller_time >= 3.0 && !remove_contact){ //FIXME: this should become a switching condition from the forces
       remove_contact = true;
-      g1_mpc_->solveOneStep(xs_out, us_out, data_out, com_ref, desired_frames_vec, desired_frames_vec[0]["left_rubber_hand"], true);
+      g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, true);
     }else if(controller_time >= 6.0 && remove_contact){
       std::cout<<"SHOULD BE NEW STEP NOW \n";
       exit(23);
-      g1_mpc_->solveOneStep(xs_out, us_out, data_out, com_ref, desired_frames_vec, desired_frames_vec[0]["left_rubber_hand"], false);
+      g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, false);
     }else{
-      g1_mpc_->solveOneStep(xs_out, us_out, data_out, com_ref, desired_frames_vec, desired_frames_vec[0]["left_rubber_hand"], false);
+      g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, false);
     }
    
     auto end_time = std::chrono::high_resolution_clock::now();
@@ -169,21 +192,23 @@ void TrackPlan::Compute() {
       dm->data_->com_costs_.resize(data_out.com_costs.size());
       dm->data_->com_costs_ = data_out.com_costs;
 
-      dm->data_->torso_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("torso_link", controller_time);
+      dm->data_->torso_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("torso_primitive_shape", controller_time);
       dm->data_->right_knee_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("right_knee_link", controller_time);
       dm->data_->left_knee_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("left_knee_link", controller_time);
       dm->data_->right_ankle_roll_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("right_ankle_roll_link", controller_time);
       dm->data_->left_ankle_roll_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("left_ankle_roll_link", controller_time);
       dm->data_->left_rubber_hand_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("left_rubber_hand", controller_time);
       dm->data_->right_rubber_hand_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("right_rubber_hand", controller_time);
+      dm->data_->com_des_pos_ = pkl_utils::get_com_des_pos(com_des_, controller_time, g1_mpc_->getDt());
 
-      dm->data_->torso_curr_pos_ = data_out.frame_current_pos["torso_link"];
+      dm->data_->torso_curr_pos_ = data_out.frame_current_pos["torso_primitive_shape"];
       dm->data_->left_ankle_roll_curr_pos_ = data_out.frame_current_pos["left_ankle_roll_link"];
       dm->data_->right_ankle_roll_curr_pos_ = data_out.frame_current_pos["right_ankle_roll_link"];
       dm->data_->left_knee_curr_pos_ = data_out.frame_current_pos["left_knee_link"];
       dm->data_->right_knee_curr_pos_ = data_out.frame_current_pos["right_knee_link"];
       dm->data_->left_rubber_hand_curr_pos_ = data_out.frame_current_pos["left_rubber_hand"];
       dm->data_->right_rubber_hand_curr_pos_ = data_out.frame_current_pos["right_rubber_hand"];
+      dm->data_->com_curr_pos_ = data_out.com_curr_pos;
 
       dm->data_->left_hand_frame_costs_.resize(data_out.left_hand_frame_costs.size());
       dm->data_->right_hand_frame_costs_.resize(data_out.right_hand_frame_costs.size());
@@ -213,6 +238,11 @@ void TrackPlan::Compute() {
       dm->data_->left_foot_contact_costs_ = data_out.left_foot_contact_costs;
       dm->data_->right_foot_contact_costs_ = data_out.right_foot_contact_costs;
 
+      dm->data_->l_foot_rf_ = data_out.contact_forces["l_foot_contact_contact"];
+      dm->data_->r_foot_rf_ = data_out.contact_forces["r_foot_contact_contact"];
+      dm->data_->l_hand_rf_ = data_out.contact_forces["left_rubber_hand_contact"];
+      dm->data_->r_hand_rf_ = data_out.contact_forces["right_rubber_hand_contact"];
+
       // dm->data_->frame_curr_pose_ = data_out.frame_curr_pose;
     #endif
 
@@ -241,6 +271,7 @@ void TrackPlan::Compute() {
     data_out.right_hand_contact_costs.clear();
     data_out.left_foot_contact_costs.clear();
     data_out.right_foot_contact_costs.clear();
+    data_out.contact_forces.clear();
 
     {
       std::lock_guard<std::mutex> lock(data_mutex_);

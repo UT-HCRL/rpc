@@ -47,11 +47,17 @@ void G1DataManager::SendData()
     msg.add_rfoot_pos(data_->rfoot_pos_[i]);
     msg.add_lfoot_ori(data_->lfoot_ori_[i]);
     msg.add_rfoot_ori(data_->rfoot_ori_[i]);
+    msg.add_lhand_pos(data_->lhand_pos_[i]);
+    msg.add_rhand_pos(data_->rhand_pos_[i]);
+    msg.add_lhand_ori(data_->lhand_ori_[i]);
+    msg.add_rhand_ori(data_->rhand_ori_[i]);
   }
   msg.add_est_base_joint_ori(data_->est_base_joint_ori_[3]);
   msg.add_kf_base_joint_ori(data_->kf_base_joint_ori_[3]);
   msg.add_lfoot_ori(data_->lfoot_ori_[3]);
   msg.add_rfoot_ori(data_->rfoot_ori_[3]);
+  msg.add_lhand_ori(data_->lhand_ori_[3]);
+  msg.add_rhand_ori(data_->rhand_ori_[3]);
 
   for (int i(0); i < data_->joint_positions_.size(); i++)
   {
@@ -264,6 +270,36 @@ void G1DataManager::SendData()
   right_rubber_hand_des_pos_msg.set_y(data_->right_rubber_hand_des_pos_(1));
   right_rubber_hand_des_pos_msg.set_z(data_->right_rubber_hand_des_pos_(2));
   msg.mutable_right_rubber_hand_des_pos()->CopyFrom(right_rubber_hand_des_pos_msg);
+
+  g1::Pos com_des_pos_msg;
+  com_des_pos_msg.set_x(data_->com_des_pos_(0));
+  com_des_pos_msg.set_y(data_->com_des_pos_(1));
+  com_des_pos_msg.set_z(data_->com_des_pos_(2));
+  msg.mutable_com_des_pos()->CopyFrom(com_des_pos_msg);
+
+  g1::Pos l_foot_rf_msg;
+  l_foot_rf_msg.set_x(data_->l_foot_rf_(0));
+  l_foot_rf_msg.set_y(data_->l_foot_rf_(1));
+  l_foot_rf_msg.set_z(data_->l_foot_rf_(2));
+  msg.mutable_l_foot_rf()->CopyFrom(l_foot_rf_msg);
+
+  g1::Pos r_foot_rf_msg;
+  r_foot_rf_msg.set_x(data_->r_foot_rf_(0));
+  r_foot_rf_msg.set_y(data_->r_foot_rf_(1));
+  r_foot_rf_msg.set_z(data_->r_foot_rf_(2));
+  msg.mutable_r_foot_rf()->CopyFrom(r_foot_rf_msg);
+
+  g1::Pos l_hand_rf_msg;
+  l_hand_rf_msg.set_x(data_->l_hand_rf_(0));
+  l_hand_rf_msg.set_y(data_->l_hand_rf_(1));
+  l_hand_rf_msg.set_z(data_->l_hand_rf_(2));
+  msg.mutable_l_hand_rf()->CopyFrom(l_hand_rf_msg);
+
+  g1::Pos r_hand_rf_msg;
+  r_hand_rf_msg.set_x(data_->r_hand_rf_(0));
+  r_hand_rf_msg.set_y(data_->r_hand_rf_(1));
+  r_hand_rf_msg.set_z(data_->r_hand_rf_(2));
+  msg.mutable_r_hand_rf()->CopyFrom(r_hand_rf_msg);
   // =============================================================
 
   // =============================================================
@@ -310,6 +346,12 @@ void G1DataManager::SendData()
   right_rubber_hand_curr_pos_msg.set_y(data_->right_rubber_hand_curr_pos_(1));
   right_rubber_hand_curr_pos_msg.set_z(data_->right_rubber_hand_curr_pos_(2));
   msg.mutable_right_rubber_hand_curr_pos()->CopyFrom(right_rubber_hand_curr_pos_msg);
+
+  g1::Pos com_curr_pos_msg;
+  com_curr_pos_msg.set_x(data_->com_curr_pos_(0));
+  com_curr_pos_msg.set_y(data_->com_curr_pos_(1));
+  com_curr_pos_msg.set_z(data_->com_curr_pos_(2));
+  msg.mutable_com_curr_pos()->CopyFrom(com_curr_pos_msg);
 
   // serialize msg in string type
   std::string encoded_msg;

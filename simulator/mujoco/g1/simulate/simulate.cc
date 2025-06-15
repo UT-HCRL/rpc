@@ -1423,6 +1423,7 @@ void UiEvent(mjuiState* state) {
       for (int i = 0; i < sim->m_->neq; ++i) {
         if (sim->m_->eq_type[i] == mjEQ_WELD) {
           std::cout << "[Mujoco sim] Remove the Weld constraint!" << '\n';
+          sim->reset_gains_ = true;
           sim->d_->eq_active[i] = false;
         }
       }

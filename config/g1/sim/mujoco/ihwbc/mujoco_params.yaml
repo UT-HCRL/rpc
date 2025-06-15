@@ -1,111 +1,111 @@
 actuator_gains:
   left_hip_pitch_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 650.0
+    kd: 10.0
   left_hip_roll_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 650.0
+    kd: 10.0
   left_hip_yaw_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 650.0
+    kd: 10.0
   left_knee_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 650.0
+    kd: 10.0
   left_ankle_pitch_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 650.0
+    kd: 10.0
   left_ankle_roll_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 650.0
+    kd: 10.0
   right_hip_pitch_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 650.0
+    kd: 10.0
   right_hip_roll_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 650.0
+    kd: 10.0
   right_hip_yaw_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 650.0
+    kd: 10.0
   right_knee_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 650.0
+    kd: 10.0
   right_ankle_pitch_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 650.0
+    kd: 10.0
   right_ankle_roll_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 650.0
+    kd: 10.0
   waist_yaw_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   left_shoulder_pitch_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   left_shoulder_roll_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   left_shoulder_yaw_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   left_elbow_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   left_wrist_roll_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   left_wrist_pitch_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   left_wrist_yaw_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   right_shoulder_pitch_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   right_shoulder_roll_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   right_shoulder_yaw_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   right_elbow_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   right_wrist_roll_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   right_wrist_pitch_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
   right_wrist_yaw_joint:
-    kp: 0.0
-    kd: 0.0
+    kp: 50.0
+    kd: 10.0
 
 initial_config:
   base_pos_x: 0.
   base_pos_y: 0.
-  base_pos_z: 0.65
-  base_quat_w: 1.
+  base_pos_z: 0.68
   base_quat_x: 0.
   base_quat_y: 0.
   base_quat_z: 0.
-  left_hip_pitch_joint: -0.524
-  left_hip_roll_joint: 0.
-  left_hip_yaw_joint: 0.
-  left_knee_joint: 0.785
-  left_ankle_pitch_joint: -0.262
-  left_ankle_roll_joint: 0.
-  right_hip_pitch_joint: -0.524
-  right_hip_roll_joint: 0.
-  right_hip_yaw_joint: 0.
-  right_knee_joint: 0.785
-  right_ankle_pitch_joint: -0.262
-  right_ankle_roll_joint: 0.
-  waist_yaw_joint: 0.
-  left_shoulder_pitch_joint: 0.
-  left_shoulder_roll_joint: 0.524
-  left_shoulder_yaw_joint: 0.
-  left_elbow_joint: 1.571
+  base_quat_w: 1.
+  left_hip_pitch_joint: -0.697
+  left_hip_roll_joint: 0.0
+  left_hip_yaw_joint: 0.0
+  left_knee_joint: 1.23
+  left_ankle_pitch_joint: -0.53
+  left_ankle_roll_joint: 0.0
+  right_hip_pitch_joint: -0.697
+  right_hip_roll_joint: 0.0
+  right_hip_yaw_joint: 0.0
+  right_knee_joint: 1.23
+  right_ankle_pitch_joint: -0.53
+  right_ankle_roll_joint: 0.0
+  waist_yaw_joint: 0.0
+  left_shoulder_pitch_joint: 0.0
+  left_shoulder_roll_joint: 0.0
+  left_shoulder_yaw_joint: 0.0
+  left_elbow_joint: 0.0
   left_wrist_roll_joint: 0
   left_wrist_pitch_joint: 0
   left_wrist_yaw_joint: 0
@@ -117,9 +117,9 @@ initial_config:
   left_one_joint: 0.
   left_two_joint: 0.
   right_shoulder_pitch_joint: 0.
-  right_shoulder_roll_joint: -0.524
+  right_shoulder_roll_joint: 0.0
   right_shoulder_yaw_joint: 0.
-  right_elbow_joint: 1.571
+  right_elbow_joint: 0.0
   right_wrist_roll_joint: 0.
   right_wrist_pitch_joint: 0.
   right_wrist_yaw_joint: 0.

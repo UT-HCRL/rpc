@@ -67,23 +67,24 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
     frame_residuals_.resize(N_horizon_ + 1);
 
     pinocchio::urdf::buildModel(robot_path, pinocchio::JointModelFreeFlyer(), model_full_);
+    pinocchio_data_ = std::make_unique<pinocchio::Data>(model_full_);
 
-    if(locked_joints_list_.empty()) {
-        reduced_model_ = false;
-        std::shared_ptr<crocoddyl::StateMultibody> state = std::make_shared<crocoddyl::StateMultibody>(std::make_shared<pinocchio::Model>(model_full_));
-        state_ = std::make_shared<crocoddyl::StateMultibody>(std::make_shared<pinocchio::Model>(model_full_));
-    }
+    // if(locked_joints_list_.empty()) {
+    reduced_model_ = false;
+    std::shared_ptr<crocoddyl::StateMultibody> state = std::make_shared<crocoddyl::StateMultibody>(std::make_shared<pinocchio::Model>(model_full_));
+    state_ = std::make_shared<crocoddyl::StateMultibody>(std::make_shared<pinocchio::Model>(model_full_));
+    // }
 
-    else {
-        reduced_model_ = true;
-        locked_joints_.reserve(locked_joints_list_.size());
-        for (const auto& joint : locked_joints_list_) {
-            locked_joints_.push_back(joint);
-        }
+    // else {
+    //     reduced_model_ = true;
+    //     locked_joints_.reserve(locked_joints_list_.size());
+    //     for (const auto& joint : locked_joints_list_) {
+    //         locked_joints_.push_back(joint);
+    //     }
         
-        pinocchio::buildReducedModel(model_full_, locked_joints_, Eigen::VectorXd::Zero(model_full_.nq), model_);
-        state_ = std::make_shared<crocoddyl::StateMultibody>(std::make_shared<pinocchio::Model>(model_));
-    }
+    //     pinocchio::buildReducedModel(model_full_, locked_joints_, Eigen::VectorXd::Zero(model_full_.nq), model_);
+    //     state_ = std::make_shared<crocoddyl::StateMultibody>(std::make_shared<pinocchio::Model>(model_));
+    // }
 
     actuation_ = std::make_shared<crocoddyl::ActuationModelFloatingBase>(state_);
     for(int i = 0; i < N_horizon_; i++){
@@ -288,17 +289,14 @@ void HumanoidMulticontactTracker::setInitialJointConfiguration(const Eigen::Vect
 void HumanoidMulticontactTracker::addCoMCost(const double com_tracking_weight = 1e4, const mpc_utils::Phase phase = mpc_utils::Phase::Running, const int horizon_index) {
 
     auto& cost_model = (phase == mpc_utils::Phase::Running) ? running_cost_model_[horizon_index] : terminal_cost_model_;
-    pinocchio::Data data(model_full_);
- 
-    com_reference_ << pinocchio::centerOfMass(model_full_, data, x0_.head(state_->get_nq())); // get only q0_  // 0, 0, 0.8; 
+    
+    com_reference_ << pinocchio::centerOfMass(model_full_, *pinocchio_data_, x0_.head(state_->get_nq())); // get only q0_  // 0, 0, 0.8; 
 
     com_residual_.push_back(std::make_shared<crocoddyl::ResidualModelCoMPosition>(state_, com_reference_, actuation_->get_nu()));
 
     std::shared_ptr<crocoddyl::ActivationModelAbstract> com_activation = std::make_shared<crocoddyl::ActivationModelQuad>(3);
     std::shared_ptr<crocoddyl::CostModelAbstract> com_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, com_activation, com_residual_[horizon_index]);
-
     cost_model->addCost("CoMTracking", com_cost, com_tracking_weight);
-
 }
 
 void HumanoidMulticontactTracker::addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase = mpc_utils::Phase::Running, const int horizon_index){
@@ -306,10 +304,9 @@ void HumanoidMulticontactTracker::addFrameTrackingCost(const std::string& frame_
     auto& cost_model = (phase == mpc_utils::Phase::Running) ? running_cost_model_[horizon_index] : terminal_cost_model_;
     mpc_utils::Weights2D frame_cost_weight = (phase == mpc_utils::Phase::Running) ? frame_targets_[frame_name] : frame_targets_terminal_[frame_name];
 
-    pinocchio::Data data_full_(model_full_);
     Eigen::VectorXd q = x0_.head(state_->get_nq());
-    pinocchio::forwardKinematics(model_full_, data_full_, q);
-    pinocchio::updateFramePlacements(model_full_, data_full_);
+    pinocchio::forwardKinematics(model_full_, *pinocchio_data_, q);
+    pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
 
     // pinocchio::SE3 current_pose = data_full_.oMf[model_full_.getFrameId(frame_name)];
     // std::cout << "current_pose which will be desired is: " << current_pose.translation().transpose() << std::endl;
@@ -378,10 +375,14 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
         pinocchio::SE3 contact_frame_pose = pinocchio::SE3::Identity();
 
         if(frame_name.find("right_rubber") != std::string::npos){
+            // contact_frame_pose.rotation() = Eigen::Matrix3d::Identity();
             contact_frame_pose.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
         }else if(frame_name.find("left_rubber") != std::string::npos){
-            contact_frame_pose.rotation() = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
+            contact_frame_pose.rotation() = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
+            // contact_frame_pose.rotation() = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
+            // contact_frame_pose.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
             // contact_frame_pose.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
+            // contact_frame_pose.rotation() = Eigen::Matrix3d::Identity();
         }
 
         if(phase == mpc_utils::Phase::Running){
@@ -397,8 +398,8 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
 
         Eigen::Matrix3d rotation;
         if(frame_name.find("right_rubber") != std::string::npos){
-            // rotation = Eigen::Matrix3d::Identity(); 
-            rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
+            rotation = Eigen::Matrix3d::Identity(); 
+            // rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
             // rotation = RH_rotation_;
             std::string contact_suffix;
             contact_suffix = (phase == mpc_utils::Phase::Running) ? "_contact" : "_contact_terminal";
@@ -406,8 +407,9 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
         }
         else if(frame_name.find("left_rubber") != std::string::npos){
             // rotation = Eigen::Matrix3d::Identity();
-            rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
-            // rotation = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
+            rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
+            // rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
+            // rotation = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
             std::cout << "Friction cone Z axis: " << rotation.col(2).transpose() << std::endl;
             // rotation = LH_rotation_;
             std::string contact_suffix;
@@ -428,87 +430,46 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
 
 }
 
-void HumanoidMulticontactTracker::removeContactCosts(const std::vector<std::string>& frame_names){
-
-    // for(const auto& frame_name: frame_names) {
-    //     std::string frame_base = model_full_.frames[model_full_.getFrameId(frame_name)].name;
-    //     running_contact_models_->removeContact(frame_base + "_contact");
-    //     terminal_contact_models_->removeContact(frame_base + "_contact_terminal");
-
-    //     //remove friction cone costs for all running models:
-    //     for (std::size_t i = 0; i < N_horizon_; i++) {
-    //         running_cost_model_[i]->removeCost(frame_base + "_friction_cone");
-    //     }
-    //     //remove friction cone costs for terminal model:
-    //     terminal_cost_model_->removeCost(frame_base + "_friction_cone");
-    // }
-
-}
-
 void HumanoidMulticontactTracker::deactivateContacts(const std::vector<std::string>& frame_names){
 
     for (const auto& frame_name : frame_names) {
         for(size_t i = 0; i < N_horizon_; i++) {
             running_contact_models_[i]->changeContactStatus(frame_name + "_contact", false);
+            running_cost_model_[i]->changeCostStatus(frame_name + "_friction_cone", false);
         }
         terminal_contact_models_->changeContactStatus(frame_name + "_contact_terminal", false);
+        terminal_cost_model_->changeCostStatus(frame_name + "_friction_cone", false);
     }
 }
 
-void HumanoidMulticontactTracker::activateContacts(const std::vector<std::string>& frame_names, pinocchio::SE3 contact_pose){
-    for (const auto& frame_name : frame_names) {
-        // pinocchio::Data data_full_(model_full_);
-        // pinocchio::forwardKinematics(model_full_, data_full_, x0_.head(state_->get_nq()));
-        // pinocchio::updateFramePlacements(model_full_, data_full_);
-        // pinocchio::SE3 contact_pose_world = data_full_.oMf[model_full_.getFrameId(frame_name)];
-        pinocchio::SE3 contact_pose_world = contact_pose;
-            
-        contact_pose_world.rotation() = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
-        // contact_pose_world.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
+/**
+ * @brief Activates the contacts for the specified frame names.
+ * 
+ * This function sets the reference pose for each frame in the `frame_names` vector at the current reached pose
+ * and activates the corresponding contacts in the running and terminal contact models.
+ * 
+ * @param frame_names A vector of strings representing the names of the frames to activate contacts for.
+ * 
+ * @note This function assumes that the `pinocchio_data_` and `model_full_` are already initialized and contain the necessary frame information.
+ */
+void HumanoidMulticontactTracker::activateContacts(const std::vector<std::string>& frame_names){
 
-        if (frame_name == "left_rubber_hand") {
-            for (size_t i = 0; i < N_horizon_; ++i) {
-            running_cost_model_[i]->removeCost("frame_" + frame_name);
-            // std::shared_ptr<crocoddyl::CostModelAbstract> zero_cost = std::make_shared<crocoddyl::CostModelResidual>(
-            //     state_, std::make_shared<crocoddyl::ActivationModelWeightedQuad>(Eigen::VectorXd::Zero(6)),
-            //     std::make_shared<crocoddyl::ResidualModelFramePlacement>(state_, model_full_.getFrameId(frame_name), pinocchio::SE3(), actuation_->get_nu()));
-            // running_cost_model_[i]->addCost("frame_" + frame_name, zero_cost, 1.0);
+    if(cost_mask_[3]) {
+        for(size_t i = 0; i < N_horizon_ + 1; i++){
+            for (const auto& frame_name : frame_names) {
+                pinocchio::SE3 contact_pose = pinocchio_data_->oMf[model_full_.getFrameId(frame_name)];
+                frame_residuals_[i][frame_name]->set_reference(contact_pose);
             }
-            terminal_cost_model_->removeCost("frame_" + frame_name);
-            // std::shared_ptr<crocoddyl::CostModelAbstract> zero_cost_terminal = std::make_shared<crocoddyl::CostModelResidual>(
-            // state_, std::make_shared<crocoddyl::ActivationModelWeightedQuad>(Eigen::VectorXd::Zero(6)),
-            // std::make_shared<crocoddyl::ResidualModelFramePlacement>(state_, model_full_.getFrameId(frame_name), pinocchio::SE3(), actuation_->get_nu()));
-            // terminal_cost_model_->addCost("frame_" + frame_name, zero_cost_terminal, 1.0);
         }
-
-        std::cout << "New position of the hand for frame " << frame_name << ": " 
-                  << contact_pose_world.translation().transpose() << std::endl;
-        
-        Eigen::Vector3d z_axis = contact_pose_world.rotation().col(2);
-        std::cout << "Z axis of contact frame: " << z_axis.transpose() << std::endl;
-
-        // Update running models
-        for (size_t i = 0; i < N_horizon_; ++i) {
-            auto contact_item = running_contact_models_[i]->get_contacts().at(frame_name + "_contact");
-            auto contact_model = std::static_pointer_cast<crocoddyl::ContactModel6D>(contact_item->contact);
-            contact_model->set_reference(contact_pose_world);
+    }
+    for (const auto& frame_name : frame_names) {
+        for (size_t i = 0; i < N_horizon_; i++) {
             running_contact_models_[i]->changeContactStatus(frame_name + "_contact", true);
         }
-
-        auto contact_item_term = terminal_contact_models_->get_contacts().at(frame_name + "_contact_terminal");
-        auto contact_model_term = std::static_pointer_cast<crocoddyl::ContactModel6D>(contact_item_term->contact);
-        contact_model_term->set_reference(contact_pose_world);
         terminal_contact_models_->changeContactStatus(frame_name + "_contact_terminal", true);
     }
-        
-    // for (const auto& frame_name : frame_names) {
-    //     for(size_t i = 0; i < N_horizon_; i++) {
-    //         running_contact_models_[i]->changeContactStatus(frame_name + "_contact", true);
-    //     }
-    //     terminal_contact_models_->changeContactStatus(frame_name + "_contact_terminal", true);
-    // }
 }
-
+ 
 std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMulticontactTracker::createMultiFrameActionModel(const std::vector<std::string>& frame_names, const int horizon_index){
 
     if (cost_mask_[0]) {
@@ -599,10 +560,12 @@ void HumanoidMulticontactTracker::initializeSolver(){
 
 }
 
-void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const Eigen::Vector3d& desired_com, std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames, const pinocchio::SE3 fake_val, bool contact_trigger) {
+void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const std::vector<Eigen::Vector3d>& desired_com, std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames, bool contact_trigger) {
 
     static bool first_iteration = true;
     const std::size_t N = fddp_->get_problem()->get_T();
+    // static int iteration = 0;
+    // static double avg_solve_time_ = 0.0;
 
     if(first_iteration){
         std::vector<Eigen::VectorXd> xs(N, x0_);
@@ -612,8 +575,9 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         first_iteration = false;
 
         if(cost_mask_[2]) {
-            for(const auto com_residual : com_residual_){
-                com_residual->set_reference(desired_com);
+            for(size_t i = 0; i < N + 1; i++){
+                com_residual_[i]->set_reference(desired_com[i]);
+
             }
         }
         if(cost_mask_[3]) {
@@ -627,34 +591,40 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
 
         problem_->set_x0(xs[0]);
 
-        problem_->calc(xs, us);
-        problem_->calcDiff(xs, us);
-        auto TModel = problem_->get_terminalModel();
-        auto TData = problem_->get_terminalData();
-        Eigen::MatrixXd Q = TData->Lxx;
-        std::cout << "\n\nLxx [The one I set] :\n\n" << Q << std::endl;
-        computeDARE(xs, us, desired_com);
+        // problem_->calc(xs, us);
+        // problem_->calcDiff(xs, us);
+        // auto TModel = problem_->get_terminalModel();
+        // auto TData = problem_->get_terminalData();
+        // Eigen::MatrixXd Q = TData->Lxx;
+        // std::cout << "\n\nLxx [The one I set] :\n\n" << Q << std::endl;
+        // computeDARE(xs, us);
 
+        // std::cout << "Desired torso frame position: " << desired_frames[0]["torso_primitive_shape"].translation().transpose() << std::endl;
+        // std::cout << "Desired ankle left frame position: " << desired_frames[0]["left_ankle_roll_link"].translation().transpose() << std::endl;
+        pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
+        pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
+        // std::cout << "Current torso frame position: " << pinocchio_data_->oMf[model_full_.getFrameId("torso_primitive_shape")].translation().transpose() << std::endl;
+        // std::cout << "Current ankle frame position: " << pinocchio_data_->oMf[model_full_.getFrameId("left_ankle_roll_link")].translation().transpose() << std::endl;
+        fddp_->setCandidate(xs, us, false);
         fddp_->solve(xs, us, max_iter_);
 
-        getEigenForceFromSolver(); //NOTE: Added to extract debugging forces
+        // auto contact_forces = getEigenForceFromSolver();
+        // const auto& f = contact_forces[0]["l_foot_contact"];
+        // std::cout << "l_foot contact force — linear: " << f.head<3>().transpose()
+        //           << ", angular: " << f.tail<3>().transpose() << std::endl;
+        
 
     }else{
 
-        // TODO: re-enable to switch contacts
         if (contact_trigger) {
-            std::vector<std::string> to_remove = {"l_foot_contact"};
+            std::cout << " HERE IS DELETING CONTACT \n";
+            // std::vector<std::string> to_remove = {"l_foot_contact"};
             std::vector<std::string> to_add = {"left_rubber_hand"};
-
-            // pinocchio::SE3 desired_left_hand_pose = frame_residuals_[0]["left_rubber_hand"]->get_reference();
-
-            pinocchio::Data data_full_(model_full_);
-            pinocchio::forwardKinematics(model_full_, data_full_, xs_out[0].head(state_->get_nq()));
-            pinocchio::updateFramePlacements(model_full_, data_full_);
-            pinocchio::SE3 current_left_hand_pose = data_full_.oMf[model_full_.getFrameId("left_rubber_hand")];
+            pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
+            pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
             
-            deactivateContacts(to_remove);
-            activateContacts(to_add, current_left_hand_pose);
+            // deactivateContacts(to_remove);
+            activateContacts(to_add);
         }
 
         std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
@@ -662,28 +632,35 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         xs.push_back(xs_out[0]);
         problem_->set_x0(xs[0]);
 
+        if(cost_mask_[2]) {
+            for(size_t i = 0; i < N + 1; i++){
+                com_residual_[i]->set_reference(desired_com[i]);
+            }
+        }
+
         if(cost_mask_[3]) {
             for(size_t i = 0; i < N + 1; i++){
                 for (const auto& frame_name : frame_targets_) {
-                    // std::cout << " frame_name: " << frame_name.first << std::endl;
                     const pinocchio::SE3 temp = desired_frames[i][frame_name.first];
-                    frame_residuals_[i][frame_name.first]->set_reference(temp);
+                    if(!isContactActive(frame_name.first)){
+                        frame_residuals_[i][frame_name.first]->set_reference(temp);
+                    }
                 }
             }
         }
 
-        // auto ref = std::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(std::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(problem_->get_runningDatas()[0])->differential)->costs->costs["frame_left_rubber_hand"]->get_r().transpose();
-        // std::cout<< " reference for frame" << frame_residuals_[0]["left_rubber_hand"] <<"is : " << ref <<std::endl;
-
-        // computeDARE(xs, us, desired_com);
-
-        auto start_time = std::chrono::high_resolution_clock::now(); //NOTE: uncomment these for performance measurement
+        fddp_->setCandidate(xs, us, true);
+        auto start_time = std::chrono::high_resolution_clock::now();
         fddp_->solve(xs, us, max_iter_);
-        getEigenForceFromSolver(); //NOTE: Added to extract debugging forces
+        getEigenForceFromSolver();
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         // std::cout << "Solver duration: " << duration << " ms" << std::endl;
-
+        // avg_solve_time_ = (avg_solve_time_ * iteration + duration) / (iteration + 1);
+        // iteration++;
+        // if(iteration% 10 == 0) {
+        //     std::cout << "Iteration: " << iteration << ", Average solver time: " << avg_solve_time_ << " ms" << std::endl;
+        // }
         // std::cout << "Problem is " << (fddp_->get_is_feasible() ? "Feasible" : "Infeasible") 
         //       << ", Iterations: " << fddp_->get_iter() << "\n";
 
@@ -691,39 +668,46 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
     
     xs_out = fddp_->get_xs();
     us_out = fddp_->get_us();
+
+    pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
+    pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
     
     for(int i=0; i<N; i++){
         data_out.xReg_costs.push_back(getCostValue("xReg", i));
         data_out.uReg_costs.push_back(getCostValue("uReg", i));
         data_out.xBound_costs.push_back(getCostValue("xBounds", i));
-        data_out.left_hand_frame_costs.push_back(getCostValue("frame_left_rubber_hand", i));
-        data_out.right_hand_frame_costs.push_back(getCostValue("frame_right_rubber_hand", i));
-        data_out.left_ankle_frame_costs.push_back(getCostValue("frame_left_ankle_roll_link", i));
-        data_out.right_ankle_frame_costs.push_back(getCostValue("frame_right_ankle_roll_link", i));
-        data_out.left_knee_frame_costs.push_back(getCostValue("frame_left_knee_link", i));
-        data_out.right_knee_frame_costs.push_back(getCostValue("frame_right_knee_link", i));
-        data_out.torso_link_frame_costs.push_back(getCostValue("frame_torso_link", i));
-        data_out.left_hand_contact_costs.push_back(getCostValue("left_rubber_hand_friction_cone", i));
-        data_out.right_hand_contact_costs.push_back(getCostValue("right_rubber_hand_friction_cone", i));
-        data_out.left_foot_contact_costs.push_back(getCostValue("l_foot_contact_friction_cone", i));
-        data_out.right_foot_contact_costs.push_back(getCostValue("r_foot_contact_friction_cone", i));
+        if(cost_mask_[3]) data_out.left_hand_frame_costs.push_back(getCostValue("frame_left_rubber_hand", i));
+        if(cost_mask_[3]) data_out.right_hand_frame_costs.push_back(getCostValue("frame_right_rubber_hand", i));
+        if(cost_mask_[3]) data_out.left_ankle_frame_costs.push_back(getCostValue("frame_left_ankle_roll_link", i));
+        if(cost_mask_[3]) data_out.right_ankle_frame_costs.push_back(getCostValue("frame_right_ankle_roll_link", i));
+        if(cost_mask_[3]) data_out.left_knee_frame_costs.push_back(getCostValue("frame_left_knee_link", i));
+        if(cost_mask_[3]) data_out.right_knee_frame_costs.push_back(getCostValue("frame_right_knee_link", i));
+        if(cost_mask_[3]) data_out.torso_link_frame_costs.push_back(getCostValue("frame_torso_primitive_shape", i));
+        if(cost_mask_[3]) data_out.left_hand_contact_costs.push_back(getCostValue("left_rubber_hand_friction_cone", i));
+        if(cost_mask_[3]) data_out.right_hand_contact_costs.push_back(getCostValue("right_rubber_hand_friction_cone", i));
+        if(cost_mask_[3]) data_out.left_foot_contact_costs.push_back(getCostValue("l_foot_contact_friction_cone", i));
+        if(cost_mask_[3]) data_out.right_foot_contact_costs.push_back(getCostValue("r_foot_contact_friction_cone", i));
         if(cost_mask_[2]) data_out.com_costs.push_back(getCostValue("CoMTracking", i));
     }
 
-    if(cost_mask_[3]) {
-        pinocchio::Data data_full_(model_full_);
-        pinocchio::forwardKinematics(model_full_, data_full_, xs_out[0].head(state_->get_nq()));
-        pinocchio::updateFramePlacements(model_full_, data_full_);
+    if(cost_mask_[2]) data_out.com_curr_pos =  pinocchio::centerOfMass(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
 
+    if(cost_mask_[3]) {
         for(size_t i = 0; i < N + 1; i++){
             for (const auto& frame_name : frame_targets_) {
-                // std::cout << " frame_name: " << frame_name.first << std::endl;
-                data_out.frame_current_pos[frame_name.first] = data_full_.oMf[model_full_.getFrameId(frame_name.first)].translation();
+                data_out.frame_current_pos[frame_name.first] = pinocchio_data_->oMf[model_full_.getFrameId(frame_name.first)].translation();
             }
         }
     }
 
-    // std::cout << "Left foot contact cost: " << getCostValue("l_foot_contact_friction_cone", 0) << std::endl;
+    auto contact_forces = getEigenForceFromSolver();
+    for(const auto& contacts : running_contact_models_[0]->get_contacts()) {
+        // std::cout << "Contact forces for frame: " << contacts.first << std::endl;
+        // std::cout << "Linear: " << contact_forces[0][contacts.first].head<3>().transpose() << std::endl;
+        // std::cout << "Angular: " << contact_forces[0][contacts.first].tail<3>().transpose() << std::endl;
+        data_out.contact_forces[contacts.first] = contact_forces[0][contacts.first].head<3>();
+    }
+
 }
 
 double HumanoidMulticontactTracker::getCostValue(const std::string& cost_name, const int horizon_index) const {
@@ -746,7 +730,7 @@ double HumanoidMulticontactTracker::getCostValue(const std::string& cost_name, c
     return it->second->cost;
 }
 
-void HumanoidMulticontactTracker::computeDARE(const std::vector<Eigen::VectorXd>& xs_out, const std::vector<Eigen::VectorXd>& us_out, const Eigen::Vector3d& desired_com) {
+void HumanoidMulticontactTracker::computeDARE(const std::vector<Eigen::VectorXd>& xs_out, const std::vector<Eigen::VectorXd>& us_out) {
     
     const std::size_t N = fddp_->get_problem()->get_T();
 
@@ -773,6 +757,41 @@ void HumanoidMulticontactTracker::computeDARE(const std::vector<Eigen::VectorXd>
     if(success){
         std::cout<<"\n\nOptimal P:\n" << K_DARE_ << std::endl;
         std::cout<<"Duration : " << duration << "ms\n";
+    }
+
+}
+
+void HumanoidMulticontactTracker::printContacts() const {
+    std::cout << "Active contacts at this step:" << std::endl;
+    for(int i=0; i<N_horizon_; i++){
+        for (const auto& contact_pair : running_contact_models_[i]->get_contacts()) {
+            const std::string& name = contact_pair.first;
+            const auto& contact = contact_pair.second;
+            if (contact->active) {
+                std::cout << "Contact: " << name << " at i: <<" <<i <<" is active." << std::endl;
+            } else {
+                std::cout << "Contact: " << name << " at i: <<" <<i << " is inactive." << std::endl;
+            }
+        }
+    }
+    
+    for (const auto& contact_pair : terminal_contact_models_->get_contacts()) {
+        const std::string& name = contact_pair.first;
+        const auto& contact = contact_pair.second;
+        if (contact->active) {
+            std::cout << "Contact: " << name << " is active." << std::endl;
+        } else {
+            std::cout << "Contact: " << name << " is inactive." << std::endl;
+        }
+    }
+}
+
+bool HumanoidMulticontactTracker::isContactActive(const std::string& contact_name) const {
+    
+    try {
+        return running_contact_models_[0]->get_contacts().at(contact_name + "_contact")->active;
+    } catch (const std::out_of_range&) {
+        return false;
     }
 
 }
@@ -824,30 +843,29 @@ std::vector<std::vector<std::map<std::string, pinocchio::Force>>> const Humanoid
 
 }
 
-std::vector<std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>>> const HumanoidMulticontactTracker::getEigenForceFromSolver(){
+std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> const HumanoidMulticontactTracker::getEigenForceFromSolver(){
 
     auto running_models = problem_->get_runningModels();
     auto running_datas = problem_->get_runningDatas();
-    std::vector<std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>>> forces_trajectory;
+    std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> forces_trajectory;
 
-    for (std::size_t t = 0; t < N_horizon_; ++t) {
+    for (std::size_t t = 0; t < N_horizon_; t++) {
         auto model = running_models[t];
         auto data = running_datas[t];
         
-        std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> time_step_forces;
         std::map<std::string, Eigen::Matrix<double,6,1>> contact_forces;
 
         auto integrated_data = std::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(data);
 
         if (!integrated_data || !integrated_data->differential) {
-            forces_trajectory.push_back(time_step_forces);
+            forces_trajectory.push_back(contact_forces);
             continue;
         }
 
         auto contact_data = std::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(
         integrated_data->differential);
         if (!contact_data) {
-            forces_trajectory.push_back(time_step_forces);
+            forces_trajectory.push_back(contact_forces);
             continue;
         }
 
@@ -856,22 +874,9 @@ std::vector<std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>>> const
             const std::string& name = contact_pair.first;
             const auto& contact = contact_pair.second;
             contact_forces[name] = mpc_utils::fromPinocchioForce(contact->f);
-            // std::cout << "Contact for " << name << " at t=" << t 
-            //           << ": f_linear=" << contact_forces[name].head<3>().transpose()
-            //           << ", f_angular=" << contact_forces[name].tail<3>().transpose() << std::endl;
-            // if (name == "left_rubber_hand_contact" && t == 0) {
-            //     std::cout << "First contact for left_rubber_hand_contact at t=0: "
-            //             << "f_linear=" << contact->f.linear().transpose()
-            //             << ", f_angular=" << contact->f.angular().transpose() << std::endl;
-            // }
-
         }
 
-
-        if (!contact_forces.empty()) {
-            time_step_forces.push_back(contact_forces);
-        }
-        forces_trajectory.push_back(time_step_forces);
+        forces_trajectory.push_back(contact_forces);
     }
     
     return forces_trajectory;

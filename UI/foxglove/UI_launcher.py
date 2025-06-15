@@ -26,6 +26,21 @@ parser.add_argument(
 parser.add_argument("--hw_or_sim", choices=["hw", "sim"], default="sim")
 args = parser.parse_args()
 
+crocoddyl_forces = ["l_foot_rf", "r_foot_rf", "l_hand_rf", "r_hand_rf"] # TODO: add left and right hand
+
+def rot_to_quat(rot):
+    """
+    Parameters
+    ----------
+    rot (np.array): SO3
+
+    Returns
+    -------
+    quat (np.array): scalar last quaternion
+
+    """
+    return np.copy(R.from_matrix(rot).as_quat())
+
 if args.visualizer == "meshcat":
     from pinocchio.visualize import MeshcatVisualizer
     import meshcat
@@ -91,6 +106,11 @@ async def main():
             FrameTransform.DESCRIPTOR.full_name,
             frame_schema,
         ).add_chan(server)
+        
+        arrows_scene = ShapeScene()
+        shape_params = ["arrows", [0, 0, 1, 0.5], [0.03, 0.1, 0.08]]
+        for name in crocoddyl_forces:
+            arrows_scene.add_shape(name, *shape_params)
 
         mpc_horizon = 2 #FIXME: can this be dynamic or should we load the horizon from yaml?
 
@@ -157,6 +177,48 @@ async def main():
             True, "torso_link_frame_costs", "json", "torso_link_frame_costs", [f"N_{i}" for i in range(mpc_horizon)]
         ).add_chan(server)
 
+        grfs_chan_id = await SceneChannel(
+            True, "GRFs", "json", "normal",
+            [
+                "l_foot_rf_x",
+                "l_foot_rf_y",
+                "l_foot_rf_z",
+                "r_foot_rf_x",
+                "r_foot_rf_y",
+                "r_foot_rf_z",
+                "l_hand_rf_x",
+                "l_hand_rf_y",
+                "l_hand_rf_z",
+                "r_hand_rf_x",
+                "r_hand_rf_y",
+                "r_hand_rf_z",
+            ]
+        ).add_chan(server)
+
+        normS_chan_id = await SceneChannel(
+            False,
+            "normal_viz",
+            "protobuf",
+            SceneUpdate.DESCRIPTOR.full_name,
+            scene_schema,
+        ).add_chan(server)
+        
+        lf_pos_chan_id = await SceneChannel(
+            True, "lf_pos", "json", "lf_pos", ["x", "y", "z"]
+        ).add_chan(server)
+
+        rf_pos_chan_id = await SceneChannel(
+            True, "rf_pos", "json", "rf_pos", ["x", "y", "z"]
+        ).add_chan(server)
+
+        lh_pos_chan_id = await SceneChannel(
+            True, "lh_pos", "json", "lh_pos", ["x", "y", "z"]
+        ).add_chan(server)
+
+        rh_pos_chan_id = await SceneChannel(
+            True, "rh_pos", "json", "rh_pos", ["x", "y", "z"]
+        ).add_chan(server)
+
         # Send the FrameTransform every frame to update the model's position
         transform = FrameTransform()
 
@@ -184,6 +246,54 @@ async def main():
             vis_q[0:3] = np.array(base_pos)
             vis_q[3:7] = np.array(base_ori)  # quaternion [x,y,z,w]
             vis_q[7:] = np.array(msg.joint_positions)
+
+            await server.send_message(
+                lf_pos_chan_id,
+                now,
+                json.dumps(
+                    {
+                        "x": list(msg.lfoot_pos)[0],
+                        "y": list(msg.lfoot_pos)[1],
+                        "z": list(msg.lfoot_pos)[2],
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                rf_pos_chan_id,
+                now,
+                json.dumps(
+                    {
+                        "x": list(msg.rfoot_pos)[0],
+                        "y": list(msg.rfoot_pos)[1],
+                        "z": list(msg.rfoot_pos)[2],
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                lh_pos_chan_id,
+                now,
+                json.dumps(
+                    {
+                        "x": list(msg.lhand_pos)[0],
+                        "y": list(msg.lhand_pos)[1],
+                        "z": list(msg.lhand_pos)[2],
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                rh_pos_chan_id,
+                now,
+                json.dumps(
+                    {
+                        "x": list(msg.rhand_pos)[0],
+                        "y": list(msg.rhand_pos)[1],
+                        "z": list(msg.rhand_pos)[2],
+                    }
+                ).encode("utf8"),
+            )
 
             # TODO: Create a dictionary to shorten the code avoiding repetition of await
             await server.send_message(
@@ -380,6 +490,28 @@ async def main():
                     ).encode("utf8"),
                 )
 
+            if hasattr(msg, "l_foot_rf") and hasattr(msg, "r_foot_rf") and hasattr(msg, "l_hand_rf") and hasattr(msg, "r_hand_rf") and msg.l_foot_rf and msg.r_foot_rf and msg.l_hand_rf and msg.r_hand_rf:
+                await server.send_message(
+                    grfs_chan_id,
+                    now,
+                    json.dumps(
+                        {
+                            "l_foot_rf_x": msg.l_foot_rf.x,
+                            "l_foot_rf_y": msg.l_foot_rf.y,
+                            "l_foot_rf_z": msg.l_foot_rf.z,
+                            "r_foot_rf_x": msg.r_foot_rf.x,
+                            "r_foot_rf_y": msg.r_foot_rf.y,
+                            "r_foot_rf_z": msg.r_foot_rf.z,
+                            "l_hand_rf_x": msg.l_hand_rf.x,
+                            "l_hand_rf_y": msg.l_hand_rf.y,
+                            "l_hand_rf_z": msg.l_hand_rf.z,
+                            "r_hand_rf_x": msg.r_hand_rf.x,
+                            "r_hand_rf_y": msg.r_hand_rf.y,
+                            "r_hand_rf_z": msg.r_hand_rf.z,
+                        }
+                    ).encode("utf8"),
+                )
+
             # update mesh positions
             pin.forwardKinematics(model, data, vis_q)
             pin.updateGeometryPlacements(model, data, visual_model, visual_data)
@@ -390,9 +522,114 @@ async def main():
                 )
                 transform.rotation.Clear()
                 transform.translation.Clear()
+            
+            pin.updateFramePlacements(model, data)
+            for fid, m_frame in enumerate(model.frames):
+                frame_name = model.frames[fid].name
+                transform.parent_frame_id = "world"
+                transform.child_frame_id = frame_name
+                transform.translation.x = data.oMf[fid].translation[0]
+                transform.translation.y = data.oMf[fid].translation[1]
+                transform.translation.z = data.oMf[fid].translation[2]
+                rot = data.oMf[fid].rotation
+                q = rot_to_quat(rot)
+                transform.rotation.x = q[0]
+                transform.rotation.y = q[1]
+                transform.rotation.z = q[2]
+                transform.rotation.w = q[3]
+                await server.send_message(
+                    tf_chan_id, now, transform.SerializeToString()
+                )
+                transform.rotation.Clear()
+                transform.translation.Clear()
 
             Ry = R.from_euler("y", -np.pi / 2).as_matrix()
 
+            if hasattr(msg, "l_foot_rf") and hasattr(msg, "r_foot_rf") and msg.l_foot_rf and msg.r_foot_rf:
+                for obj in crocoddyl_forces:
+                    transform.parent_frame_id = "world"
+                    transform.child_frame_id = obj
+                    transform.timestamp.FromNanoseconds(now)
+                    # show aligned at the center of respective foot sole
+                    if obj == "l_foot_rf":
+                        if np.linalg.norm(msg.lfoot_ori) == 0:
+                            lfoot_ori = [0, 0, 0, 1] 
+                        else:
+                            lfoot_ori = msg.lfoot_ori
+                        R_foot = R.from_quat(lfoot_ori).as_matrix()
+                        transform.translation.x = msg.lfoot_pos[0]
+                        transform.translation.y = msg.lfoot_pos[1]
+                        transform.translation.z = msg.lfoot_pos[2]
+                    elif obj == "r_foot_rf":
+                        if np.linalg.norm(msg.rfoot_ori) == 0:
+                            rfoot_ori = [0, 0, 0, 1]
+                        else:
+                            rfoot_ori = msg.rfoot_ori
+                        R_foot = R.from_quat(rfoot_ori).as_matrix()
+                        transform.translation.x = msg.rfoot_pos[0]
+                        transform.translation.y = msg.rfoot_pos[1]
+                        transform.translation.z = msg.rfoot_pos[2]
+                    elif obj == "l_hand_rf":
+                        if np.linalg.norm(msg.lhand_ori) == 0:
+                            lhand_ori = [0, 0, 0, 1]
+                        else:
+                            lhand_ori = msg.lhand_ori
+                        R_foot = R.from_quat(lhand_ori).as_matrix()
+                        transform.translation.x = msg.lhand_pos[0]
+                        transform.translation.y = msg.lhand_pos[1]
+                        transform.translation.z = msg.lhand_pos[2]
+                    elif obj == "r_hand_rf":
+                        if np.linalg.norm(msg.rhand_ori) == 0:
+                            rhand_ori = [0, 0, 0, 1]
+                        else:
+                            rhand_ori = msg.rhand_ori
+                        R_foot = R.from_quat(rhand_ori).as_matrix()
+                        transform.translation.x = msg.rhand_pos[0]
+                        transform.translation.y = msg.rhand_pos[1]
+                        transform.translation.z = msg.rhand_pos[2]
+
+                    # rotate transform since arrow points in +x direction
+                    q_cmd_arrow = rot_to_quat(Ry)
+                    transform.rotation.x = q_cmd_arrow[0]
+                    transform.rotation.y = q_cmd_arrow[1]
+                    transform.rotation.z = q_cmd_arrow[2]
+                    transform.rotation.w = q_cmd_arrow[3]
+
+                    if obj in crocoddyl_forces:
+                        force_dir = np.array([getattr(msg, obj).x, getattr(msg, obj).y, getattr(msg, obj).z])
+
+                        if np.all(force_dir != 0.0):
+                            force_norm = np.linalg.norm(force_dir)
+
+                            # compute axis and angle of rotation to align z with force direction
+                            force_dir /= force_norm
+                            rot_ang = np.arccos(force_dir.dot(np.array([0, 0, 1])))
+                            rot_ax = np.cross(force_dir, np.array([0, 0, 1]))
+                            rot_ax /= np.linalg.norm(rot_ax)
+                            ax_hat = np.array(
+                                [
+                                    [0, -rot_ax[2], rot_ax[1]],
+                                    [rot_ax[2], 0, -rot_ax[0]],
+                                    [-rot_ax[1], rot_ax[0], 0],
+                                ]
+                            )
+                            R_rot_force = (
+                                np.eye(3)
+                                + np.sin(rot_ang) * ax_hat
+                                + (1 - np.cos(rot_ang)) * ax_hat @ ax_hat
+                            )
+                            quat_force = rot_to_quat(R_rot_force)
+
+                            # force scale
+                            force_magnitude = force_norm / 1200.0
+                
+                            arrows_scene.scale(obj, quat_force, force_magnitude, now)
+                            tasks.append(
+                                server.send_message(tf_chan_id, now, transform.SerializeToString())
+                            )
+                            await server.send_message(
+                                normS_chan_id, now, arrows_scene.serialized_msg(obj)
+                            )
 
             await asyncio.gather(*tasks)
 
@@ -488,16 +725,6 @@ if args.visualizer != "none":
         )
         right_hand_q = pin.neutral(right_hand_model)
 
-        left_hand_ref_viz, left_hand_ref_model = vis_tools.add_sphere(
-            viz.viewer, "left_hand_ref", color=[1.0, 0.0, 0.0, 0.4]
-        )
-        left_hand_ref_q = pin.neutral(left_hand_ref_model)
-
-        right_hand_ref_viz, right_hand_ref_model = vis_tools.add_sphere(
-            viz.viewer, "right_hand_ref", color=[1.0, 0.0, 0.0, 0.4]
-        )
-        right_hand_ref_q = pin.neutral(right_hand_ref_model)
-
         torso_des_viz, torso_des_model = vis_tools.add_sphere(
             viz.viewer, "torso_des_pos", color=[1.0, 0.0, 0.0, 0.4]
         )
@@ -522,6 +749,11 @@ if args.visualizer != "none":
             viz.viewer, "right_knee_des_pos", color=[1.0, 0.0, 0.0, 0.4]
         )
         right_knee_ref_q = pin.neutral(right_knee_ref_model)
+
+        com_des_pos_viz, com_des_pos_model = vis_tools.add_sphere(
+            viz.viewer, "com_des_pos", color=[1.0, 0.0, 0.0, 0.4]
+        )
+        com_des_pos_q = pin.neutral(com_des_pos_model)
 
         # Current values
         left_hand_curr_viz, left_hand_curr_model = vis_tools.add_sphere(
@@ -559,6 +791,10 @@ if args.visualizer != "none":
         )
         right_knee_curr_q = pin.neutral(right_knee_curr_model)
 
+        com_curr_pos_viz, com_curr_pos_model = vis_tools.add_sphere(
+            viz.viewer, "com_curr_pos", color=[0.0, 0.0, 1.0, 0.4]
+        )
+        com_curr_pos_q = pin.neutral(com_curr_pos_model)
 
 
 def process_data_saver(visualize_type):
@@ -739,11 +975,20 @@ while True:
             if hasattr(msg, "right_knee_des_pos") and msg.right_knee_des_pos:
                 right_knee_ref_q[:3] = np.array([msg.right_knee_des_pos.x, msg.right_knee_des_pos.y, msg.right_knee_des_pos.z])
                 right_knee_ref_viz.display(right_knee_ref_q)
+
+            if hasattr(msg, "com_des_pos") and msg.com_des_pos:
+                com_des_pos_q[:3] = np.array([msg.com_des_pos.x, msg.com_des_pos.y, msg.com_des_pos.z])
+                com_des_pos_viz.display(com_des_pos_q)
+            
+            if hasattr(msg, "com_curr_pos") and msg.com_curr_pos:
+                com_curr_pos_q[:3] = np.array([msg.com_curr_pos.x, msg.com_curr_pos.y, msg.com_curr_pos.z])
+                com_curr_pos_viz.display(com_curr_pos_q)
             
         elif args.visualizer == "foxglove":
             # webbrowser.open('https://app.foxglove.dev/view?ds=foxglove-websocket&ds.url=ws%3A%2F%2Flocalhost%3A8765')
             th_fast = threading.Thread(target=asyncio.run(main()), args=())
             th_fast.start()
+            process_data_saver("none")
             # asyncio.run(main())
 
     else:  # if 'none' specified

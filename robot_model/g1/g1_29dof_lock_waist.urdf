@@ -548,7 +548,19 @@
       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
     </inertial>
   </link>
-
+  <!--=============================== torso_primitive_shape (torso_primitive_shape) ===========================-->
+  <joint name="torso_primitive_shape_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.0039635 0.0 0.15"/>
+    <parent link="torso_link"/>
+    <child link="torso_primitive_shape"/>
+  </joint>
+  <link name="torso_primitive_shape">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <mass value="1e-9"/>
+      <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+  </link>
 
   <joint name="waist_pitch_joint" type="fixed">
     <origin xyz="0 0 0.019" rpy="0 0 0"/>

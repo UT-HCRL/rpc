@@ -25,6 +25,7 @@ class HumanoidMulticontactTracker{
 
         void printModel() const;
         void printWeights() const;
+        void printContacts() const;
         void setConfigPath(const std::string& config_path){config_path_ = config_path;}
 
         void loadCostMask();
@@ -56,21 +57,22 @@ class HumanoidMulticontactTracker{
         void addRegularizationCosts(const Eigen::VectorXd& xreg_weights, const double xreg_weight, const double ureg_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase, const int horizon_index = 0);
 
-        void removeContactCosts(const std::vector<std::string>& frame_names);
         void deactivateContacts(const std::vector<std::string>& frame_names);
-        void activateContacts(const std::vector<std::string>& frame_names, pinocchio::SE3 contact_pose);
+        void activateContacts(const std::vector<std::string>& frame_names);
 
         std::vector<std::vector<std::map<std::string, pinocchio::Force>>> const getForceFromSolver();
-        std::vector<std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>>> const getEigenForceFromSolver();
-        
+        std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> const getEigenForceFromSolver();
+    
         double getCostValue(const std::string& cost_name, const int horizon_index) const;
 
+        bool isContactActive(const std::string& contact_name) const;
+
         void initializeSolver();
-        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const Eigen::Vector3d& desired_com = Eigen::Vector3d(0., 0., 0.), std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {}, const pinocchio::SE3 fake_val = pinocchio::SE3(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0., 0., 0.)), bool contact_trigger = false);
+        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const std::vector<Eigen::Vector3d>& desired_com = {}, std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {}, bool contact_trigger = false);
         std::vector<std::string> getTargetFrameNames() const {return track_frame_names_;}
         
         // Auxiliary functions for DARE computation
-        void computeDARE(const std::vector<Eigen::VectorXd>& xs_out, const std::vector<Eigen::VectorXd>& us_out, const Eigen::Vector3d& desired_com);
+        void computeDARE(const std::vector<Eigen::VectorXd>& xs_out, const std::vector<Eigen::VectorXd>& us_out);
 
 
     private:
@@ -139,6 +141,7 @@ class HumanoidMulticontactTracker{
         //### PINOCCHIO ###
         pinocchio::Model model_full_;
         pinocchio::Model model_;
+        std::unique_ptr<pinocchio::Data> pinocchio_data_;
         std::vector<pinocchio::JointIndex> locked_joints_;
         //#################
 

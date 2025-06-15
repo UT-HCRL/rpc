@@ -15,10 +15,10 @@ public:
   int phase_ = 1;
 
   Eigen::Vector3d est_base_joint_pos_ = Eigen::Vector3d::Zero();
-  Eigen::Vector4d est_base_joint_ori_ = Eigen::Vector4d::Zero();
+  Eigen::VectorXd est_base_joint_ori_ = (Eigen::VectorXd(4) << 1.0, 0.0, 0.0, 0.0).finished();
 
   Eigen::Vector3d kf_base_joint_pos_ = Eigen::Vector3d::Zero();
-  Eigen::Vector4d kf_base_joint_ori_ = Eigen::Vector4d::Zero();
+  Eigen::VectorXd kf_base_joint_ori_ = (Eigen::VectorXd(4) << 1.0, 0.0, 0.0, 0.0).finished();
 
   Eigen::VectorXd joint_positions_ = Eigen::VectorXd::Zero(27);
   Eigen::VectorXd joint_velocities_ = Eigen::VectorXd::Zero(27);
@@ -29,8 +29,14 @@ public:
   Eigen::VectorXd lfoot_pos_ = Eigen::VectorXd::Zero(3);
   Eigen::VectorXd rfoot_pos_ = Eigen::VectorXd::Zero(3);
 
-  Eigen::VectorXd lfoot_ori_ = Eigen::VectorXd::Zero(4);
-  Eigen::VectorXd rfoot_ori_ = Eigen::VectorXd::Zero(4);
+  Eigen::VectorXd lhand_pos_ = Eigen::VectorXd::Zero(3);
+  Eigen::VectorXd rhand_pos_ = Eigen::VectorXd::Zero(3);
+
+  Eigen::VectorXd lfoot_ori_ = (Eigen::VectorXd(4) << 1.0, 0.0, 0.0, 0.0).finished();
+  Eigen::VectorXd rfoot_ori_ = (Eigen::VectorXd(4) << 1.0, 0.0, 0.0, 0.0).finished();
+
+  Eigen::VectorXd lhand_ori_ = (Eigen::VectorXd(4) << 1.0, 0.0, 0.0, 0.0).finished();
+  Eigen::VectorXd rhand_ori_ = (Eigen::VectorXd(4) << 1.0, 0.0, 0.0, 0.0).finished();
 
   Eigen::VectorXd lfoot_rf_cmd_ = Eigen::VectorXd::Zero(6);
   Eigen::VectorXd rfoot_rf_cmd_ = Eigen::VectorXd::Zero(6);
@@ -124,6 +130,14 @@ public:
   Eigen::Vector3d right_knee_curr_pos_;
   Eigen::Vector3d left_rubber_hand_curr_pos_;
   Eigen::Vector3d right_rubber_hand_curr_pos_;
+
+  Eigen::Vector3d com_curr_pos_;
+  Eigen::Vector3d com_des_pos_;
+  
+  Eigen::Vector3d l_foot_rf_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d r_foot_rf_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d l_hand_rf_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d r_hand_rf_ = Eigen::Vector3d::Zero();
 
   // MPC Contact Costs:
   std::vector<double> left_hand_contact_costs_;

@@ -47,9 +47,13 @@ namespace pkl_utils{
 
         std::vector<Matrix<double, 37, 1>> getJointTauDes() const;
 
+        std::vector<Vector3d> getCoM() const;
+
         std::vector<double> getTimeVec() const;
 
         const PickleType& getPickleType() const;
+
+        void setPickleType(const PickleType& pkl_type);
 
     private:
 

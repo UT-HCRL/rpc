@@ -135,6 +135,20 @@ message pnc_msg {
   Pos right_knee_curr_pos = 87;
   Pos left_rubber_hand_curr_pos = 88;
   Pos right_rubber_hand_curr_pos = 89;
+  Pos com_curr_pos = 90;
+
+  Pos com_des_pos = 91;
+
+  Pos l_foot_rf = 92;
+  Pos r_foot_rf = 93;
+  Pos l_hand_rf = 94;
+  Pos r_hand_rf = 95;
+
+  repeated float lhand_pos = 96;
+  repeated float rhand_pos = 97;
+
+  repeated float lhand_ori = 98;
+  repeated float rhand_ori = 99;
 
 }
 

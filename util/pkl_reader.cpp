@@ -27,8 +27,32 @@ public:
             py::object file = open_func(filePath, "rb");
 
             // std::cout << "[PKL_READER] - Pickle type is: " << (pkl_type == PickleType::DICT ? "DICT" : (pkl_type == PickleType::LIST ? "LIST" : "BEZIER")) << std::endl;
-            
-            if(pkl_type == PickleType::LIST) {
+            if (pkl_type == PickleType::COMPOSITE){
+                bool once = true;
+                py::list loaded_data;
+                while (true) {
+                    try {
+                        py::object obj = pickle.attr("load")(file);
+                        if (py::isinstance<py::dict>(obj) && once) {
+                            bez_data_ = obj["bez_path"];
+                            once = false;
+                        }
+                        loaded_data.append(obj);
+
+                    } catch (py::error_already_set& e) {
+                        if (e.matches(PyExc_EOFError)) {
+                            break;
+                        } else if (e.matches(PyExc_ModuleNotFoundError)) {
+                            std::cerr << "Missing module during unpickling: " << e.what() << std::endl;
+                            break;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                data_ = loaded_data;
+            }
+            else if(pkl_type == PickleType::LIST) {
                 py::list loaded_data;
                 while (true) {
                     try {
@@ -53,7 +77,7 @@ public:
             } else if(pkl_type == PickleType::BEZIER) {
                 data_ = pickle.attr("load")(file);
                 if (py::isinstance<py::dict>(data_)) {
-                    data_ = data_["bez_path"];
+                    bez_data_ = data_["bez_path"];
                     // std::cout << "[PKL_READER] - Imported bezier path\n";
                 } else {
                     std::cerr << "Unpickled object is not a Bezier Curve\n";
@@ -83,13 +107,17 @@ public:
         }
 
         try {
-            if (py::isinstance<py::list>(data_) && pkl_type_ == PickleType::LIST) {
+            if(pkl_type_ == PickleType::COMPOSITE){
+                parseBezier();
+                parseList();
+            }
+            else if (py::isinstance<py::list>(data_) && pkl_type_ == PickleType::LIST) {
                 // std::cout << "[PKL_READER] - Parsing list..." << std::endl;
                 parseList();
             } else if (py::isinstance<py::dict>(data_) && pkl_type_ == PickleType::DICT) {
                 // std::cout << "[PKL_READER] - Parsing dictionary..." << std::endl;
                 parseDict();
-            } else if (py::isinstance<py::list>(data_) && pkl_type_ == PickleType::BEZIER) {
+            } else if (py::isinstance<py::list>(bez_data_) && pkl_type_ == PickleType::BEZIER) {
                 // std::cout << "[PKL_READER] - Parsing Bezier curve..." << std::endl;
                 parseBezier();
             } 
@@ -129,11 +157,21 @@ public:
                                 Vector<double, 44> tmp_pos_vec;
                                 Vector<double, 43> tmp_vel_vec;
                                 Vector<double, 37> tmp_tau_vec;
+                                Vector3d tmp_com_vec;
+                                size_t v_idx = 0;
                                 py::list pylist = value;
                                 // std::cout << "[ ";
                                 for (auto elem : pylist) {
                                     if (py::isinstance<py::float_>(elem)) {
-                                        if (key == "time") {
+                                        if ( key == "center_of_mass"){
+                                            tmp_com_vec(v_idx) = elem.cast<double>();
+                                            v_idx++;
+                                            if (v_idx == 3){
+                                                com_des_.emplace_back(tmp_com_vec);
+                                                v_idx = 0;
+                                            }
+                                        }
+                                        else if (key == "time") {
                                             time_vec_.emplace_back(elem.cast<double>());
                                             // std::cout << " LOGGED " << std::endl;
                                         }
@@ -166,11 +204,29 @@ public:
                                             // store current vector and clear for next iteration
                                             joint_tau_des_.emplace_back(tmp_tau_vec);
                                             tmp_tau_vec.setZero();
-                                        } else if (key == "grf_lfoot") {
+                                        }else if (key == "grf_lfoot") {
                                         } else if (key == "grf_rfoot") {
                                         } else if (key == "grf_lhand") {
                                         } else if (key == "grf_rhand") {
-                                        } else {
+                                        } else if (key == "rh_act") {
+                                        } else if (key == "lh_act") {
+                                        } else if (key == "rkn_act") {
+                                        } else if (key == "lkn_act"){
+                                        } else if (key == "rf_act") {
+                                        } else if (key == "lf_act"){
+                                        } else if (key == "torso_act"){
+                                        } else if (key == "bez_path"){
+                                            //pass;
+                                        }else if (key == "center_of_mass"){
+
+                                            for (auto el : elem) {
+                                                tmp_com_vec(vec_idx) = el.cast<double>();
+                                                vec_idx++;
+                                            }
+                                            com_des_.emplace_back(tmp_com_vec);
+                                            tmp_com_vec.setZero();
+                                        
+                                        }else {
                                             std::cerr << "[PKL_READER] - Unknown format for variable: " << key << std::endl;
                                         }
                                     }
@@ -238,7 +294,7 @@ public:
     void parseBezier(){
         int temp=0;
 
-        py::list composite_bez_list = data_;
+        py::list composite_bez_list = bez_data_;
         composite_bezier_curves_.reserve(py::len(composite_bez_list));
 
         for (size_t i = 0; i < composite_bez_list.size(); ++i) {
@@ -281,7 +337,6 @@ public:
             composite_bezier_curves_.emplace_back(CompositeBezierCurve(beziers));
 
         }
-
     }
 
     const PickleType& getPickleType() const{
@@ -320,6 +375,10 @@ public:
         return joint_tau_des_;
     }
 
+    std::vector<Vector3d> getCoM() const {
+        return com_des_;
+    }
+
     std::vector<double> getTimeVec() const {
         return time_vec_;
     }
@@ -329,12 +388,14 @@ private:
     std::string filename_;
     bool is_ready_;
     py::object data_;
+    py::object bez_data_;
     PickleType pkl_type_;
 
     std::vector<CompositeBezierCurve> composite_bezier_curves_;
     std::vector<Matrix<double, 44, 1>> joint_pos_des_;
     std::vector<Matrix<double, 43, 1>> joint_vel_des_;
     std::vector<Matrix<double, 37, 1>> joint_tau_des_;
+    std::vector<Vector3d> com_des_;
     std::vector<double> time_vec_;
     std::function<void(const std::string&)> log_;
 
@@ -375,6 +436,10 @@ std::vector<Matrix<double, 37, 1>> PickleReader::getJointTauDes() const {
 
 std::vector<double> PickleReader::getTimeVec() const {
     return impl_->getTimeVec();
+}
+
+std::vector<Vector3d> PickleReader::getCoM() const {
+    return impl_->getCoM();
 }
 
 } // namespace pkl_utils

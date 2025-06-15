@@ -43,28 +43,28 @@ joint_names:
 initial_config:
   base_pos_x: 0.
   base_pos_y: 0.
-  base_pos_z: 0.68
+  base_pos_z: 0.65
   base_quat_x: 0.
   base_quat_y: 0.
   base_quat_z: 0.
   base_quat_w: 1.
-  left_hip_pitch_joint: -0.697
-  left_hip_roll_joint: 0.0
-  left_hip_yaw_joint: 0.0
-  left_knee_joint: 1.23
-  left_ankle_pitch_joint: -0.53
-  left_ankle_roll_joint: 0.0
-  right_hip_pitch_joint: -0.697
-  right_hip_roll_joint: 0.0
-  right_hip_yaw_joint: 0.0
-  right_knee_joint: 1.23
-  right_ankle_pitch_joint: -0.53
-  right_ankle_roll_joint: 0.0
-  waist_yaw_joint: 0.0
-  left_shoulder_pitch_joint: 0.0
-  left_shoulder_roll_joint: 0.0
-  left_shoulder_yaw_joint: 0.0
-  left_elbow_joint: 0.0
+  left_hip_pitch_joint: -0.5236 #-0.758
+  left_hip_roll_joint: 0.0 #-0.001
+  left_hip_yaw_joint: 0.0 #0.004
+  left_knee_joint: 1.047 #1.387
+  left_ankle_pitch_joint: -0.5236 #-0.629
+  left_ankle_roll_joint: 0.0 #0.004
+  right_hip_pitch_joint: -0.5236 #-0.761
+  right_hip_roll_joint: 0.0 #-0.006
+  right_hip_yaw_joint: 0.0 #-0.002
+  right_knee_joint: 1.047 #1.386
+  right_ankle_pitch_joint:  -0.5236 #-0.625
+  right_ankle_roll_joint: 0.0 #0.002
+  waist_yaw_joint: 0.0 #-0.001
+  left_shoulder_pitch_joint: 0.0 #0.
+  left_shoulder_roll_joint: 0.0 #0.524
+  left_shoulder_yaw_joint: 0.0 #0.
+  left_elbow_joint: 0.0 #1.571
   left_wrist_roll_joint: 0
   left_wrist_pitch_joint: 0
   left_wrist_yaw_joint: 0
@@ -91,10 +91,10 @@ initial_config:
   right_two_joint: 0.
 
 #          [   Reg,   xBound,   CoM,    Frames,    Contacts    ]
-cost_mask: [    1,      1,       1,        1,          1       ]
+cost_mask: [    1,      1,       0,        1,          1       ]
 
 tracking_frames:
-  - torso_primitive_shape
+  - torso_link
   - left_ankle_roll_link
   - right_ankle_roll_link
   - left_knee_link
@@ -104,11 +104,11 @@ tracking_frames:
 
 running_costs:
   xReg:
-    w: 0.0001
+    w: 0.001
     state_w:
-      base_pos: [0.0, 0.0, 0.0]
+      base_pos: [10.0, 10.0, 10.0]
       base_rot: [0.0, 0.0, 0.0]
-      joint_pos: 0.0
+      joint_pos: 200.0
       joint_vel: 100.0
   uReg:
     w: 0.02
@@ -117,26 +117,26 @@ running_costs:
   CoM:
     w: 10000.0
   tracking_frames:
-    torso_primitive_shape: 
-      pos: 1000.0
+    torso_link: 
+      pos: 80.0
       rot: 0.0
     left_ankle_roll_link: 
-      pos: 0.0
-      rot: 1000.0
+      pos: 80.0
+      rot: 0.0
     right_ankle_roll_link: 
-      pos: 0.0
-      rot: 1000.0
+      pos: 80.0
+      rot: 0.0
     left_knee_link: 
-      pos: 1000.0
+      pos: 500.0
       rot: 0.0
     right_knee_link: 
-      pos: 1000.0
+      pos: 500.0
       rot: 0.0
     left_rubber_hand: 
-      pos: 4000.0
-      rot: 0.0
+      pos: 80.0
+      rot: 10.0
     right_rubber_hand: 
-      pos: 4000.0
+      pos: 80.0
       rot: 0.0
   contact_frames:
     l_foot_contact:
@@ -156,40 +156,40 @@ terminal_costs:
   xReg:
     w: 0.01
     state_w:
-      base_pos: [0.0, 0.0, 0.0]
-      base_rot: [0.0, 0.0, 0.0]
+      base_pos: [100.0, 80.0, 100.0]
+      base_rot: [10.0, 10.0, 10.0]
       joint_pos: 0.0
-      joint_vel: 20.0
+      joint_vel: 50.0
   uReg:
-    w: 0.01
+    w: 1.0
   xBound:
     w: 300.0
   CoM:
-    w: 3000.0
+    w: 1000.0
   tracking_frames:
-    torso_primitive_shape:
-      pos: 100.0
+    torso_link:
+      pos: 1000.0
       rot: 0.0
     left_ankle_roll_link:
-      pos: 10.0
-      rot: 100.0
-    right_ankle_roll_link:
-      pos: 10.0
-      rot: 100.0
-    left_knee_link:
       pos: 1000.0
+      rot: 0.0
+    right_ankle_roll_link:
+      pos: 1000.0
+      rot: 0.0
+    left_knee_link:
+      pos: 900.0
       rot: 0.0
     right_knee_link:
-      pos: 1000.0
+      pos: 900.0
       rot: 0.0
     left_rubber_hand:
-      pos: 100.0
-      rot: 0.0
+      pos: 1000.0
+      rot: 100.0
     right_rubber_hand:
-      pos: 100.0
+      pos: 1000.0
       rot: 0.0
 
 mpc:
-  dt: 0.025
+  dt: 0.02
   horizon: 4
-  max_iter: 3
+  max_iter: 100

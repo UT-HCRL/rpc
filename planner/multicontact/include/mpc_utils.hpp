@@ -61,7 +61,7 @@ namespace mpc_utils {
 
     struct MPCData{
         int total_iterations;
-        std::vector<double> xReg_costs; 
+        std::vector<double> xReg_costs;
         std::vector<double> uReg_costs;
         std::vector<double> xBound_costs;
         std::vector<double> com_costs;
@@ -83,6 +83,11 @@ namespace mpc_utils {
         std::vector<double> right_foot_contact_costs;
 
         std::unordered_map<std::string, Eigen::Vector3d> frame_current_pos;
+
+        Eigen::Vector3d com_ref_pos;
+        Eigen::Vector3d com_curr_pos;
+
+        std::unordered_map<std::string, Eigen::Vector3d> contact_forces;
 
     };
 
@@ -283,6 +288,9 @@ namespace mpc_utils {
         if (w < 0.0) {
             throw std::invalid_argument("Weight must be non-negative");
         }
+        if (w == 0.0) {
+            return; // No normalization needed for zero weight
+        }
         if (N <= 0) {
             throw std::invalid_argument("Number of weights must be positive");
         }
@@ -294,6 +302,9 @@ namespace mpc_utils {
         
         if ((w.array() < 0.0).all()) {
             throw std::invalid_argument("Weight must be non-negative");
+        }
+        else if((w.array() == 0.0).all()) {
+            return;
         }
         
         if (N <= 0) {
@@ -308,6 +319,9 @@ namespace mpc_utils {
         
         if ((w.array() < 0.0).all()) {
             throw std::invalid_argument("Weight must be non-negative");
+        }
+        else if((w.array() == 0.0).all()) {
+            return;
         }
         
         if (N <= 0) {

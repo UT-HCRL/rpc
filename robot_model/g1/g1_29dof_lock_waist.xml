@@ -315,7 +315,7 @@
 
   <!--start with the fixed base pose-->
   <equality>
-    <weld body1="world_link" body2="pelvis" relpose="0 0 0.75 1 0 0 0"/>
+    <weld body1="world_link" body2="pelvis" relpose="0 0 0.8 1 0 0 0"/>
   </equality>
 
 </mujoco>

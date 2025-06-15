@@ -107,6 +107,8 @@ class Simulate {
   mjModel* m_ = nullptr;
   mjData* d_ = nullptr;
 
+  bool reset_gains_ = false;
+
   InterruptHandler *interrupt_handler_ = nullptr;
 
   int ncam_ = 0;
