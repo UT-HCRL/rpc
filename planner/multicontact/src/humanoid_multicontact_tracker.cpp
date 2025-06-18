@@ -584,7 +584,17 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             for(size_t i = 0; i < N + 1; i++){
                 for (const auto& frame_name : frame_targets_) {
                     const pinocchio::SE3 temp = desired_frames[i][frame_name.first];
-                    frame_residuals_[i][frame_name.first]->set_reference(temp);
+                    if(!isContactActive(frame_name.first)){
+                        frame_residuals_[i][frame_name.first]->set_reference(temp);
+                    }else{
+                        // If the frame is in contact, we set the reference to the current position
+                        // This is useful for frames that are already in contact and we want to keep them there
+                        std::cout<<"Setting reference for frame " << frame_name.first << " to current position in contact." << std::endl;
+                        std::cout<<"Current reference is: " << pinocchio_data_->oMf[model_full_.getFrameId(frame_name.first)] << std::endl;
+                        pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs[0].head(state_->get_nq()));
+                        pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
+                        frame_residuals_[i][frame_name.first]->set_reference(pinocchio_data_->oMf[model_full_.getFrameId(frame_name.first)]);
+                    }
                 }
             }
         }
@@ -789,7 +799,13 @@ void HumanoidMulticontactTracker::printContacts() const {
 bool HumanoidMulticontactTracker::isContactActive(const std::string& contact_name) const {
     
     try {
-        return running_contact_models_[0]->get_contacts().at(contact_name + "_contact")->active;
+        if(contact_name == "left_ankle_roll_link"){
+            return running_contact_models_[0]->get_contacts().at("l_foot_contact_contact")->active;
+        }else if(contact_name == "right_ankle_roll_link"){
+            return running_contact_models_[0]->get_contacts().at("r_foot_contact_contact")->active;
+        }else{
+            return running_contact_models_[0]->get_contacts().at(contact_name + "_contact")->active;
+        }
     } catch (const std::out_of_range&) {
         return false;
     }
