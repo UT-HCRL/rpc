@@ -406,8 +406,8 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
             contact_model->changeContactStatus(model_full_.frames[model_full_.getFrameId(frame_name)].name + contact_suffix, false);
         }
         else if(frame_name.find("left_rubber") != std::string::npos){
-            // rotation = Eigen::Matrix3d::Identity();
-            rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
+            rotation = Eigen::Matrix3d::Identity();
+            // rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
             // rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
             // rotation = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
             std::cout << "Friction cone Z axis: " << rotation.col(2).transpose() << std::endl;
@@ -424,7 +424,7 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
         std::shared_ptr<crocoddyl::ActivationModelAbstract> surf_activation_friction = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(bounds);
         std::shared_ptr<crocoddyl::ResidualModelAbstract> surf_residual = std::make_shared<crocoddyl::ResidualModelContactFrictionCone>(state_, model_full_.getFrameId(frame_name), surf_cone, actuation_->get_nu());
         std::shared_ptr<crocoddyl::CostModelAbstract> surf_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, surf_activation_friction, surf_residual);
-        cost_model->addCost(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_friction_cone", surf_cost, 1e6);
+        cost_model->addCost(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_friction_cone", surf_cost, 1e4);
 
     }
 
@@ -589,8 +589,8 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
                     }else{
                         // If the frame is in contact, we set the reference to the current position
                         // This is useful for frames that are already in contact and we want to keep them there
-                        std::cout<<"Setting reference for frame " << frame_name.first << " to current position in contact." << std::endl;
-                        std::cout<<"Current reference is: " << pinocchio_data_->oMf[model_full_.getFrameId(frame_name.first)] << std::endl;
+                        // std::cout<<"Setting reference for frame " << frame_name.first << " to current position in contact." << std::endl;
+                        // std::cout<<"Current reference is: " << pinocchio_data_->oMf[model_full_.getFrameId(frame_name.first)] << std::endl;
                         pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs[0].head(state_->get_nq()));
                         pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
                         frame_residuals_[i][frame_name.first]->set_reference(pinocchio_data_->oMf[model_full_.getFrameId(frame_name.first)]);

@@ -38,16 +38,22 @@ G1Interface::G1Interface() : Interface() {
   this->_SetParameters();
 
   // initialize state estimator
-  if (state_estimator_type_ == "default")
+  if (b_cheater_mode_){
     se_ = new G1StateEstimator(robot_, cfg_);
-  else if (state_estimator_type_ == "kf")
-    se_ = new G1KFStateEstimator(robot_, cfg_);
-  else {
-    std::cout
-        << "[G1Interface] Please check the state estimator type in pnc.yaml"
-        << '\n';
-    assert(false);
+  }else{
+    if (state_estimator_type_ == "default")
+      se_ = new G1StateEstimator(robot_, cfg_);
+    else if (state_estimator_type_ == "kf")
+      se_ = new G1KFStateEstimator(robot_, cfg_);
+
+    else {
+      std::cout
+          << "[G1Interface] Please check the state estimator type in pnc.yaml"
+          << '\n';
+      assert(false);
+    }
   }
+
 
   // initialize controller
   if (wbc_type_ == "ihwbc") {

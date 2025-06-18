@@ -3,6 +3,7 @@ import numpy as np
 import pinocchio as pin
 from foxglove_schemas_protobuf.FrameTransform_pb2 import FrameTransform
 
+from scipy.spatial.transform import Rotation as R
 from util.python_utils.util import rot_to_quat
 
 
@@ -16,7 +17,6 @@ def isMesh(geometry_object):
         return True
 
     return False
-
 
 def update_robot_transform(
     visual: pin.GeometryModel,
@@ -47,7 +47,6 @@ def update_robot_transform(
     transform.rotation.z = q[2]
     transform.rotation.w = q[3]
 
-
 def update_2d_transform(obj_name: str, pos_2d: np.ndarray, transform: FrameTransform):
     transform.parent_frame_id = "world"
     transform.child_frame_id = obj_name
@@ -74,3 +73,16 @@ COLOR_RGBA_MAP = {
 
 def get_rgba(color_name):
     return COLOR_RGBA_MAP.get(color_name.lower(), [0.0, 0.0, 0.0, 0.5])
+
+def rot_to_quat(rot):
+    """
+    Parameters
+    ----------
+    rot (np.array): SO3
+
+    Returns
+    -------
+    quat (np.array): scalar last quaternion
+
+    """
+    return np.copy(R.from_matrix(rot).as_quat())

@@ -11,11 +11,13 @@ import pickle
 import pinocchio as pin
 import numpy as np
 
+from scipy.spatial.transform import Rotation as R
+
 cwd = os.getcwd()
 sys.path.append(cwd)
 
 from mcap_protobuf.writer import Writer
-from UI.visualization_toolbox import update_robot_transform, update_2d_transform, update_3d_transform, get_rgba, COLOR_RGBA_MAP
+from UI.visualization_toolbox import update_robot_transform, update_2d_transform, update_3d_transform, get_rgba, COLOR_RGBA_MAP, rot_to_quat
 from google.protobuf.wrappers_pb2 import FloatValue
 from foxglove_schemas_protobuf.Point3_pb2 import Point3
 from foxglove_schemas_protobuf.FrameTransform_pb2 import FrameTransform
@@ -35,6 +37,71 @@ def create_sphere_scene(scene_frame_id, rgba, sized=0.03):
     sphere_model.size.y = sized
     sphere_model.size.z = sized
     return sphere_scene
+
+def create_arrow_scene(scene_frame_id, force_x, force_y, force_z, rgba, arrow_settings = [0.3, 0.1, 0.8], scaling = 1200.0):
+    """
+    Create an arrow scene for MCAP based on raw force components
+    
+    Args:
+        scene_frame_id: Frame ID for the scene
+        force_x, force_y, force_z: raw force components
+        rgba: color array [r, g, b, a]
+    """
+    arrow_scene = SceneUpdate()
+    arrow_entity = arrow_scene.entities.add()
+    arrow_entity.frame_id = scene_frame_id
+    
+    arrow_model = arrow_entity.arrows.add()
+    arrow_model.color.r = rgba[0]
+    arrow_model.color.g = rgba[1] 
+    arrow_model.color.b = rgba[2]
+    arrow_model.color.a = 1.0
+    
+    force_dir = np.array([force_x, force_y, force_z])
+    
+    if np.all(force_dir != 0.0):
+        force_norm = np.linalg.norm(force_dir)
+        force_dir_norm = force_dir / force_norm
+        force_magnitude = force_norm / scaling
+        
+        rot_ang = np.arccos(np.clip(force_dir_norm.dot(np.array([0, 0, 1])), -1.0, 1.0))
+        
+        if rot_ang > 1e-6:  # Avoid division by zero for parallel vectors
+            rot_ax = np.cross(force_dir_norm, np.array([0, 0, 1]))
+            rot_ax /= np.linalg.norm(rot_ax)
+            
+            ax_hat = np.array([
+                [0, -rot_ax[2], rot_ax[1]],
+                [rot_ax[2], 0, -rot_ax[0]],
+                [-rot_ax[1], rot_ax[0], 0],
+            ])
+            R_rot_force = (
+                np.eye(3)
+                + np.sin(rot_ang) * ax_hat
+                + (1 - np.cos(rot_ang)) * ax_hat @ ax_hat
+            )
+            quat_force = rot_to_quat(R_rot_force)
+        else:
+            quat_force = [0, 0, 0, 1]
+    else:
+        force_magnitude = 0.0
+        quat_force = [0, 0, 0, 1]
+
+    arrow_scale = force_magnitude
+    arrow_model.shaft_length = arrow_scale
+    arrow_model.shaft_diameter = arrow_settings[0]
+    arrow_model.head_length = arrow_settings[1]
+    arrow_model.head_diameter = arrow_settings[2]
+    
+    arrow_model.pose.position.x = 0.0
+    arrow_model.pose.position.y = 0.0
+    arrow_model.pose.position.z = 0.0
+    arrow_model.pose.orientation.x = quat_force[0]
+    arrow_model.pose.orientation.y = quat_force[1]
+    arrow_model.pose.orientation.z = quat_force[2]
+    arrow_model.pose.orientation.w = quat_force[3]
+    
+    return arrow_scene
 
 def main():
 
@@ -70,6 +137,13 @@ def main():
         "r_foot_rf", 
         "l_hand_rf", 
         "r_hand_rf"
+    ]
+    
+    arrows_fddp_object_names = [
+        "l_foot_rf",
+        "r_foot_rf",
+        "l_hand_rf",
+        "r_hand_rf",
     ]
 
     spheres_des_object_names = [
@@ -110,6 +184,7 @@ def main():
     vis_horizon_dict = {}
     vis_des_spheres_dict = {}
     vis_curr_spheres_dict = {}
+    vis_arrows_dict = {}
 
     for oname in vis_3d_object_names:
         vis_3d_dict[oname] = []
@@ -122,6 +197,9 @@ def main():
 
     for oname in spheres_curr_object_names:
         vis_curr_spheres_dict[oname] = []
+    
+    for oname in arrows_fddp_object_names:
+        vis_arrows_dict[oname] = []
 
     # Read and collect all data from pkl file
     with open(cwd + "/experiment_data/debug.pkl", "rb") as f:
@@ -144,6 +222,9 @@ def main():
 
                 for oname in spheres_curr_object_names: #curr frame spheres
                     vis_curr_spheres_dict[oname].append(d[oname])
+                
+                for oname in arrows_fddp_object_names: #fddp arrows
+                    vis_arrows_dict[oname].append(d[oname])
 
             except EOFError:
                 break
@@ -160,7 +241,7 @@ def main():
 
     for frame_id in spheres_curr_object_names:
         scenes_dict[frame_id] = create_sphere_scene(frame_id, get_rgba("blue"), sized=0.03)
-
+        
     # send data to mcap file
     with open(cwd + "/experiment_data/" + robot_name + "_foxglove.mcap", "wb") as f, Writer(f) as mcap_writer:
         for i in range(len(time)):
@@ -172,8 +253,29 @@ def main():
             # update transformations of all visual model objects
             pin.forwardKinematics(model, data, vis_q)
             pin.updateGeometryPlacements(model, data, visual_model, visual_data)
+            pin.updateFramePlacements(model, data)
             for visual in visual_model.geometryObjects:
                 update_robot_transform(visual, visual_data, visual_model, transform)
+                mcap_writer.write_message(
+                    "transforms", transform, int(time[i] * 1e9), int(time[i] * 1e9)
+                )
+                transform.rotation.Clear()
+                transform.translation.Clear()
+            
+
+            for fid, m_frame in enumerate(model.frames):
+                frame_name = model.frames[fid].name
+                transform.parent_frame_id = "world"
+                transform.child_frame_id = frame_name
+                transform.translation.x = data.oMf[fid].translation[0]
+                transform.translation.y = data.oMf[fid].translation[1]
+                transform.translation.z = data.oMf[fid].translation[2]
+                rot = data.oMf[fid].rotation
+                q = rot_to_quat(rot)
+                transform.rotation.x = q[0]
+                transform.rotation.y = q[1]
+                transform.rotation.z = q[2]
+                transform.rotation.w = q[3]
                 mcap_writer.write_message(
                     "transforms", transform, int(time[i] * 1e9), int(time[i] * 1e9)
                 )
@@ -218,7 +320,56 @@ def main():
                 scene.entities[0].timestamp.FromNanoseconds(int(time[i] * 1e9))
                 mcap_writer.write_message(
                     f"{scene_name}_marker", scene, int(time[i] * 1e9), int(time[i] * 1e9)
-                )            
+                )
+
+            for arrow_name in arrows_fddp_object_names:
+                force_data = vis_arrows_dict[arrow_name][i]
+                
+                transform.parent_frame_id = "world"
+                transform.child_frame_id = arrow_name
+                
+                if arrow_name == "l_foot_rf":
+                    pos_data = vis_3d_dict["lfoot_pos"][i]
+                    ori_data = vis_3d_dict["lfoot_ori"][i]
+                elif arrow_name == "r_foot_rf":
+                    pos_data = vis_3d_dict["rfoot_pos"][i]
+                    ori_data = vis_3d_dict["rfoot_ori"][i]
+                elif arrow_name == "l_hand_rf":
+                    pos_data = vis_3d_dict["lhand_pos"][i]
+                    ori_data = [0, 0, 0, 1]  # Do i need a rot?
+                elif arrow_name == "r_hand_rf":
+                    pos_data = vis_3d_dict["rhand_pos"][i]
+                    ori_data = [0, 0, 0, 1]  # Do i need a rot?
+                
+                transform.translation.x = pos_data[0]
+                transform.translation.y = pos_data[1]
+                transform.translation.z = pos_data[2]
+                
+                from scipy.spatial.transform import Rotation as R
+                Ry = R.from_euler("y", -np.pi / 2).as_matrix()
+                q_cmd_arrow = rot_to_quat(Ry)
+                transform.rotation.x = q_cmd_arrow[0]
+                transform.rotation.y = q_cmd_arrow[1]
+                transform.rotation.z = q_cmd_arrow[2]
+                transform.rotation.w = q_cmd_arrow[3]
+                
+                mcap_writer.write_message(
+                    "transforms", transform, int(time[i] * 1e9), int(time[i] * 1e9)
+                )
+                transform.rotation.Clear()
+                transform.translation.Clear()
+                
+                arrow_scene = create_arrow_scene(
+                    arrow_name,
+                    force_data[0],
+                    force_data[1],
+                    force_data[2],
+                    get_rgba("yellow")
+                )
+                arrow_scene.entities[0].timestamp.FromNanoseconds(int(time[i] * 1e9))
+                mcap_writer.write_message(
+                    f"{arrow_name}_arrow_marker", arrow_scene, int(time[i] * 1e9), int(time[i] * 1e9)
+                )
 
         mcap_writer.finish()
 

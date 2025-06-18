@@ -18,7 +18,7 @@ from scipy.spatial.transform import Rotation as R
 parser = argparse.ArgumentParser()
 parser.add_argument("--b_use_plotjuggler", type=bool, default=False)
 parser.add_argument(
-    "--visualizer", choices=["none", "meshcat", "foxglove"], default="meshcat"
+    "--visualizer", choices=["none", "meshcat", "foxglove"], default="none"
 )
 parser.add_argument(
     "--robot", choices=["draco", "g1", "fixed_draco", "manipulator"], default="g1"
@@ -699,7 +699,6 @@ async def main():
                 # Send messages
                 tasks.append(server.send_message(tf_chan_id, now, transform.SerializeToString()))
                 tasks.append(server.send_message(des_traj_chan_id, now, curr_traj_scene.serialized_msg(frame_name)))
-
             process_data_saver("foxglove")
             await asyncio.gather(*tasks)
 
@@ -865,6 +864,9 @@ if args.visualizer != "none":
             viz.viewer, "com_curr_pos", color=[0.0, 0.0, 1.0, 0.4]
         )
         com_curr_pos_q = pin.neutral(com_curr_pos_model)
+else:
+    from messages.g1_pb2 import *
+    msg = pnc_msg()
 
 def process_data_saver(visualize_type):
     if visualize_type == "meshcat":
@@ -939,69 +941,51 @@ def process_data_saver(visualize_type):
             data_saver.add(f"{frame_name}", [pos_msg.x, pos_msg.y, pos_msg.z])
 
     elif visualize_type == "none":
-        # save data in pkl file (typically, for Plotjuggler)
         data_saver.add("time", msg.time)
-        data_saver.add("phase", msg.phase)
         data_saver.add("est_base_joint_pos", list(msg.est_base_joint_pos))
         data_saver.add("est_base_joint_ori", list(msg.est_base_joint_ori))
-        data_saver.add("kf_base_joint_pos", list(msg.kf_base_joint_pos))
-        data_saver.add("kf_base_joint_ori", list(msg.kf_base_joint_ori))
         data_saver.add("joint_positions", list(msg.joint_positions))
-        data_saver.add("des_com_pos", list(msg.des_com_pos))
-        data_saver.add("act_com_pos", list(msg.act_com_pos))
         data_saver.add("lfoot_pos", list(msg.lfoot_pos))
         data_saver.add("rfoot_pos", list(msg.rfoot_pos))
         data_saver.add("lfoot_ori", list(msg.lfoot_ori))
         data_saver.add("rfoot_ori", list(msg.rfoot_ori))
-        data_saver.add("lfoot_rf_cmd", list(msg.lfoot_rf_cmd))
-        data_saver.add("rfoot_rf_cmd", list(msg.rfoot_rf_cmd))
-        data_saver.add("b_lfoot", msg.b_lfoot)
-        data_saver.add("b_rfoot", msg.b_rfoot)
-        data_saver.add("lfoot_volt_normal_raw", msg.lfoot_volt_normal_raw)
-        data_saver.add("rfoot_volt_normal_raw", msg.rfoot_volt_normal_raw)
-        data_saver.add("lfoot_rf_normal", msg.lfoot_rf_normal)
-        data_saver.add("rfoot_rf_normal", msg.rfoot_rf_normal)
-        data_saver.add("lfoot_rf_normal_filt", msg.lfoot_rf_normal_filt)
-        data_saver.add("rfoot_rf_normal_filt", msg.rfoot_rf_normal_filt)
-        data_saver.add("est_icp", list(msg.est_icp))
-        data_saver.add("des_icp", list(msg.des_icp))
-        data_saver.add("des_cmp", list(msg.des_cmp))
-        data_saver.add("com_xy_weight", list(msg.com_xy_weight))
-        data_saver.add("com_xy_kp", list(msg.com_xy_kp))
-        data_saver.add("com_xy_kd", list(msg.com_xy_kd))
-        data_saver.add("com_xy_ki", list(msg.com_xy_ki))
-        data_saver.add("com_z_weight", msg.com_z_weight)
-        data_saver.add("com_z_kp", msg.com_z_kp)
-        data_saver.add("com_z_kd", msg.com_z_kd)
-        data_saver.add("torso_ori_weight", list(msg.torso_ori_weight))
-        data_saver.add("torso_ori_kp", list(msg.torso_ori_kp))
-        data_saver.add("torso_ori_kd", list(msg.torso_ori_kd))
-        data_saver.add("lf_pos_weight", list(msg.lf_pos_weight))
-        data_saver.add("lf_pos_kp", list(msg.lf_pos_kp))
-        data_saver.add("lf_pos_kd", list(msg.lf_pos_kd))
-        data_saver.add("rf_pos_weight", list(msg.rf_pos_weight))
-        data_saver.add("rf_pos_kp", list(msg.rf_pos_kp))
-        data_saver.add("rf_pos_kd", list(msg.rf_pos_kd))
-        data_saver.add("lf_ori_weight", list(msg.lf_ori_weight))
-        data_saver.add("lf_ori_kp", list(msg.lf_ori_kp))
-        data_saver.add("lf_ori_kd", list(msg.lf_ori_kd))
-        data_saver.add("rf_ori_weight", list(msg.rf_ori_weight))
-        data_saver.add("rf_ori_kp", list(msg.rf_ori_kp))
-        data_saver.add("rf_ori_kd", list(msg.rf_ori_kd))
-        data_saver.add("quat_world_local", list(msg.quat_world_local))
-        data_saver.add("joint_pos_des", list(msg.joint_pos_des))
-        data_saver.add("joint_vel_des", list(msg.joint_vel_des))
-        data_saver.add("joint_trq_des", list(msg.joint_trq_des))
+        data_saver.add("lhand_pos", list(msg.lhand_pos))
+        data_saver.add("rhand_pos", list(msg.rhand_pos))
+        data_saver.add("xreg_costs", list(msg.xreg_costs))
+        data_saver.add("ureg_costs", list(msg.ureg_costs))
+        data_saver.add("xbound_costs", list(msg.xbound_costs))
+        data_saver.add("com_costs", list(msg.com_costs))
+        data_saver.add("left_hand_contact_costs", list(msg.left_hand_contact_costs))
+        data_saver.add("left_foot_contact_costs", list(msg.left_foot_contact_costs))
+        data_saver.add("right_foot_contact_costs", list(msg.right_foot_contact_costs))
+        data_saver.add("right_hand_contact_costs", list(msg.right_hand_contact_costs))
+        data_saver.add("right_hand_frame_costs", list(msg.right_hand_frame_costs))
+        data_saver.add("left_hand_frame_costs", list(msg.left_hand_frame_costs))
+        data_saver.add("left_ankle_frame_costs", list(msg.left_ankle_frame_costs))
+        data_saver.add("right_ankle_frame_costs", list(msg.right_ankle_frame_costs))
+        data_saver.add("left_knee_frame_costs", list(msg.left_knee_frame_costs))
+        data_saver.add("right_knee_frame_costs", list(msg.right_knee_frame_costs))
+        data_saver.add("torso_link_frame_costs", list(msg.torso_link_frame_costs))
+        data_saver.add("l_foot_rf", [msg.l_foot_rf.x, msg.l_foot_rf.y, msg.l_foot_rf.z])
+        data_saver.add("r_foot_rf", [msg.r_foot_rf.x, msg.r_foot_rf.y, msg.r_foot_rf.z])
+        data_saver.add("l_hand_rf", [msg.l_hand_rf.x, msg.l_hand_rf.y, msg.l_hand_rf.z])
+        data_saver.add("r_hand_rf", [msg.r_hand_rf.x, msg.r_hand_rf.y, msg.r_hand_rf.z])
+
+        for frame_name in viz_des_trajectories.keys():
+            pos_msg = getattr(msg, frame_name)
+            data_saver.add(f"{frame_name}", [pos_msg.x, pos_msg.y, pos_msg.z])
+        for frame_name in viz_curr_trajectories.keys():
+            pos_msg = getattr(msg, frame_name)
+            data_saver.add(f"{frame_name}", [pos_msg.x, pos_msg.y, pos_msg.z])
+
 
     data_saver.advance()
 
 while True:
-    # print("\nFLAG_B1")
-    # receive msg through socket
+
     encoded_msg = socket.recv()
     msg.ParseFromString(encoded_msg)
-    # print("FLAG_MSG")
-    # if publishing raw messages, floating base estimates names are not important
+
     if args.visualizer != "none":
         check_if_kf_estimator(msg.kf_base_joint_pos, msg.est_base_joint_pos)
 
@@ -1091,7 +1075,6 @@ while True:
         elif args.visualizer == "foxglove":
             th_fast = threading.Thread(target=asyncio.run(main()), args=())
             th_fast.start()
-            # asyncio.run(main())
 
     else:  # if 'none' specified
         process_data_saver("none")
