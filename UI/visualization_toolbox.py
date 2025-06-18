@@ -53,3 +53,24 @@ def update_2d_transform(obj_name: str, pos_2d: np.ndarray, transform: FrameTrans
     transform.child_frame_id = obj_name
     transform.translation.x = pos_2d[0]
     transform.translation.y = pos_2d[1]
+
+def update_3d_transform(obj_name: str, pos_3d: np.ndarray, transform: FrameTransform):
+    transform.parent_frame_id = "world"
+    transform.child_frame_id = obj_name
+    transform.translation.x = pos_3d[0]
+    transform.translation.y = pos_3d[1]
+    transform.translation.z = pos_3d[2]
+
+COLOR_RGBA_MAP = {
+    "red": [1.0, 0.0, 0.0, 0.5],
+    "green": [0.0, 1.0, 0.0, 0.5],
+    "blue": [0.0, 0.0, 1.0, 0.5],
+    "yellow": [1.0, 1.0, 0.0, 0.5],
+    "cyan": [0.0, 1.0, 1.0, 0.5],
+    "magenta": [1.0, 0.0, 1.0, 0.5],
+    "white": [1.0, 1.0, 1.0, 0.5],
+    "black": [0.0, 0.0, 0.0, 0.5],
+}
+
+def get_rgba(color_name):
+    return COLOR_RGBA_MAP.get(color_name.lower(), [0.0, 0.0, 0.0, 0.5])

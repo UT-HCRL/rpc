@@ -26,7 +26,27 @@ parser.add_argument(
 parser.add_argument("--hw_or_sim", choices=["hw", "sim"], default="sim")
 args = parser.parse_args()
 
-crocoddyl_forces = ["l_foot_rf", "r_foot_rf", "l_hand_rf", "r_hand_rf"] # TODO: add left and right hand
+crocoddyl_forces = ["l_foot_rf", "r_foot_rf", "l_hand_rf", "r_hand_rf"]
+
+viz_des_trajectories = {
+    "left_ankle_roll_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
+    "right_ankle_roll_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
+    "left_rubber_hand_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
+    "right_rubber_hand_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
+    "torso_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
+    "left_knee_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
+    "right_knee_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
+}
+
+viz_curr_trajectories = {
+    "left_ankle_roll_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03]),
+    "right_ankle_roll_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03]),
+    "left_rubber_hand_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03]),
+    "right_rubber_hand_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03]),
+    "torso_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03]),
+    "left_knee_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03]),
+    "right_knee_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03])
+}
 
 def rot_to_quat(rot):
     """
@@ -112,6 +132,18 @@ async def main():
         for name in crocoddyl_forces:
             arrows_scene.add_shape(name, *shape_params)
 
+        des_traj_scene = ShapeScene()
+        for frame_name, (rgba_color, scale) in viz_des_trajectories.items():
+            des_traj_scene.add_shape(
+                frame_name, "spheres", rgba_color, scale
+            )
+        
+        curr_traj_scene = ShapeScene()
+        for frame_name, (rgba_color, scale) in viz_curr_trajectories.items():
+            curr_traj_scene.add_shape(
+                frame_name, "spheres", rgba_color, scale
+            )
+
         mpc_horizon = 2 #FIXME: can this be dynamic or should we load the horizon from yaml?
 
         # MPC costs
@@ -194,7 +226,6 @@ async def main():
                 "r_hand_rf_z",
             ]
         ).add_chan(server)
-
         normS_chan_id = await SceneChannel(
             False,
             "normal_viz",
@@ -203,18 +234,23 @@ async def main():
             scene_schema,
         ).add_chan(server)
         
+        des_traj_chan_id = await SceneChannel(
+            False,
+            "des_traj",
+            "protobuf",
+            SceneUpdate.DESCRIPTOR.full_name,
+            scene_schema,
+        ).add_chan(server)
+
         lf_pos_chan_id = await SceneChannel(
             True, "lf_pos", "json", "lf_pos", ["x", "y", "z"]
         ).add_chan(server)
-
         rf_pos_chan_id = await SceneChannel(
             True, "rf_pos", "json", "rf_pos", ["x", "y", "z"]
         ).add_chan(server)
-
         lh_pos_chan_id = await SceneChannel(
             True, "lh_pos", "json", "lh_pos", ["x", "y", "z"]
         ).add_chan(server)
-
         rh_pos_chan_id = await SceneChannel(
             True, "rh_pos", "json", "rh_pos", ["x", "y", "z"]
         ).add_chan(server)
@@ -247,17 +283,14 @@ async def main():
             vis_q[3:7] = np.array(base_ori)  # quaternion [x,y,z,w]
             vis_q[7:] = np.array(msg.joint_positions)
 
-            await server.send_message(
-                lf_pos_chan_id,
-                now,
-                json.dumps(
-                    {
-                        "x": list(msg.lfoot_pos)[0],
-                        "y": list(msg.lfoot_pos)[1],
-                        "z": list(msg.lfoot_pos)[2],
-                    }
-                ).encode("utf8"),
-            )
+            json_bytes = json.dumps(
+                {
+                    "x": list(msg.lfoot_pos)[0],
+                    "y": list(msg.lfoot_pos)[1],
+                    "z": list(msg.lfoot_pos)[2],
+                }
+            ).encode("utf8")
+            await server.send_message(lf_pos_chan_id, now, json_bytes)
 
             await server.send_message(
                 rf_pos_chan_id,
@@ -630,7 +663,44 @@ async def main():
                             await server.send_message(
                                 normS_chan_id, now, arrows_scene.serialized_msg(obj)
                             )
+            
+            for frame_name in viz_des_trajectories.keys():
+                # Build the transform message
+                transform.parent_frame_id = "world"
+                transform.child_frame_id = frame_name
+                transform.timestamp.FromNanoseconds(now)
+                
+                pos_msg = getattr(msg, frame_name)
+                transform.translation.x = pos_msg.x
+                transform.translation.y = pos_msg.y
+                transform.translation.z = pos_msg.z
+                
+                # Update the pose for this frame in the scene
+                des_traj_scene.update(frame_name, now)
 
+                # Send messages
+                tasks.append(server.send_message(tf_chan_id, now, transform.SerializeToString()))
+                tasks.append(server.send_message(des_traj_chan_id, now, des_traj_scene.serialized_msg(frame_name)))
+            
+            for frame_name in viz_curr_trajectories.keys():
+                # Build the transform message
+                transform.parent_frame_id = "world"
+                transform.child_frame_id = frame_name
+                transform.timestamp.FromNanoseconds(now)
+
+                pos_msg = getattr(msg, frame_name)
+                transform.translation.x = pos_msg.x
+                transform.translation.y = pos_msg.y
+                transform.translation.z = pos_msg.z
+
+                # Update the pose for this frame in the scene
+                curr_traj_scene.update(frame_name, now)
+
+                # Send messages
+                tasks.append(server.send_message(tf_chan_id, now, transform.SerializeToString()))
+                tasks.append(server.send_message(des_traj_chan_id, now, curr_traj_scene.serialized_msg(frame_name)))
+
+            process_data_saver("foxglove")
             await asyncio.gather(*tasks)
 
 
@@ -796,7 +866,6 @@ if args.visualizer != "none":
         )
         com_curr_pos_q = pin.neutral(com_curr_pos_model)
 
-
 def process_data_saver(visualize_type):
     if visualize_type == "meshcat":
         # save data in pkl file (saved to replay data)
@@ -832,7 +901,42 @@ def process_data_saver(visualize_type):
         data_saver.add("joint_trq_des", list(msg.joint_trq_des))
 
     elif visualize_type == "foxglove":
-        pass
+        data_saver.add("time", msg.time)
+        data_saver.add("est_base_joint_pos", list(msg.est_base_joint_pos))
+        data_saver.add("est_base_joint_ori", list(msg.est_base_joint_ori))
+        data_saver.add("joint_positions", list(msg.joint_positions))
+        data_saver.add("lfoot_pos", list(msg.lfoot_pos))
+        data_saver.add("rfoot_pos", list(msg.rfoot_pos))
+        data_saver.add("lfoot_ori", list(msg.lfoot_ori))
+        data_saver.add("rfoot_ori", list(msg.rfoot_ori))
+        data_saver.add("lhand_pos", list(msg.lhand_pos))
+        data_saver.add("rhand_pos", list(msg.rhand_pos))
+        data_saver.add("xreg_costs", list(msg.xreg_costs))
+        data_saver.add("ureg_costs", list(msg.ureg_costs))
+        data_saver.add("xbound_costs", list(msg.xbound_costs))
+        data_saver.add("com_costs", list(msg.com_costs))
+        data_saver.add("left_hand_contact_costs", list(msg.left_hand_contact_costs))
+        data_saver.add("left_foot_contact_costs", list(msg.left_foot_contact_costs))
+        data_saver.add("right_foot_contact_costs", list(msg.right_foot_contact_costs))
+        data_saver.add("right_hand_contact_costs", list(msg.right_hand_contact_costs))
+        data_saver.add("right_hand_frame_costs", list(msg.right_hand_frame_costs))
+        data_saver.add("left_hand_frame_costs", list(msg.left_hand_frame_costs))
+        data_saver.add("left_ankle_frame_costs", list(msg.left_ankle_frame_costs))
+        data_saver.add("right_ankle_frame_costs", list(msg.right_ankle_frame_costs))
+        data_saver.add("left_knee_frame_costs", list(msg.left_knee_frame_costs))
+        data_saver.add("right_knee_frame_costs", list(msg.right_knee_frame_costs))
+        data_saver.add("torso_link_frame_costs", list(msg.torso_link_frame_costs))
+        data_saver.add("l_foot_rf", [msg.l_foot_rf.x, msg.l_foot_rf.y, msg.l_foot_rf.z])
+        data_saver.add("r_foot_rf", [msg.r_foot_rf.x, msg.r_foot_rf.y, msg.r_foot_rf.z])
+        data_saver.add("l_hand_rf", [msg.l_hand_rf.x, msg.l_hand_rf.y, msg.l_hand_rf.z])
+        data_saver.add("r_hand_rf", [msg.r_hand_rf.x, msg.r_hand_rf.y, msg.r_hand_rf.z])
+
+        for frame_name in viz_des_trajectories.keys():
+            pos_msg = getattr(msg, frame_name)
+            data_saver.add(f"{frame_name}", [pos_msg.x, pos_msg.y, pos_msg.z])
+        for frame_name in viz_curr_trajectories.keys():
+            pos_msg = getattr(msg, frame_name)
+            data_saver.add(f"{frame_name}", [pos_msg.x, pos_msg.y, pos_msg.z])
 
     elif visualize_type == "none":
         # save data in pkl file (typically, for Plotjuggler)
@@ -985,10 +1089,8 @@ while True:
                 com_curr_pos_viz.display(com_curr_pos_q)
             
         elif args.visualizer == "foxglove":
-            # webbrowser.open('https://app.foxglove.dev/view?ds=foxglove-websocket&ds.url=ws%3A%2F%2Flocalhost%3A8765')
             th_fast = threading.Thread(target=asyncio.run(main()), args=())
             th_fast.start()
-            process_data_saver("none")
             # asyncio.run(main())
 
     else:  # if 'none' specified
