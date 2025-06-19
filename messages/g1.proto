@@ -139,10 +139,10 @@ message pnc_msg {
 
   Pos com_des_pos = 91;
 
-  Pos l_foot_rf = 92;
-  Pos r_foot_rf = 93;
-  Pos l_hand_rf = 94;
-  Pos r_hand_rf = 95;
+  repeated Pos l_foot_rf = 92;
+  repeated Pos r_foot_rf = 93;
+  repeated Pos l_hand_rf = 94;
+  repeated Pos r_hand_rf = 95;
 
   repeated float lhand_pos = 96;
   repeated float rhand_pos = 97;

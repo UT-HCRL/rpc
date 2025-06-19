@@ -27,6 +27,7 @@ parser.add_argument("--hw_or_sim", choices=["hw", "sim"], default="sim")
 args = parser.parse_args()
 
 crocoddyl_forces = ["l_foot_rf", "r_foot_rf", "l_hand_rf", "r_hand_rf"]
+mpc_horizon = 4 #FIXME: can this be dynamic or should we load the horizon from yaml?
 
 viz_des_trajectories = {
     "left_ankle_roll_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
@@ -128,10 +129,15 @@ async def main():
         ).add_chan(server)
         
         arrows_scene = ShapeScene()
-        shape_params = ["arrows", [0, 0, 1, 0.5], [0.03, 0.1, 0.08]]
+        shape_params = ["arrows", [0, 0, 1, 1.0], [0.03, 0.1, 0.08]]
+        shape_ghost_params = ["arrows", [0, 0, 1, 0.2], [0.03, 0.1, 0.08]]
         for name in crocoddyl_forces:
-            arrows_scene.add_shape(name, *shape_params)
-
+            for i in range(mpc_horizon):
+                if i == 0:
+                    arrows_scene.add_shape(f"{name}_{i}", *shape_params)
+                else:
+                    arrows_scene.add_shape(f"{name}_{i}", *shape_ghost_params)
+                
         des_traj_scene = ShapeScene()
         for frame_name, (rgba_color, scale) in viz_des_trajectories.items():
             des_traj_scene.add_shape(
@@ -143,8 +149,6 @@ async def main():
             curr_traj_scene.add_shape(
                 frame_name, "spheres", rgba_color, scale
             )
-
-        mpc_horizon = 2 #FIXME: can this be dynamic or should we load the horizon from yaml?
 
         # MPC costs
         mpc_tot_iter = await SceneChannel(
@@ -212,20 +216,19 @@ async def main():
         grfs_chan_id = await SceneChannel(
             True, "GRFs", "json", "normal",
             [
-                "l_foot_rf_x",
-                "l_foot_rf_y",
-                "l_foot_rf_z",
-                "r_foot_rf_x",
-                "r_foot_rf_y",
-                "r_foot_rf_z",
-                "l_hand_rf_x",
-                "l_hand_rf_y",
-                "l_hand_rf_z",
-                "r_hand_rf_x",
-                "r_hand_rf_y",
-                "r_hand_rf_z",
+            f"l_foot_rf_{i}_{axis}" for i in range(mpc_horizon) for axis in ["x", "y", "z"]
+            ] +
+            [
+            f"r_foot_rf_{i}_{axis}" for i in range(mpc_horizon) for axis in ["x", "y", "z"]
+            ] +
+            [
+            f"l_hand_rf_{i}_{axis}" for i in range(mpc_horizon) for axis in ["x", "y", "z"]
+            ] +
+            [
+            f"r_hand_rf_{i}_{axis}" for i in range(mpc_horizon) for axis in ["x", "y", "z"]
             ]
         ).add_chan(server)
+
         normS_chan_id = await SceneChannel(
             False,
             "normal_viz",
@@ -523,27 +526,38 @@ async def main():
                     ).encode("utf8"),
                 )
 
-            if hasattr(msg, "l_foot_rf") and hasattr(msg, "r_foot_rf") and hasattr(msg, "l_hand_rf") and hasattr(msg, "r_hand_rf") and msg.l_foot_rf and msg.r_foot_rf and msg.l_hand_rf and msg.r_hand_rf:
-                await server.send_message(
-                    grfs_chan_id,
-                    now,
-                    json.dumps(
-                        {
-                            "l_foot_rf_x": msg.l_foot_rf.x,
-                            "l_foot_rf_y": msg.l_foot_rf.y,
-                            "l_foot_rf_z": msg.l_foot_rf.z,
-                            "r_foot_rf_x": msg.r_foot_rf.x,
-                            "r_foot_rf_y": msg.r_foot_rf.y,
-                            "r_foot_rf_z": msg.r_foot_rf.z,
-                            "l_hand_rf_x": msg.l_hand_rf.x,
-                            "l_hand_rf_y": msg.l_hand_rf.y,
-                            "l_hand_rf_z": msg.l_hand_rf.z,
-                            "r_hand_rf_x": msg.r_hand_rf.x,
-                            "r_hand_rf_y": msg.r_hand_rf.y,
-                            "r_hand_rf_z": msg.r_hand_rf.z,
-                        }
-                    ).encode("utf8"),
-                )
+            if hasattr(msg, "l_foot_rf") and hasattr(msg, "r_foot_rf") and hasattr(msg, "l_hand_rf") and hasattr(msg, "r_hand_rf"):
+                
+                # for i in range(len(msg.l_foot_rf)):
+                #     print(f"Debug l_foot_rf[{i}]: x={msg.l_foot_rf[i].x}, y={msg.l_foot_rf[i].y}, z={msg.l_foot_rf[i].z}")
+
+                grfs_data = {}
+                if (
+                    len(msg.l_foot_rf) >= mpc_horizon and
+                    len(msg.r_foot_rf) >= mpc_horizon and
+                    len(msg.l_hand_rf) >= mpc_horizon and
+                    len(msg.r_hand_rf) >= mpc_horizon
+                ):
+                    for i in range(mpc_horizon):
+                        grfs_data.update({
+                            f"l_foot_rf_{i}_x": msg.l_foot_rf[i].x,
+                            f"l_foot_rf_{i}_y": msg.l_foot_rf[i].y,
+                            f"l_foot_rf_{i}_z": msg.l_foot_rf[i].z,
+                            f"r_foot_rf_{i}_x": msg.r_foot_rf[i].x,
+                            f"r_foot_rf_{i}_y": msg.r_foot_rf[i].y,
+                            f"r_foot_rf_{i}_z": msg.r_foot_rf[i].z,
+                            f"l_hand_rf_{i}_x": msg.l_hand_rf[i].x,
+                            f"l_hand_rf_{i}_y": msg.l_hand_rf[i].y,
+                            f"l_hand_rf_{i}_z": msg.l_hand_rf[i].z,
+                            f"r_hand_rf_{i}_x": msg.r_hand_rf[i].x,
+                            f"r_hand_rf_{i}_y": msg.r_hand_rf[i].y,
+                            f"r_hand_rf_{i}_z": msg.r_hand_rf[i].z,
+                        })
+                    await server.send_message(
+                        grfs_chan_id,
+                        now,
+                        json.dumps(grfs_data).encode("utf8"),
+                    )
 
             # update mesh positions
             pin.forwardKinematics(model, data, vis_q)
@@ -581,10 +595,11 @@ async def main():
             if hasattr(msg, "l_foot_rf") and hasattr(msg, "r_foot_rf") and msg.l_foot_rf and msg.r_foot_rf:
                 for obj in crocoddyl_forces:
                     transform.parent_frame_id = "world"
-                    transform.child_frame_id = obj
                     transform.timestamp.FromNanoseconds(now)
-                    # show aligned at the center of respective foot sole
-                    if obj == "l_foot_rf":
+                    # Child name is passed later as it is dependent on the horizon index, but i don't want to recompute transform each time
+                    
+                    # Determine the transform based on the object type
+                    if obj.startswith("l_foot_rf"):
                         if np.linalg.norm(msg.lfoot_ori) == 0:
                             lfoot_ori = [0, 0, 0, 1] 
                         else:
@@ -593,7 +608,7 @@ async def main():
                         transform.translation.x = msg.lfoot_pos[0]
                         transform.translation.y = msg.lfoot_pos[1]
                         transform.translation.z = msg.lfoot_pos[2]
-                    elif obj == "r_foot_rf":
+                    elif obj.startswith("r_foot_rf"):
                         if np.linalg.norm(msg.rfoot_ori) == 0:
                             rfoot_ori = [0, 0, 0, 1]
                         else:
@@ -602,7 +617,7 @@ async def main():
                         transform.translation.x = msg.rfoot_pos[0]
                         transform.translation.y = msg.rfoot_pos[1]
                         transform.translation.z = msg.rfoot_pos[2]
-                    elif obj == "l_hand_rf":
+                    elif obj.startswith("l_hand_rf"):
                         if np.linalg.norm(msg.lhand_ori) == 0:
                             lhand_ori = [0, 0, 0, 1]
                         else:
@@ -611,7 +626,7 @@ async def main():
                         transform.translation.x = msg.lhand_pos[0]
                         transform.translation.y = msg.lhand_pos[1]
                         transform.translation.z = msg.lhand_pos[2]
-                    elif obj == "r_hand_rf":
+                    elif obj.startswith("r_hand_rf"):
                         if np.linalg.norm(msg.rhand_ori) == 0:
                             rhand_ori = [0, 0, 0, 1]
                         else:
@@ -621,15 +636,19 @@ async def main():
                         transform.translation.y = msg.rhand_pos[1]
                         transform.translation.z = msg.rhand_pos[2]
 
-                    # rotate transform since arrow points in +x direction
+                    # Rotate transform since arrow points in +x direction
                     q_cmd_arrow = rot_to_quat(Ry)
                     transform.rotation.x = q_cmd_arrow[0]
                     transform.rotation.y = q_cmd_arrow[1]
                     transform.rotation.z = q_cmd_arrow[2]
                     transform.rotation.w = q_cmd_arrow[3]
 
-                    if obj in crocoddyl_forces:
-                        force_dir = np.array([getattr(msg, obj).x, getattr(msg, obj).y, getattr(msg, obj).z])
+                    for i in range(len(getattr(msg, obj))):
+                        force_dir = np.array([
+                            getattr(msg, obj)[i].x, 
+                            getattr(msg, obj)[i].y, 
+                            getattr(msg, obj)[i].z
+                        ])
 
                         if np.all(force_dir != 0.0):
                             force_norm = np.linalg.norm(force_dir)
@@ -653,15 +672,14 @@ async def main():
                             )
                             quat_force = rot_to_quat(R_rot_force)
 
-                            # force scale
                             force_magnitude = force_norm / 1200.0
-                
-                            arrows_scene.scale(obj, quat_force, force_magnitude, now)
+                            arrows_scene.scale(f"{obj}_{i}", quat_force, force_magnitude, now)
+                            transform.child_frame_id = f"{obj}_{i}"
                             tasks.append(
                                 server.send_message(tf_chan_id, now, transform.SerializeToString())
                             )
                             await server.send_message(
-                                normS_chan_id, now, arrows_scene.serialized_msg(obj)
+                                normS_chan_id, now, arrows_scene.serialized_msg(f"{obj}_{i}")
                             )
             
             for frame_name in viz_des_trajectories.keys():
@@ -928,10 +946,19 @@ def process_data_saver(visualize_type):
         data_saver.add("left_knee_frame_costs", list(msg.left_knee_frame_costs))
         data_saver.add("right_knee_frame_costs", list(msg.right_knee_frame_costs))
         data_saver.add("torso_link_frame_costs", list(msg.torso_link_frame_costs))
-        data_saver.add("l_foot_rf", [msg.l_foot_rf.x, msg.l_foot_rf.y, msg.l_foot_rf.z])
-        data_saver.add("r_foot_rf", [msg.r_foot_rf.x, msg.r_foot_rf.y, msg.r_foot_rf.z])
-        data_saver.add("l_hand_rf", [msg.l_hand_rf.x, msg.l_hand_rf.y, msg.l_hand_rf.z])
-        data_saver.add("r_hand_rf", [msg.r_hand_rf.x, msg.r_hand_rf.y, msg.r_hand_rf.z])
+
+        if len(msg.l_foot_rf) == 0:
+            for i in range(mpc_horizon):
+                data_saver.add(f"l_foot_rf_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"r_foot_rf_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"l_hand_rf_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"r_hand_rf_{i}", [0.0, 0.0, 0.0])
+        else:
+            for i in range(len(msg.l_foot_rf)):
+                data_saver.add(f"l_foot_rf_{i}", [msg.l_foot_rf[i].x, msg.l_foot_rf[i].y, msg.l_foot_rf[i].z])
+                data_saver.add(f"r_foot_rf_{i}", [msg.r_foot_rf[i].x, msg.r_foot_rf[i].y, msg.r_foot_rf[i].z])
+                data_saver.add(f"l_hand_rf_{i}", [msg.l_hand_rf[i].x, msg.l_hand_rf[i].y, msg.l_hand_rf[i].z])
+                data_saver.add(f"r_hand_rf_{i}", [msg.r_hand_rf[i].x, msg.r_hand_rf[i].y, msg.r_hand_rf[i].z])
 
         for frame_name in viz_des_trajectories.keys():
             pos_msg = getattr(msg, frame_name)
@@ -966,10 +993,10 @@ def process_data_saver(visualize_type):
         data_saver.add("left_knee_frame_costs", list(msg.left_knee_frame_costs))
         data_saver.add("right_knee_frame_costs", list(msg.right_knee_frame_costs))
         data_saver.add("torso_link_frame_costs", list(msg.torso_link_frame_costs))
-        data_saver.add("l_foot_rf", [msg.l_foot_rf.x, msg.l_foot_rf.y, msg.l_foot_rf.z])
-        data_saver.add("r_foot_rf", [msg.r_foot_rf.x, msg.r_foot_rf.y, msg.r_foot_rf.z])
-        data_saver.add("l_hand_rf", [msg.l_hand_rf.x, msg.l_hand_rf.y, msg.l_hand_rf.z])
-        data_saver.add("r_hand_rf", [msg.r_hand_rf.x, msg.r_hand_rf.y, msg.r_hand_rf.z])
+        # data_saver.add("l_foot_rf", [msg.l_foot_rf.x, msg.l_foot_rf.y, msg.l_foot_rf.z])
+        # data_saver.add("r_foot_rf", [msg.r_foot_rf.x, msg.r_foot_rf.y, msg.r_foot_rf.z])
+        # data_saver.add("l_hand_rf", [msg.l_hand_rf.x, msg.l_hand_rf.y, msg.l_hand_rf.z])
+        # data_saver.add("r_hand_rf", [msg.r_hand_rf.x, msg.r_hand_rf.y, msg.r_hand_rf.z])
 
         for frame_name in viz_des_trajectories.keys():
             pos_msg = getattr(msg, frame_name)
