@@ -675,7 +675,9 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         //       << ", Iterations: " << fddp_->get_iter() << "\n";
 
     }
-    
+    fddp_->get_is_feasible() ? data_out.b_fddp_feasible = true : data_out.b_fddp_feasible = false;
+    data_out.total_iterations = fddp_->get_iter();
+
     xs_out = fddp_->get_xs();
     us_out = fddp_->get_us();
 

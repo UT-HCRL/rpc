@@ -18,7 +18,7 @@ sys.path.append(cwd)
 
 from mcap_protobuf.writer import Writer
 from UI.visualization_toolbox import update_robot_transform, update_2d_transform, update_3d_transform, get_rgba, COLOR_RGBA_MAP, rot_to_quat
-from google.protobuf.wrappers_pb2 import FloatValue
+from google.protobuf.wrappers_pb2 import FloatValue, BoolValue, Int32Value
 from foxglove_schemas_protobuf.Point3_pb2 import Point3
 from foxglove_schemas_protobuf.FrameTransform_pb2 import FrameTransform
 from foxglove_schemas_protobuf.SceneUpdate_pb2 import SceneUpdate
@@ -111,6 +111,7 @@ def main():
 
     time = []
     base_pos, base_ori, joint_positions = [], [], []
+    total_iterations, fddp_feasible = [], []
 
     vis_3d_object_names = [
         "lfoot_pos", 
@@ -210,6 +211,8 @@ def main():
                 base_pos.append(d["est_base_joint_pos"])
                 base_ori.append(d["est_base_joint_ori"])
                 joint_positions.append(d["joint_positions"])
+                total_iterations.append(d["total_iterations"])
+                fddp_feasible.append(d["b_fddp_feasible"][0])
 
                 for oname in vis_3d_object_names:
                     vis_3d_dict[oname].append(d[oname])
@@ -246,6 +249,18 @@ def main():
     # send data to mcap file
     with open(cwd + "/experiment_data/" + robot_name + "_foxglove.mcap", "wb") as f, Writer(f) as mcap_writer:
         for i in range(len(time)):
+            mcap_writer.write_message(
+                "fddp_feasible",
+                BoolValue(value=fddp_feasible[i]),
+                int(time[i] * 1e9),
+                int(time[i] * 1e9),
+            )
+            mcap_writer.write_message(
+                "total_iterations",
+                Int32Value(value=total_iterations[i]),
+                int(time[i] * 1e9),
+                int(time[i] * 1e9),
+            )
             # Update all transforms (to visualize URDF)
             vis_q[0:3] = np.array(base_pos[i])
             vis_q[3:7] = np.array(base_ori[i])  # quaternion [x,y,z,w]

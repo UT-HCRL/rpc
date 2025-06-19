@@ -213,6 +213,10 @@ async def main():
             True, "torso_link_frame_costs", "json", "torso_link_frame_costs", [f"N_{i}" for i in range(mpc_horizon)]
         ).add_chan(server)
 
+        mpc_fddp_feasible = await SceneChannel(
+            True, "fddp_feasible", "json", "fddp_feasible", ["value"]
+        ).add_chan(server)
+
         grfs_chan_id = await SceneChannel(
             True, "GRFs", "json", "normal",
             [
@@ -509,7 +513,17 @@ async def main():
                     }
                 ).encode("utf8"),
             )
-            
+
+            await server.send_message(
+                mpc_fddp_feasible,
+                now,
+                json.dumps(
+                    {
+                        "value": msg.b_fddp_feasible[0],
+                    }
+                ).encode("utf8"),
+            )
+
             for hand, channel in [
                 (msg.right_rubber_hand_des_pos, mpc_right_hand_des_pos),
                 (msg.left_rubber_hand_des_pos, mpc_left_hand_des_pos),
@@ -959,6 +973,9 @@ def process_data_saver(visualize_type):
                 data_saver.add(f"r_foot_rf_{i}", [msg.r_foot_rf[i].x, msg.r_foot_rf[i].y, msg.r_foot_rf[i].z])
                 data_saver.add(f"l_hand_rf_{i}", [msg.l_hand_rf[i].x, msg.l_hand_rf[i].y, msg.l_hand_rf[i].z])
                 data_saver.add(f"r_hand_rf_{i}", [msg.r_hand_rf[i].x, msg.r_hand_rf[i].y, msg.r_hand_rf[i].z])
+
+        data_saver.add("b_fddp_feasible", list(msg.b_fddp_feasible))
+        data_saver.add("total_iterations", msg.total_iterations)
 
         for frame_name in viz_des_trajectories.keys():
             pos_msg = getattr(msg, frame_name)

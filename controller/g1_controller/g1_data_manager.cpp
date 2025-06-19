@@ -227,6 +227,11 @@ void G1DataManager::SendData()
     msg.add_right_foot_contact_costs(data_->right_foot_contact_costs_[i]);
 
   // =============================================================
+  // MPC Feasibility
+  // =============================================================
+  msg.add_b_fddp_feasible(data_->b_fddp_feasible_);
+
+  // =============================================================
   // MPC Desired Poses
   // =============================================================
   g1::Pos torso_des_pos_msg;
