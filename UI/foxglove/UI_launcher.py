@@ -516,7 +516,7 @@ async def main():
                 now,
                 json.dumps(
                     {
-                        "value": msg.b_fddp_feasible[0],
+                        "value": msg.b_fddp_feasible,
                     }
                 ).encode("utf8"),
             )
@@ -946,8 +946,9 @@ def process_data_saver(visualize_type):
         data_saver.add("r_foot_rf", [msg.r_foot_rf.x, msg.r_foot_rf.y, msg.r_foot_rf.z])
         data_saver.add("l_hand_rf", [msg.l_hand_rf.x, msg.l_hand_rf.y, msg.l_hand_rf.z])
         data_saver.add("r_hand_rf", [msg.r_hand_rf.x, msg.r_hand_rf.y, msg.r_hand_rf.z])
-        data_saver.add("b_fddp_feasible", list(msg.b_fddp_feasible))
+        data_saver.add("b_fddp_feasible", msg.b_fddp_feasible)
         data_saver.add("total_iterations", msg.total_iterations)
+        data_saver.add("solve_duration", msg.solve_duration)
 
         for frame_name in viz_des_trajectories.keys():
             pos_msg = getattr(msg, frame_name)

@@ -82,6 +82,7 @@ namespace mpc_utils {
         std::vector<double> left_foot_contact_costs;
         std::vector<double> right_foot_contact_costs;
         bool b_fddp_feasible;
+        float solve_duration;
 
         std::unordered_map<std::string, Eigen::Vector3d> frame_current_pos;
 

@@ -566,12 +566,13 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
     const std::size_t N = fddp_->get_problem()->get_T();
     // static int iteration = 0;
     // static double avg_solve_time_ = 0.0;
+    long solve_duration = 0.;
 
     if(first_iteration){
         std::vector<Eigen::VectorXd> xs(N, x0_);
         std::vector<Eigen::VectorXd> us = problem_->quasiStatic_xs(xs);
         xs.push_back(x0_);
-        
+
         first_iteration = false;
 
         if(cost_mask_[2]) {
@@ -616,13 +617,16 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         // std::cout << "Current torso frame position: " << pinocchio_data_->oMf[model_full_.getFrameId("torso_primitive_shape")].translation().transpose() << std::endl;
         // std::cout << "Current ankle frame position: " << pinocchio_data_->oMf[model_full_.getFrameId("left_ankle_roll_link")].translation().transpose() << std::endl;
         fddp_->setCandidate(xs, us, false);
+        auto start_time = std::chrono::high_resolution_clock::now();
         fddp_->solve(xs, us, max_iter_);
+        auto end_time = std::chrono::high_resolution_clock::now();
+        solve_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
         // auto contact_forces = getEigenForceFromSolver();
         // const auto& f = contact_forces[0]["l_foot_contact"];
         // std::cout << "l_foot contact force — linear: " << f.head<3>().transpose()
         //           << ", angular: " << f.tail<3>().transpose() << std::endl;
-        
+
 
     }else{
 
@@ -632,7 +636,7 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             std::vector<std::string> to_add = {"left_rubber_hand"};
             pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
             pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
-            
+
             // deactivateContacts(to_remove);
             activateContacts(to_add);
         }
@@ -664,7 +668,7 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         fddp_->solve(xs, us, max_iter_);
         getEigenForceFromSolver();
         auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        solve_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         // std::cout << "Solver duration: " << duration << " ms" << std::endl;
         // avg_solve_time_ = (avg_solve_time_ * iteration + duration) / (iteration + 1);
         // iteration++;
@@ -719,7 +723,7 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         // std::cout << "Angular: " << contact_forces[0][contacts.first].tail<3>().transpose() << std::endl;
         data_out.contact_forces[contacts.first] = contact_forces[0][contacts.first].head<3>();
     }
-
+    data_out.solve_duration = solve_duration;
 }
 
 double HumanoidMulticontactTracker::getCostValue(const std::string& cost_name, const int horizon_index) const {

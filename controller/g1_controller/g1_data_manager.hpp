@@ -145,8 +145,9 @@ public:
   std::vector<double> left_foot_contact_costs_;
   std::vector<double> right_foot_contact_costs_;
 
-  // MPC feasible?
+  // MPC solve statistics
   bool b_fddp_feasible_;
+  float solve_duration_;
 
 };
 

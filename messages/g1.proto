@@ -150,7 +150,8 @@ message pnc_msg {
   repeated float lhand_ori = 98;
   repeated float rhand_ori = 99;
 
-  repeated bool b_fddp_feasible = 100;
+  bool b_fddp_feasible = 100;
+  float solve_duration = 101;
 }
 
 message rs_teleop_msg {

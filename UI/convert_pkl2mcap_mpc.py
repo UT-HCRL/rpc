@@ -181,11 +181,18 @@ def main():
         "torso_link_frame_costs",
     ]
 
+    single_value_names = [
+        "b_fddp_feasible",
+        "total_iterations",
+        "solve_duration",
+    ]
+
     vis_3d_dict = {}
     vis_horizon_dict = {}
     vis_des_spheres_dict = {}
     vis_curr_spheres_dict = {}
     vis_arrows_dict = {}
+    single_value_dict = {}
 
     for oname in vis_3d_object_names:
         vis_3d_dict[oname] = []
@@ -202,6 +209,9 @@ def main():
     for oname in arrows_fddp_object_names:
         vis_arrows_dict[oname] = []
 
+    for oname in single_value_names:
+        single_value_dict[oname] = []
+
     # Read and collect all data from pkl file
     with open(cwd + "/experiment_data/debug.pkl", "rb") as f:
         while True:
@@ -211,8 +221,6 @@ def main():
                 base_pos.append(d["est_base_joint_pos"])
                 base_ori.append(d["est_base_joint_ori"])
                 joint_positions.append(d["joint_positions"])
-                total_iterations.append(d["total_iterations"])
-                fddp_feasible.append(d["b_fddp_feasible"][0])
 
                 for oname in vis_3d_object_names:
                     vis_3d_dict[oname].append(d[oname])
@@ -228,6 +236,9 @@ def main():
                 
                 for oname in arrows_fddp_object_names: #fddp arrows
                     vis_arrows_dict[oname].append(d[oname])
+
+                for oname in single_value_names: #fddp arrows
+                    single_value_dict[oname].append(d[oname])
 
             except EOFError:
                 break
@@ -248,18 +259,21 @@ def main():
     # send data to mcap file
     with open(cwd + "/experiment_data/" + robot_name + "_foxglove.mcap", "wb") as f, Writer(f) as mcap_writer:
         for i in range(len(time)):
-            mcap_writer.write_message(
-                "fddp_feasible",
-                BoolValue(value=fddp_feasible[i]),
-                int(time[i] * 1e9),
-                int(time[i] * 1e9),
-            )
-            mcap_writer.write_message(
-                "total_iterations",
-                Int32Value(value=total_iterations[i]),
-                int(time[i] * 1e9),
-                int(time[i] * 1e9),
-            )
+            for oname, ovalue in single_value_dict.items():
+                if isinstance(ovalue[i], bool):
+                    val = BoolValue(value=ovalue[i])
+                elif isinstance(ovalue[i], int):
+                    val = Int32Value(value=ovalue[i])
+                elif isinstance(ovalue[i], float):
+                    val = FloatValue(value=ovalue[i])
+                else:
+                    raise ValueError(f"Unsupported type for {oname}: {type(ovalue[i])}")
+                mcap_writer.write_message(
+                    oname,
+                    val,
+                    int(time[i] * 1e9),
+                    int(time[i] * 1e9),
+                )
             # Update all transforms (to visualize URDF)
             vis_q[0:3] = np.array(base_pos[i])
             vis_q[3:7] = np.array(base_ori[i])  # quaternion [x,y,z,w]
