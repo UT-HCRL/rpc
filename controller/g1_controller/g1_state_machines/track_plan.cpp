@@ -238,10 +238,21 @@ void TrackPlan::Compute() {
       dm->data_->left_foot_contact_costs_ = data_out.left_foot_contact_costs;
       dm->data_->right_foot_contact_costs_ = data_out.right_foot_contact_costs;
 
-      dm->data_->l_foot_rf_ = data_out.contact_forces["l_foot_contact_contact"];
-      dm->data_->r_foot_rf_ = data_out.contact_forces["r_foot_contact_contact"];
-      dm->data_->l_hand_rf_ = data_out.contact_forces["left_rubber_hand_contact"];
-      dm->data_->r_hand_rf_ = data_out.contact_forces["right_rubber_hand_contact"];
+      for (int i = 0; i < g1_mpc_->getNhorizon(); ++i) {
+        dm->data_->l_foot_rf_.resize(g1_mpc_->getNhorizon());
+        dm->data_->r_foot_rf_.resize(g1_mpc_->getNhorizon());
+        dm->data_->l_hand_rf_.resize(g1_mpc_->getNhorizon());
+        dm->data_->r_hand_rf_.resize(g1_mpc_->getNhorizon());
+        dm->data_->l_foot_rf_[i] = data_out.contact_forces["l_foot_contact_contact_" + std::to_string(i)];
+        dm->data_->r_foot_rf_[i] = data_out.contact_forces["r_foot_contact_contact_" + std::to_string(i)];
+        dm->data_->l_hand_rf_[i] = data_out.contact_forces["left_rubber_hand_contact_" + std::to_string(i)];
+        dm->data_->r_hand_rf_[i] = data_out.contact_forces["right_rubber_hand_contact_" + std::to_string(i)];
+      }
+
+      // dm->data_->l_foot_rf_ = data_out.contact_forces["l_foot_contact_contact"];
+      // dm->data_->r_foot_rf_ = data_out.contact_forces["r_foot_contact_contact"];
+      // dm->data_->l_hand_rf_ = data_out.contact_forces["left_rubber_hand_contact"];
+      // dm->data_->r_hand_rf_ = data_out.contact_forces["right_rubber_hand_contact"];
 
       dm->data_->b_fddp_feasible_ = data_out.b_fddp_feasible;
       dm->data_->solve_duration_ = data_out.solve_duration;

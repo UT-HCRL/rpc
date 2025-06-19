@@ -134,10 +134,10 @@ public:
   Eigen::Vector3d com_curr_pos_;
   Eigen::Vector3d com_des_pos_;
   
-  Eigen::Vector3d l_foot_rf_ = Eigen::Vector3d::Zero();
-  Eigen::Vector3d r_foot_rf_ = Eigen::Vector3d::Zero();
-  Eigen::Vector3d l_hand_rf_ = Eigen::Vector3d::Zero();
-  Eigen::Vector3d r_hand_rf_ = Eigen::Vector3d::Zero();
+  std::vector<Eigen::Vector3d> l_foot_rf_ = {Eigen::Vector3d::Zero()};
+  std::vector<Eigen::Vector3d> r_foot_rf_ = {Eigen::Vector3d::Zero()};
+  std::vector<Eigen::Vector3d> l_hand_rf_ = {Eigen::Vector3d::Zero()};
+  std::vector<Eigen::Vector3d> r_hand_rf_ = {Eigen::Vector3d::Zero()};
 
   // MPC Contact Costs:
   std::vector<double> left_hand_contact_costs_;

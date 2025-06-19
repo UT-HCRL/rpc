@@ -717,12 +717,16 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
     }
 
     auto contact_forces = getEigenForceFromSolver();
-    for(const auto& contacts : running_contact_models_[0]->get_contacts()) {
-        // std::cout << "Contact forces for frame: " << contacts.first << std::endl;
-        // std::cout << "Linear: " << contact_forces[0][contacts.first].head<3>().transpose() << std::endl;
-        // std::cout << "Angular: " << contact_forces[0][contacts.first].tail<3>().transpose() << std::endl;
-        data_out.contact_forces[contacts.first] = contact_forces[0][contacts.first].head<3>();
+    for(int i=0; i<N; i++){
+        for(const auto& contacts : running_contact_models_[i]->get_contacts()) {
+            std::string contact_id = contacts.first + "_" + std::to_string(i);
+            data_out.contact_forces[contact_id] = contact_forces[i][contacts.first].head<3>(); // TODO: add terminal also
+        }
     }
+    // for(const auto& contacts : running_contact_models_[0]->get_contacts()) {
+    //     data_out.contact_forces[contacts.first] = contact_forces[0][contacts.first].head<3>();
+    // }
+
     data_out.solve_duration = solve_duration;
 }
 

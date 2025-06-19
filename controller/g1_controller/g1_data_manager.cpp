@@ -283,29 +283,38 @@ void G1DataManager::SendData()
   com_des_pos_msg.set_z(data_->com_des_pos_(2));
   msg.mutable_com_des_pos()->CopyFrom(com_des_pos_msg);
 
-  g1::Pos l_foot_rf_msg;
-  l_foot_rf_msg.set_x(data_->l_foot_rf_(0));
-  l_foot_rf_msg.set_y(data_->l_foot_rf_(1));
-  l_foot_rf_msg.set_z(data_->l_foot_rf_(2));
-  msg.mutable_l_foot_rf()->CopyFrom(l_foot_rf_msg);
+  for (int i(0); i < data_->right_foot_contact_costs_.size(); i++){
+    g1::Pos l_foot_rf_msg;
+    l_foot_rf_msg.set_x(data_->l_foot_rf_[i](0));
+    l_foot_rf_msg.set_y(data_->l_foot_rf_[i](1));
+    l_foot_rf_msg.set_z(data_->l_foot_rf_[i](2));
+    msg.add_l_foot_rf()->CopyFrom(l_foot_rf_msg);
+  }
 
-  g1::Pos r_foot_rf_msg;
-  r_foot_rf_msg.set_x(data_->r_foot_rf_(0));
-  r_foot_rf_msg.set_y(data_->r_foot_rf_(1));
-  r_foot_rf_msg.set_z(data_->r_foot_rf_(2));
-  msg.mutable_r_foot_rf()->CopyFrom(r_foot_rf_msg);
+  for (int i(0); i < data_->left_foot_contact_costs_.size(); i++){
+    g1::Pos r_foot_rf_msg;
+    r_foot_rf_msg.set_x(data_->r_foot_rf_[i](0));
+    r_foot_rf_msg.set_y(data_->r_foot_rf_[i](1));
+    r_foot_rf_msg.set_z(data_->r_foot_rf_[i](2));
+    msg.add_r_foot_rf()->CopyFrom(r_foot_rf_msg);
+  }
+  
+  for (int i(0); i < data_->left_hand_contact_costs_.size(); i++){
+    g1::Pos l_hand_rf_msg;
+    l_hand_rf_msg.set_x(data_->l_hand_rf_[i](0));
+    l_hand_rf_msg.set_y(data_->l_hand_rf_[i](1));
+    l_hand_rf_msg.set_z(data_->l_hand_rf_[i](2));
+    msg.add_l_hand_rf()->CopyFrom(l_hand_rf_msg);
+  }
 
-  g1::Pos l_hand_rf_msg;
-  l_hand_rf_msg.set_x(data_->l_hand_rf_(0));
-  l_hand_rf_msg.set_y(data_->l_hand_rf_(1));
-  l_hand_rf_msg.set_z(data_->l_hand_rf_(2));
-  msg.mutable_l_hand_rf()->CopyFrom(l_hand_rf_msg);
+  for (int i(0); i < data_->right_hand_contact_costs_.size(); i++){
+    g1::Pos r_hand_rf_msg;
+    r_hand_rf_msg.set_x(data_->r_hand_rf_[i](0));
+    r_hand_rf_msg.set_y(data_->r_hand_rf_[i](1));
+    r_hand_rf_msg.set_z(data_->r_hand_rf_[i](2));
+    msg.add_r_hand_rf()->CopyFrom(r_hand_rf_msg);
+  }
 
-  g1::Pos r_hand_rf_msg;
-  r_hand_rf_msg.set_x(data_->r_hand_rf_(0));
-  r_hand_rf_msg.set_y(data_->r_hand_rf_(1));
-  r_hand_rf_msg.set_z(data_->r_hand_rf_(2));
-  msg.mutable_r_hand_rf()->CopyFrom(r_hand_rf_msg);
   // =============================================================
 
   // =============================================================

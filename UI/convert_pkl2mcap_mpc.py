@@ -55,7 +55,7 @@ def create_arrow_scene(scene_frame_id, force_x, force_y, force_z, rgba, arrow_se
     arrow_model.color.r = rgba[0]
     arrow_model.color.g = rgba[1] 
     arrow_model.color.b = rgba[2]
-    arrow_model.color.a = 1.0
+    arrow_model.color.a = rgba[3]
     
     force_dir = np.array([force_x, force_y, force_z])
     
@@ -133,13 +133,9 @@ def main():
         "right_knee_curr_pos",
         "left_rubber_hand_curr_pos",
         "right_rubber_hand_curr_pos",
-        "torso_curr_pos",
-        "l_foot_rf", 
-        "r_foot_rf", 
-        "l_hand_rf", 
-        "r_hand_rf"
+        "torso_curr_pos"
     ]
-    
+
     arrows_fddp_object_names = [
         "l_foot_rf",
         "r_foot_rf",
@@ -181,6 +177,8 @@ def main():
         "torso_link_frame_costs",
     ]
 
+    mpc_horizon = 4
+
     single_value_names = [
         "b_fddp_feasible",
         "total_iterations",
@@ -207,7 +205,9 @@ def main():
         vis_curr_spheres_dict[oname] = []
     
     for oname in arrows_fddp_object_names:
-        vis_arrows_dict[oname] = []
+        for i in range(mpc_horizon):
+            vis_arrows_dict[f"{oname}_{i}"] = []
+            print(f"Debugging vis_arrows_dict[{oname}_{i}]: {vis_arrows_dict[f'{oname}_{i}']}")
 
     for oname in single_value_names:
         single_value_dict[oname] = []
@@ -235,9 +235,10 @@ def main():
                     vis_curr_spheres_dict[oname].append(d[oname])
                 
                 for oname in arrows_fddp_object_names: #fddp arrows
-                    vis_arrows_dict[oname].append(d[oname])
+                    for i in range(mpc_horizon):
+                        vis_arrows_dict[f"{oname}_{i}"].append(d[f"{oname}_{i}"])
 
-                for oname in single_value_names: #fddp arrows
+                for oname in single_value_names: #fddp solve statistics
                     single_value_dict[oname].append(d[oname])
 
             except EOFError:
@@ -319,6 +320,14 @@ def main():
                     int(time[i] * 1e9),
                 )
 
+            for vname, vval in vis_arrows_dict.items():
+                mcap_writer.write_message(
+                    vname,
+                    Point3(x=vval[i][0], y=vval[i][1], z=vval[i][2]),
+                    int(time[i] * 1e9),
+                    int(time[i] * 1e9),
+                )
+
             for cname, cval in vis_horizon_dict.items():
                 for knot_index, knot_value in enumerate(cval[i]):
                     name = f"{cname}_N_{knot_index}"
@@ -352,11 +361,7 @@ def main():
                 )
 
             for arrow_name in arrows_fddp_object_names:
-                force_data = vis_arrows_dict[arrow_name][i]
-                
-                transform.parent_frame_id = "world"
-                transform.child_frame_id = arrow_name
-                
+
                 if arrow_name == "l_foot_rf":
                     pos_data = vis_3d_dict["lfoot_pos"][i]
                     ori_data = vis_3d_dict["lfoot_ori"][i]
@@ -368,37 +373,52 @@ def main():
                     ori_data = [0, 0, 0, 1]  # Do i need a rot?
                 elif arrow_name == "r_hand_rf":
                     pos_data = vis_3d_dict["rhand_pos"][i]
-                    ori_data = [0, 0, 0, 1]  # Do i need a rot?
+                    ori_data = [0, 0, 0, 1]
                 
-                transform.translation.x = pos_data[0]
-                transform.translation.y = pos_data[1]
-                transform.translation.z = pos_data[2]
-                
-                from scipy.spatial.transform import Rotation as R
-                Ry = R.from_euler("y", -np.pi / 2).as_matrix()
-                q_cmd_arrow = rot_to_quat(Ry)
-                transform.rotation.x = q_cmd_arrow[0]
-                transform.rotation.y = q_cmd_arrow[1]
-                transform.rotation.z = q_cmd_arrow[2]
-                transform.rotation.w = q_cmd_arrow[3]
-                
-                mcap_writer.write_message(
-                    "transforms", transform, int(time[i] * 1e9), int(time[i] * 1e9)
-                )
-                transform.rotation.Clear()
-                transform.translation.Clear()
-                
-                arrow_scene = create_arrow_scene(
-                    arrow_name,
-                    force_data[0],
-                    force_data[1],
-                    force_data[2],
-                    get_rgba("yellow")
-                )
-                arrow_scene.entities[0].timestamp.FromNanoseconds(int(time[i] * 1e9))
-                mcap_writer.write_message(
-                    f"{arrow_name}_arrow_marker", arrow_scene, int(time[i] * 1e9), int(time[i] * 1e9)
-                )
+                for knot_index in range(mpc_horizon):
+
+                    knot_arrow_name = f"{arrow_name}_{knot_index}"
+                    if knot_arrow_name in vis_arrows_dict and len(vis_arrows_dict[knot_arrow_name]) > i:
+                        force_data = vis_arrows_dict[knot_arrow_name][i]
+                        if np.all(np.array(force_data) == 0.0):
+                            continue
+                        # print(f"Debugging force_data for {knot_arrow_name} at index {i}: {force_data}")
+                    else:
+                        print(f"Warning: {knot_arrow_name} not found or index {i} out of range in vis_arrows_dict.")
+                        continue
+
+                    transform.parent_frame_id = "world"
+                    transform.child_frame_id = knot_arrow_name
+
+                    transform.translation.x = pos_data[0]
+                    transform.translation.y = pos_data[1]
+                    transform.translation.z = pos_data[2]
+
+                    from scipy.spatial.transform import Rotation as R
+                    Ry = R.from_euler("y", -np.pi / 2).as_matrix()
+                    q_cmd_arrow = rot_to_quat(Ry)
+                    transform.rotation.x = q_cmd_arrow[0]
+                    transform.rotation.y = q_cmd_arrow[1]
+                    transform.rotation.z = q_cmd_arrow[2]
+                    transform.rotation.w = q_cmd_arrow[3]
+
+                    mcap_writer.write_message(
+                        "transforms", transform, int(time[i] * 1e9), int(time[i] * 1e9)
+                    )
+                    transform.rotation.Clear()
+                    transform.translation.Clear()
+
+                    arrow_scene = create_arrow_scene(
+                        knot_arrow_name,
+                        force_data[0],
+                        force_data[1],
+                        force_data[2],
+                        get_rgba("s_blue" if knot_index == 0 else "blue")
+                    )
+                    arrow_scene.entities[0].timestamp.FromNanoseconds(int(time[i] * 1e9))
+                    mcap_writer.write_message(
+                        f"{knot_arrow_name}_arrow_marker", arrow_scene, int(time[i] * 1e9), int(time[i] * 1e9)
+                    )
 
         mcap_writer.finish()
 
