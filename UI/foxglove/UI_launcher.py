@@ -960,10 +960,6 @@ def process_data_saver(visualize_type):
         data_saver.add("left_knee_frame_costs", list(msg.left_knee_frame_costs))
         data_saver.add("right_knee_frame_costs", list(msg.right_knee_frame_costs))
         data_saver.add("torso_link_frame_costs", list(msg.torso_link_frame_costs))
-        data_saver.add("l_foot_rf", [msg.l_foot_rf.x, msg.l_foot_rf.y, msg.l_foot_rf.z])
-        data_saver.add("r_foot_rf", [msg.r_foot_rf.x, msg.r_foot_rf.y, msg.r_foot_rf.z])
-        data_saver.add("l_hand_rf", [msg.l_hand_rf.x, msg.l_hand_rf.y, msg.l_hand_rf.z])
-        data_saver.add("r_hand_rf", [msg.r_hand_rf.x, msg.r_hand_rf.y, msg.r_hand_rf.z])
 
         if len(msg.l_foot_rf) == 0:
             for i in range(mpc_horizon):
@@ -978,7 +974,7 @@ def process_data_saver(visualize_type):
                 data_saver.add(f"l_hand_rf_{i}", [msg.l_hand_rf[i].x, msg.l_hand_rf[i].y, msg.l_hand_rf[i].z])
                 data_saver.add(f"r_hand_rf_{i}", [msg.r_hand_rf[i].x, msg.r_hand_rf[i].y, msg.r_hand_rf[i].z])
 
-        data_saver.add("b_fddp_feasible", list(msg.b_fddp_feasible))
+        data_saver.add("b_fddp_feasible", msg.b_fddp_feasible)
         data_saver.add("total_iterations", msg.total_iterations)
         data_saver.add("solve_duration", msg.solve_duration)
 

@@ -38,7 +38,7 @@ def create_sphere_scene(scene_frame_id, rgba, sized=0.03):
     sphere_model.size.z = sized
     return sphere_scene
 
-def create_arrow_scene(scene_frame_id, force_x, force_y, force_z, rgba, arrow_settings = [0.3, 0.1, 0.8], scaling = 1200.0):
+def create_arrow_scene(scene_frame_id, force_x, force_y, force_z, rgba, arrow_settings = [0.03, 0.1, 0.08], scaling = 1200.0):
     """
     Create an arrow scene for MCAP based on raw force components
     
