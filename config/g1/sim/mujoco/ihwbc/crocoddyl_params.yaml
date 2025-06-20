@@ -102,6 +102,10 @@ tracking_frames:
   - left_rubber_hand
   - right_rubber_hand
 
+friction:
+  w: 10000.0
+  mu: 0.5
+
 running_costs:
   xReg:
     w: 0.0001

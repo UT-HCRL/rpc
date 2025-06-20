@@ -98,7 +98,8 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
     terminal_contact_models_ = std::make_shared<crocoddyl::ContactModelMultiple>(state_, actuation_->get_nu());
 
     //### Default class member init ###
-    mu_ = 0.7;
+    util::ReadParameter(params_["friction"], "w", friction_weight_);
+    util::ReadParameter(params_["friction"], "mu", mu_);
 
     RH_rotation_ = Eigen::AngleAxisd(-M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
     LH_rotation_ = Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
