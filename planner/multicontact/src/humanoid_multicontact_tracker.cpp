@@ -178,7 +178,7 @@ void HumanoidMulticontactTracker::loadRegularizationWeights() {
     for (int i = 0; i < 3; ++i) xreg_weights_(i) = pow(base_pos_weights[i],2);
     for (int i = 0; i < 3; ++i) xreg_weights_(3 + i) = pow(base_rot_weights[i],2);
     for (int i = 6; i < nv; ++i) xreg_weights_(i) = pow(joint_pos_weights,2);
-    for (int i = 6; i < nv; ++i) xreg_weights_(nv + i) = pow(joint_vel_weights,2);      // ignore floating base vel
+    for (int i = 0; i < nv; ++i) xreg_weights_(nv + i) = pow(joint_vel_weights,2);      // ignore floating base vel
     mpc_utils::normalize_weights(xreg_weights_, N_horizon_);
 
     util::ReadParameter(params_["running_costs"]["uReg"], "w", ureg_weight_);
@@ -194,7 +194,7 @@ void HumanoidMulticontactTracker::loadRegularizationWeights() {
     for (int i = 0; i < 3; ++i) terminal_xreg_weights_(i) = pow(base_pos_weights[i],2);
     for (int i = 0; i < 3; ++i) terminal_xreg_weights_(3 + i) = pow(base_rot_weights[i],2);
     for (int i = 6; i < nv; ++i) terminal_xreg_weights_(i) = pow(joint_pos_weights,2);
-    for (int i = 6; i < nv; ++i) terminal_xreg_weights_(nv + i) = pow(joint_vel_weights,2);     // ignore floating base vel
+    for (int i = 0; i < nv; ++i) terminal_xreg_weights_(nv + i) = pow(joint_vel_weights,2);     // ignore floating base vel
 
     util::ReadParameter(params_["terminal_costs"]["uReg"], "w", terminal_ureg_weight_);
 
@@ -732,6 +732,19 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
     // for(const auto& contacts : running_contact_models_[0]->get_contacts()) {
     //     data_out.contact_forces[contacts.first] = contact_forces[0][contacts.first].head<3>();
     // }
+
+    // save predicted end effector positions
+    for (int i = 0; i < N; ++i) {
+        for (const auto& frame_name : track_frame_names_) {
+            auto q_current = xs_out[i].head(state_->get_nq());
+            pinocchio::forwardKinematics(model_full_, *pinocchio_data_, q_current);
+            pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
+
+            pinocchio::SE3 frame_pose = pinocchio_data_->oMf[model_full_.getFrameId(frame_name)];
+            std::string frame_id = frame_name + "_" + std::to_string(i);
+            data_out.predicted_frame_positions[frame_id] = frame_pose.translation();
+        }
+    }
 
     data_out.solve_duration = solve_duration;
 }

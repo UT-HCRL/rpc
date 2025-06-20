@@ -247,6 +247,21 @@ void TrackPlan::Compute() {
         dm->data_->r_foot_rf_[i] = data_out.contact_forces["r_foot_contact_contact_" + std::to_string(i)];
         dm->data_->l_hand_rf_[i] = data_out.contact_forces["left_rubber_hand_contact_" + std::to_string(i)];
         dm->data_->r_hand_rf_[i] = data_out.contact_forces["right_rubber_hand_contact_" + std::to_string(i)];
+        // predicted frame positions
+        dm->data_->predicted_torso_pos_.resize(g1_mpc_->getNhorizon());
+        // dm->data_->predicted_left_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
+        // dm->data_->predicted_right_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
+        // dm->data_->predicted_left_knee_pos_.resize(g1_mpc_->getNhorizon());
+        // dm->data_->predicted_right_knee_pos_.resize(g1_mpc_->getNhorizon());
+        dm->data_->predicted_left_rubber_pos_.resize(g1_mpc_->getNhorizon());
+        dm->data_->predicted_right_rubber_pos_.resize(g1_mpc_->getNhorizon());
+        dm->data_->predicted_torso_pos_[i] = data_out.predicted_frame_positions["torso_primitive_shape_" + std::to_string(i)];
+        // dm->data_->predicted_left_ankle_roll_pos_[i] = data_out.predicted_frame_positions["left_ankle_roll_link_" + std::to_string(i)];
+        // dm->data_->predicted_right_ankle_roll_pos_[i] = data_out.predicted_frame_positions["right_ankle_roll_link_" + std::to_string(i)];
+        // dm->data_->predicted_left_knee_pos_[i] = data_out.predicted_frame_positions["left_knee_link_" + std::to_string(i)];
+        // dm->data_->predicted_right_knee_pos_[i] = data_out.predicted_frame_positions["right_knee_link_" + std::to_string(i)];
+        dm->data_->predicted_left_rubber_pos_[i] = data_out.predicted_frame_positions["left_rubber_hand_" + std::to_string(i)];
+        dm->data_->predicted_right_rubber_pos_[i] = data_out.predicted_frame_positions["right_rubber_hand_" + std::to_string(i)];
       }
 
       // dm->data_->l_foot_rf_ = data_out.contact_forces["l_foot_contact_contact"];

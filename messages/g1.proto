@@ -152,6 +152,11 @@ message pnc_msg {
 
   bool b_fddp_feasible = 100;
   float solve_duration = 101;
+
+  repeated Pos predicted_torso = 102;
+  repeated Pos predicted_lhand = 103;
+  repeated Pos predicted_rhand = 104;
+
 }
 
 message rs_teleop_msg {

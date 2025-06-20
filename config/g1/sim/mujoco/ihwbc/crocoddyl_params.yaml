@@ -172,7 +172,7 @@ terminal_costs:
     w: 3000.0
   tracking_frames:
     torso_primitive_shape:
-      pos: 100.0
+      pos: 1000.0
       rot: 0.0
     left_ankle_roll_link:
       pos: 10.0

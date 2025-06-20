@@ -956,6 +956,21 @@ def process_data_saver(visualize_type):
                 data_saver.add(f"l_hand_rf_{i}", [msg.l_hand_rf[i].x, msg.l_hand_rf[i].y, msg.l_hand_rf[i].z])
                 data_saver.add(f"r_hand_rf_{i}", [msg.r_hand_rf[i].x, msg.r_hand_rf[i].y, msg.r_hand_rf[i].z])
 
+        if len(msg.predicted_torso) == 0:
+            for i in range(mpc_horizon):
+                data_saver.add(f"predicted_torso_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"predicted_lhand_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"predicted_rhand_{i}", [0.0, 0.0, 0.0])
+        else:
+            for i in range(len(msg.predicted_torso)):
+                data_saver.add(f"predicted_torso_{i}", [msg.predicted_torso[i].x, msg.predicted_torso[i].y, msg.predicted_torso[i].z])
+            #     data_saver.add(f"predicted_lankle_{i}", [msg.predicted_lankle[i].x, msg.predicted_lankle[i].y, msg.predicted_lankle[i].z])
+            #     data_saver.add(f"predicted_rankle_{i}", [msg.predicted_rankle[i].x, msg.predicted_rankle[i].y, msg.predicted_rankle[i].z])
+            #     data_saver.add(f"predicted_lknee_{i}", [msg.predicted_lknee[i].x, msg.predicted_lknee[i].y, msg.predicted_lknee[i].z])
+            #     data_saver.add(f"predicted_rknee_{i}", [msg.predicted_rknee[i].x, msg.predicted_rknee[i].y, msg.predicted_rknee[i].z])
+                data_saver.add(f"predicted_lhand_{i}", [msg.predicted_lhand[i].x, msg.predicted_lhand[i].y, msg.predicted_lhand[i].z])
+                data_saver.add(f"predicted_rhand_{i}", [msg.predicted_rhand[i].x, msg.predicted_rhand[i].y, msg.predicted_rhand[i].z])
+
         data_saver.add("b_fddp_feasible", msg.b_fddp_feasible)
         data_saver.add("total_iterations", msg.total_iterations)
         data_saver.add("solve_duration", msg.solve_duration)

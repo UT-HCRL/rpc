@@ -184,6 +184,12 @@ def main():
 
     mpc_horizon = 4
 
+    predicted_object_names = [
+        "predicted_torso",
+        "predicted_lhand",
+        "predicted_rhand",
+    ]
+
     single_value_names = [
         "b_fddp_feasible",
         "total_iterations",
@@ -195,6 +201,7 @@ def main():
     vis_des_spheres_dict = {}
     vis_curr_spheres_dict = {}
     vis_arrows_dict = {}
+    predicted_object_dict = {}
     single_value_dict = {}
 
     for oname in vis_3d_object_names:
@@ -213,6 +220,10 @@ def main():
         for i in range(mpc_horizon):
             vis_arrows_dict[f"{oname}_{i}"] = []
             print(f"Debugging vis_arrows_dict[{oname}_{i}]: {vis_arrows_dict[f'{oname}_{i}']}")
+
+    for oname in predicted_object_names:
+        for i in range(mpc_horizon):
+            predicted_object_dict[f"{oname}_{i}"] = []
 
     for oname in single_value_names:
         single_value_dict[oname] = []
@@ -243,6 +254,10 @@ def main():
                     for i in range(mpc_horizon):
                         vis_arrows_dict[f"{oname}_{i}"].append(d[f"{oname}_{i}"])
 
+                for oname in predicted_object_names: #predicted frame positions
+                    for i in range(mpc_horizon):
+                        predicted_object_dict[f"{oname}_{i}"].append(d[f"{oname}_{i}"])
+
                 for oname in single_value_names: #fddp solve statistics
                     single_value_dict[oname].append(d[oname])
 
@@ -259,9 +274,14 @@ def main():
     for frame_id in spheres_des_object_names:
         scenes_dict[frame_id] = create_sphere_scene(frame_id, get_rgba("red"), sized=0.03)
 
-    for frame_id in spheres_curr_object_names:
-        scenes_dict[frame_id] = create_sphere_scene(frame_id, get_rgba("blue"), sized=0.03)
+    # for frame_id in spheres_curr_object_names:
+    #     scenes_dict[frame_id] = create_sphere_scene(frame_id, get_rgba("blue"), sized=0.03)
         
+    for frame_name in predicted_object_names:
+        for i in range(mpc_horizon):
+            alpha = np.maximum(1 - 0.2*i, 0.02)
+            scenes_dict[f"{frame_name}_{i}"] = create_sphere_scene(f"{frame_name}_{i}", [0, 0, 1, alpha], sized=0.03)
+
     # send data to mcap file
     with open(cwd + "/experiment_data/" + robot_name + "_foxglove.mcap", "wb") as f, Writer(f) as mcap_writer:
         for i in range(len(time)):
@@ -350,7 +370,15 @@ def main():
                 )
                 transform.rotation.Clear()
                 transform.translation.Clear()
-            
+
+            for vname, vval in predicted_object_dict.items():
+                update_3d_transform(vname, vval[i], transform)
+                mcap_writer.write_message(
+                    "transforms", transform, int(time[i] * 1e9), int(time[i] * 1e9)
+                )
+                transform.rotation.Clear()
+                transform.translation.Clear()
+
             for vname, vval in vis_curr_spheres_dict.items():
                 update_3d_transform(vname, vval[i], transform)
                 mcap_writer.write_message(

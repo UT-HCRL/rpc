@@ -90,6 +90,7 @@ namespace mpc_utils {
         Eigen::Vector3d com_curr_pos;
 
         std::unordered_map<std::string, Eigen::Vector3d> contact_forces;
+        std::unordered_map<std::string, Eigen::Vector3d> predicted_frame_positions;
 
     };
 

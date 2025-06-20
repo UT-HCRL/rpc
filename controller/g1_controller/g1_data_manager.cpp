@@ -315,6 +315,62 @@ void G1DataManager::SendData()
     msg.add_r_hand_rf()->CopyFrom(r_hand_rf_msg);
   }
 
+  for (int i(0); i < data_->torso_link_frame_costs_.size(); i++){
+    g1::Pos t_predicted_frame_msg;
+    t_predicted_frame_msg.set_x(data_->predicted_torso_pos_[i](0));
+    t_predicted_frame_msg.set_y(data_->predicted_torso_pos_[i](1));
+    t_predicted_frame_msg.set_z(data_->predicted_torso_pos_[i](2));
+    msg.add_predicted_torso()->CopyFrom(t_predicted_frame_msg);
+  }
+
+  // for (int i(0); i < data_->left_ankle_frame_costs_.size(); i++){
+  //   g1::Pos la_predicted_frame_msg;
+  //   la_predicted_frame_msg.set_x(data_->predicted_left_ankle_roll_pos_[i](0));
+  //   la_predicted_frame_msg.set_y(data_->predicted_left_ankle_roll_pos_[i](1));
+  //   la_predicted_frame_msg.set_z(data_->predicted_left_ankle_roll_pos_[i](2));
+  //   msg.add_predicted_lankle()->CopyFrom(la_predicted_frame_msg);
+  // }
+  //
+  // for (int i(0); i < data_->right_ankle_frame_costs_.size(); i++){
+  //   g1::Pos ra_predicted_frame_msg;
+  //   ra_predicted_frame_msg.set_x(data_->predicted_right_ankle_roll_pos_[i](0));
+  //   ra_predicted_frame_msg.set_y(data_->predicted_right_ankle_roll_pos_[i](1));
+  //   ra_predicted_frame_msg.set_z(data_->predicted_right_ankle_roll_pos_[i](2));
+  //   msg.add_predicted_rankle()->CopyFrom(ra_predicted_frame_msg);
+  // }
+  //
+  // for (int i(0); i < data_->left_knee_frame_costs_.size(); i++){
+  //   g1::Pos lk_predicted_frame_msg;
+  //   lk_predicted_frame_msg.set_x(data_->predicted_left_knee_pos_[i](0));
+  //   lk_predicted_frame_msg.set_y(data_->predicted_left_knee_pos_[i](1));
+  //   lk_predicted_frame_msg.set_z(data_->predicted_left_knee_pos_[i](2));
+  //   msg.add_predicted_lknee()->CopyFrom(lk_predicted_frame_msg);
+  // }
+  //
+  // for (int i(0); i < data_->right_knee_frame_costs_.size(); i++){
+  //   g1::Pos rk_predicted_frame_msg;
+  //   rk_predicted_frame_msg.set_x(data_->predicted_right_knee_pos_[i](0));
+  //   rk_predicted_frame_msg.set_y(data_->predicted_right_knee_pos_[i](1));
+  //   rk_predicted_frame_msg.set_z(data_->predicted_right_knee_pos_[i](2));
+  //   msg.add_predicted_rknee()->CopyFrom(rk_predicted_frame_msg);
+  // }
+
+  for (int i(0); i < data_->left_hand_frame_costs_.size(); i++){
+    g1::Pos lh_predicted_frame_msg;
+    lh_predicted_frame_msg.set_x(data_->predicted_left_rubber_pos_[i](0));
+    lh_predicted_frame_msg.set_y(data_->predicted_left_rubber_pos_[i](1));
+    lh_predicted_frame_msg.set_z(data_->predicted_left_rubber_pos_[i](2));
+    msg.add_predicted_lhand()->CopyFrom(lh_predicted_frame_msg);
+  }
+
+  for (int i(0); i < data_->right_hand_frame_costs_.size(); i++){
+    g1::Pos rh_predicted_frame_msg;
+    rh_predicted_frame_msg.set_x(data_->predicted_right_rubber_pos_[i](0));
+    rh_predicted_frame_msg.set_y(data_->predicted_right_rubber_pos_[i](1));
+    rh_predicted_frame_msg.set_z(data_->predicted_right_rubber_pos_[i](2));
+    msg.add_predicted_rhand()->CopyFrom(rh_predicted_frame_msg);
+  }
+
   // =============================================================
 
   // =============================================================
