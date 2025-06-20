@@ -108,12 +108,12 @@ friction:
 
 running_costs:
   xReg:
-    w: 0.0001
+    w: 0.1
     state_w:
       base_pos: [0.0, 0.0, 0.0]
-      base_rot: [0.0, 0.0, 0.0]
+      base_rot: [0.0, 10.0, 0.0]
       joint_pos: 0.0
-      joint_vel: 100.0
+      joint_vel: 10.0
   uReg:
     w: 0.02
   xBound:
@@ -122,7 +122,7 @@ running_costs:
     w: 10000.0
   tracking_frames:
     torso_primitive_shape: 
-      pos: 1000.0
+      pos: 10000.0
       rot: 0.0
     left_ankle_roll_link: 
       pos: 0.0
@@ -158,10 +158,10 @@ running_costs:
 
 terminal_costs:
   xReg:
-    w: 0.01
+    w: 0.05
     state_w:
       base_pos: [0.0, 0.0, 0.0]
-      base_rot: [0.0, 0.0, 0.0]
+      base_rot: [0.0, 10.0, 0.0]
       joint_pos: 0.0
       joint_vel: 20.0
   uReg:
@@ -196,4 +196,4 @@ terminal_costs:
 mpc:
   dt: 0.025
   horizon: 4
-  max_iter: 3
+  max_iter: 20

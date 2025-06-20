@@ -103,7 +103,7 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
 
     RH_rotation_ = Eigen::AngleAxisd(-M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
     LH_rotation_ = Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
-    cost_weights_ = cost_weights;
+    cost_weights_ = cost_weights;       // TODO get from config file? (currently unused)
     x0_ = Eigen::VectorXd::Zero(state_->get_nx());
     //#################################
 
@@ -174,11 +174,11 @@ void HumanoidMulticontactTracker::loadRegularizationWeights() {
     util::ReadParameter(params_["running_costs"]["xReg"]["state_w"], "joint_vel", joint_vel_weights);
     mpc_utils::normalize_weights(xreg_weight_, N_horizon_);
 
-    xreg_weights_ = Eigen::VectorXd::Ones(2 * state_->get_nv());
+    xreg_weights_ = Eigen::VectorXd::Zero(2 * state_->get_nv());
     for (int i = 0; i < 3; ++i) xreg_weights_(i) = pow(base_pos_weights[i],2);
     for (int i = 0; i < 3; ++i) xreg_weights_(3 + i) = pow(base_rot_weights[i],2);
     for (int i = 6; i < nv; ++i) xreg_weights_(i) = pow(joint_pos_weights,2);
-    for (int i = 0; i < nv; ++i) xreg_weights_(nv + i) = pow(joint_vel_weights,2);
+    for (int i = 6; i < nv; ++i) xreg_weights_(nv + i) = pow(joint_vel_weights,2);      // ignore floating base vel
     mpc_utils::normalize_weights(xreg_weights_, N_horizon_);
 
     util::ReadParameter(params_["running_costs"]["uReg"], "w", ureg_weight_);
@@ -190,11 +190,11 @@ void HumanoidMulticontactTracker::loadRegularizationWeights() {
     util::ReadParameter(params_["terminal_costs"]["xReg"]["state_w"], "joint_pos", joint_pos_weights);
     util::ReadParameter(params_["terminal_costs"]["xReg"]["state_w"], "joint_vel", joint_vel_weights);
 
-    terminal_xreg_weights_ = Eigen::VectorXd::Ones(2 * state_->get_nv());
+    terminal_xreg_weights_ = Eigen::VectorXd::Zero(2 * state_->get_nv());
     for (int i = 0; i < 3; ++i) terminal_xreg_weights_(i) = pow(base_pos_weights[i],2);
     for (int i = 0; i < 3; ++i) terminal_xreg_weights_(3 + i) = pow(base_rot_weights[i],2);
     for (int i = 6; i < nv; ++i) terminal_xreg_weights_(i) = pow(joint_pos_weights,2);
-    for (int i = 0; i < nv; ++i) terminal_xreg_weights_(nv + i) = pow(joint_vel_weights,2);
+    for (int i = 6; i < nv; ++i) terminal_xreg_weights_(nv + i) = pow(joint_vel_weights,2);     // ignore floating base vel
 
     util::ReadParameter(params_["terminal_costs"]["uReg"], "w", terminal_ureg_weight_);
 
@@ -425,8 +425,7 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
         std::shared_ptr<crocoddyl::ActivationModelAbstract> surf_activation_friction = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(bounds);
         std::shared_ptr<crocoddyl::ResidualModelAbstract> surf_residual = std::make_shared<crocoddyl::ResidualModelContactFrictionCone>(state_, model_full_.getFrameId(frame_name), surf_cone, actuation_->get_nu());
         std::shared_ptr<crocoddyl::CostModelAbstract> surf_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, surf_activation_friction, surf_residual);
-        cost_model->addCost(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_friction_cone", surf_cost, 1e4);
-
+        cost_model->addCost(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_friction_cone", surf_cost, friction_weight_);
     }
 
 }
@@ -570,6 +569,7 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
     long solve_duration = 0.;
 
     if(first_iteration){
+        fddp_->set_th_stop(1e-3);
         std::vector<Eigen::VectorXd> xs(N, x0_);
         std::vector<Eigen::VectorXd> us = problem_->quasiStatic_xs(xs);
         xs.push_back(x0_);
@@ -633,19 +633,24 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
 
         if (contact_trigger) {
             std::cout << " HERE IS DELETING CONTACT \n";
-            // std::vector<std::string> to_remove = {"l_foot_contact"};
+            std::vector<std::string> to_remove = {"l_foot_contact"};
             std::vector<std::string> to_add = {"left_rubber_hand"};
             pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
             pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
 
-            // deactivateContacts(to_remove);
+            deactivateContacts(to_remove);
             activateContacts(to_add);
+
+            // change initial torque guess at contact with quasi-static solution with new contact states
+            xs_out[0].tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv());
+            std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
+            us_out = problem_->quasiStatic_xs(xs);
         }
 
-        std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
+        // std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
         std::vector<Eigen::VectorXd> us = us_out;
-        xs.push_back(xs_out[0]);
-        problem_->set_x0(xs[0]);
+        // xs.push_back(xs_out[0]);
+        problem_->set_x0(xs_out[0]);
 
         if(cost_mask_[2]) {
             for(size_t i = 0; i < N + 1; i++){
@@ -664,9 +669,9 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             }
         }
 
-        fddp_->setCandidate(xs, us, true);
+        fddp_->setCandidate(xs_out, us, true);
         auto start_time = std::chrono::high_resolution_clock::now();
-        fddp_->solve(xs, us, max_iter_);
+        fddp_->solve(xs_out, us, max_iter_);
         getEigenForceFromSolver();
         auto end_time = std::chrono::high_resolution_clock::now();
         solve_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
