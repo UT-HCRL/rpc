@@ -58,3 +58,6 @@ protobuf/*
 #CMake related
 CMakeCache.txt
 CMakeFiles/*
+
+# Recorded data
+*.mcap
