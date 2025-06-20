@@ -126,6 +126,33 @@ void G1DataManager::SendData()
   }
 
   // =============================================================
+  // Sensor Data
+  // =============================================================
+  g1::Pos lf_contact_force_msg;
+  lf_contact_force_msg.set_x(data_->lf_contact_force_(0));
+  lf_contact_force_msg.set_y(data_->lf_contact_force_(1));
+  lf_contact_force_msg.set_z(data_->lf_contact_force_(2));
+  msg.mutable_lf_contact_force()->CopyFrom(lf_contact_force_msg);
+
+  g1::Pos rf_contact_force_msg;
+  rf_contact_force_msg.set_x(data_->rf_contact_force_(0));
+  rf_contact_force_msg.set_y(data_->rf_contact_force_(1));
+  rf_contact_force_msg.set_z(data_->rf_contact_force_(2));
+  msg.mutable_rf_contact_force()->CopyFrom(rf_contact_force_msg);
+
+  g1::Pos lh_contact_force_msg;
+  lh_contact_force_msg.set_x(data_->lh_contact_force_(0));
+  lh_contact_force_msg.set_y(data_->lh_contact_force_(1));
+  lh_contact_force_msg.set_z(data_->lh_contact_force_(2));
+  msg.mutable_lh_contact_force()->CopyFrom(lh_contact_force_msg);
+
+  g1::Pos rh_contact_force_msg;
+  rh_contact_force_msg.set_x(data_->rh_contact_force_(0));
+  rh_contact_force_msg.set_y(data_->rh_contact_force_(1));
+  rh_contact_force_msg.set_z(data_->rh_contact_force_(2));
+  msg.mutable_rh_contact_force()->CopyFrom(rh_contact_force_msg);
+
+  // =============================================================
   // MPC variables
   // =============================================================
   g1::Pos com_msg;

@@ -299,6 +299,12 @@ void G1StateEstimator::UpdateGroundTruthSensorData(
     dm->data_->est_icp = sp_->dcm_.head<2>();
     dm->data_->b_lfoot_ = sp_->b_lf_contact_;
     dm->data_->b_rfoot_ = sp_->b_rf_contact_;
+
+    dm->data_->lf_contact_force_ = sensor_data->lf_contact_force_;
+    dm->data_->rf_contact_force_ = sensor_data->rf_contact_force_;
+    dm->data_->lh_contact_force_ = sensor_data->lh_contact_force_;
+    dm->data_->rh_contact_force_ = sensor_data->rh_contact_force_;
+
   }
 #endif
 #if B_USE_MATLOGGER

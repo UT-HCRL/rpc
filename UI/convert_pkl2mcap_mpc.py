@@ -112,7 +112,7 @@ def main():
     time = []
     base_pos, base_ori, joint_positions = [], [], []
     total_iterations, fddp_feasible = [], []
-
+    
     vis_3d_object_names = [
         "lfoot_pos", 
         "rfoot_pos", 
@@ -133,14 +133,25 @@ def main():
         "right_knee_curr_pos",
         "left_rubber_hand_curr_pos",
         "right_rubber_hand_curr_pos",
-        "torso_curr_pos"
+        "torso_curr_pos",
+        "lf_contact_force",
+        "rf_contact_force",
+        "lh_contact_force",
+        "rh_contact_force"
     ]
 
     arrows_fddp_object_names = [
         "l_foot_rf",
         "r_foot_rf",
         "l_hand_rf",
-        "r_hand_rf",
+        "r_hand_rf"
+    ]
+
+    arrows_sensor_object_names = [
+        "lf_contact_force",
+        "rf_contact_force",
+        "lh_contact_force",
+        "rh_contact_force"
     ]
 
     spheres_des_object_names = [
@@ -184,6 +195,7 @@ def main():
     vis_des_spheres_dict = {}
     vis_curr_spheres_dict = {}
     vis_arrows_dict = {}
+    vis_sensor_arrows_dict = {}
 
     for oname in vis_3d_object_names:
         vis_3d_dict[oname] = []
@@ -201,6 +213,11 @@ def main():
         for i in range(mpc_horizon):
             vis_arrows_dict[f"{oname}_{i}"] = []
             print(f"Debugging vis_arrows_dict[{oname}_{i}]: {vis_arrows_dict[f'{oname}_{i}']}")
+    
+    for oname in arrows_sensor_object_names:
+        vis_sensor_arrows_dict[oname] = []
+    
+    print(f"Debugging vis_sensor_arrows_dict: {vis_sensor_arrows_dict}")
 
     # Read and collect all data from pkl file
     with open(cwd + "/experiment_data/debug.pkl", "rb") as f:
@@ -229,6 +246,9 @@ def main():
                 for oname in arrows_fddp_object_names: #fddp arrows
                     for i in range(mpc_horizon):
                         vis_arrows_dict[f"{oname}_{i}"].append(d[f"{oname}_{i}"])
+                
+                for oname in arrows_sensor_object_names:
+                    vis_sensor_arrows_dict[oname].append(d[oname])
 
             except EOFError:
                 break
@@ -249,12 +269,14 @@ def main():
     # send data to mcap file
     with open(cwd + "/experiment_data/" + robot_name + "_foxglove.mcap", "wb") as f, Writer(f) as mcap_writer:
         for i in range(len(time)):
+
             mcap_writer.write_message(
                 "fddp_feasible",
                 BoolValue(value=fddp_feasible[i]),
                 int(time[i] * 1e9),
                 int(time[i] * 1e9),
             )
+
             mcap_writer.write_message(
                 "total_iterations",
                 Int32Value(value=total_iterations[i]),
@@ -313,6 +335,14 @@ def main():
                     int(time[i] * 1e9),
                     int(time[i] * 1e9),
                 )
+            
+            # for vname, vval in vis_sensor_arrows_dict.items():
+            #     mcap_writer.write_message(
+            #         vname,
+            #         Point3(x=vval[i][0], y=vval[i][1], z=vval[i][2]),
+            #         int(time[i] * 1e9),
+            #         int(time[i] * 1e9),
+            #     )
 
             for cname, cval in vis_horizon_dict.items():
                 for knot_index, knot_value in enumerate(cval[i]):
@@ -405,6 +435,49 @@ def main():
                     mcap_writer.write_message(
                         f"{knot_arrow_name}_arrow_marker", arrow_scene, int(time[i] * 1e9), int(time[i] * 1e9)
                     )
+                
+            for arrow_name in arrows_sensor_object_names:
+                if arrow_name == "lf_contact_force":
+                    pos_data = vis_3d_dict["lfoot_pos"][i]
+                    ori_data = vis_3d_dict["lfoot_ori"][i]
+                elif arrow_name == "rf_contact_force":
+                    pos_data = vis_3d_dict["rfoot_pos"][i]
+                    ori_data = vis_3d_dict["rfoot_ori"][i]
+                elif arrow_name == "lh_contact_force":
+                    pos_data = vis_3d_dict["lhand_pos"][i]
+                    ori_data = [0, 0, 0, 1]
+                elif arrow_name == "rh_contact_force":
+                    pos_data = vis_3d_dict["rhand_pos"][i]
+                    ori_data = [0, 0, 0, 1]
+                
+                force_data = vis_sensor_arrows_dict[arrow_name][i]
+                transform.parent_frame_id = "world"
+                transform.child_frame_id = arrow_name
+                transform.translation.x = pos_data[0]
+                transform.translation.y = pos_data[1]
+                transform.translation.z = pos_data[2]
+                transform.rotation.x = 0
+                transform.rotation.y = 0
+                transform.rotation.z = 0
+                transform.rotation.w = 1
+                mcap_writer.write_message(
+                    "transforms", transform, int(time[i] * 1e9), int(time[i] * 1e9)
+                )
+                transform.rotation.Clear()
+                transform.translation.Clear()
+                if np.all(np.array(force_data) == 0.0):
+                    continue
+                arrow_scene = create_arrow_scene(
+                    arrow_name,
+                    force_data[0],
+                    force_data[1],
+                    force_data[2],
+                    get_rgba("s_yellow")
+                )
+                arrow_scene.entities[0].timestamp.FromNanoseconds(int(time[i] * 1e9))
+                mcap_writer.write_message(
+                    f"{arrow_name}_arrow_marker", arrow_scene, int(time[i] * 1e9), int(time[i] * 1e9)
+                )
 
         mcap_writer.finish()
 

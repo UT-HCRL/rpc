@@ -32,8 +32,16 @@ public:
   Eigen::VectorXd joint_vel_;
   bool b_lf_contact_;
   bool b_rf_contact_;
+  bool b_lh_contact_;
+  bool b_rh_contact_;
   float lf_contact_normal_;
   float rf_contact_normal_;
+  float lh_contact_normal_;
+  float rh_contact_normal_;
+  Eigen::Vector3d lf_contact_force_; // in world frame
+  Eigen::Vector3d rf_contact_force_; // in world frame
+  Eigen::Vector3d lh_contact_force_; // in world frame
+  Eigen::Vector3d rh_contact_force_; // in world frame
 
   // Debug or using ground truth state estimator
   Eigen::Vector3d base_joint_pos_;

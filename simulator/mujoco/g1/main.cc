@@ -99,6 +99,11 @@ YAML::Node cfg_;
 std::vector<double> kp_;
 std::vector<double> kd_;
 
+// for contact sensor id <-> string mapping
+std::vector<int> mj_contact_sensor_ids_;
+std::vector<bool> mj_contact_sensor_flags_;
+std::vector<Eigen::Vector3d> mj_contact_sensor_forces_;
+
 using Seconds = std::chrono::duration<double>;
 
 //---------------------------------------- plugin handling
@@ -402,6 +407,37 @@ void SetInitialConfig(mjModel *m, mjData *d,
   // mju_copy(d->qpos, m->key_qpos, m->nq);
 }
 
+void SetContactMap(const mjModel *m,
+                   std::vector<int> &mj_contact_sensor_ids) {
+
+  // set foot contact map
+  mj_contact_sensor_ids_.clear();
+  mj_contact_sensor_ids_.resize(4);
+  std::vector<std::string> body_names;
+  util::ReadParameter(cfg_, "contact_sensor_frames", body_names);
+
+  for (int i = 0; i < 4; ++i) {
+    mj_contact_sensor_ids_[i] = mj_name2id(m, mjOBJ_BODY, body_names[i].c_str());
+    std::cout<<"[Mujoco sim] Attaching contact sensor to body: " << body_names[i] << std::endl;
+  }
+
+  mj_contact_sensor_flags_.clear();
+  mj_contact_sensor_flags_.resize(4, false);
+
+  mj_contact_sensor_forces_.clear();
+  mj_contact_sensor_forces_.resize(4, Eigen::Vector3d::Zero());
+
+}
+
+std::pair<bool, int> CheckContact(int b_id1, int b_id2) {
+  for (size_t i = 0; i < mj_contact_sensor_ids_.size(); ++i) {
+    if (b_id1 == mj_contact_sensor_ids_[i] || b_id2 == mj_contact_sensor_ids_[i]) {
+      return {true, static_cast<int>(i)};
+    }
+  }
+  return {false, -1};
+}
+
 bool CopySensorData() {
   //=================================================
   // joint positions
@@ -498,8 +534,47 @@ bool CopySensorData() {
   // height)
   //==============================================
 
+  // Reset internal contact sensor flags and forces
+  mjtNum force[6];
+  mj_contact_sensor_flags_.clear();
+  mj_contact_sensor_flags_.resize(4, false);
+  mj_contact_sensor_forces_.clear();
+  mj_contact_sensor_forces_.resize(4, Eigen::Vector3d::Zero());
+
+  // Update internal state
+  for(int i = 0; i < d->ncon; i++){
+      mjContact &con = d->contact[i];
+
+      mj_contactForce(m, d, i, force);
+      
+      std::pair<bool, int> sensor_contact_pair = CheckContact(m->geom_bodyid[con.geom[0]], m->geom_bodyid[con.geom[1]]);
+      bool sensor_contact = sensor_contact_pair.first;
+      int b_flags = sensor_contact_pair.second;
+      if (sensor_contact) {
+        mj_contact_sensor_flags_[b_flags] = true;
+        mj_contact_sensor_forces_[b_flags] = Eigen::Vector3d(force[0], force[1], force[2]);
+      }
+  }
+
+  // Copy internal to G1SensorData
+  g1_sensor_data->b_lf_contact_ = mj_contact_sensor_flags_[0];
+  g1_sensor_data->b_rf_contact_ = mj_contact_sensor_flags_[1];
+  g1_sensor_data->b_lh_contact_ = mj_contact_sensor_flags_[2];
+  g1_sensor_data->b_rh_contact_ = mj_contact_sensor_flags_[3];
+  g1_sensor_data->lf_contact_force_ = mj_contact_sensor_forces_[0];
+  g1_sensor_data->rf_contact_force_ = mj_contact_sensor_forces_[1];
+  g1_sensor_data->lh_contact_force_ = mj_contact_sensor_forces_[2];
+  g1_sensor_data->rh_contact_force_ = mj_contact_sensor_forces_[3];
+  // g1_sensor_data->lf_contact_normal_ = mj_contact_sensor_flags_[0] ? mj_contact_sensor_forces_[0].norm() : 0.0;
+  // g1_sensor_data->rf_contact_normal_ = mj_contact_sensor_flags_[1] ? mj_contact_sensor_forces_[1].norm() : 0.0;
+  // g1_sensor_data->lh_contact_normal_ = mj_contact_sensor_flags_[2] ? mj_contact_sensor_forces_[2].norm() : 0.0;
+  // g1_sensor_data->rh_contact_normal_ = mj_contact_sensor_flags_[3] ? mj_contact_sensor_forces_[3].norm() : 0.0;
+
   return true;
+
 }
+
+
 
 void CopyCommand() {
   // joint impednace control law
@@ -787,6 +862,11 @@ void PhysicsThread(mj::Simulate *sim, const char *filename) {
       // Set initial configuration
       //**********************************************
       SetInitialConfig(m, d, mj_qpos_map_);
+      //**********************************************
+
+      // Initialise sensor data
+      //**********************************************
+      SetContactMap(m, mj_contact_sensor_ids_);
       //**********************************************
 
       // lock the sim mutex

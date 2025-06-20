@@ -49,6 +49,8 @@ viz_curr_trajectories = {
     "right_knee_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03])
 }
 
+contact_sensor_forces = ["lf_contact_force", "rf_contact_force", "lh_contact_force", "rh_contact_force"]
+
 def rot_to_quat(rot):
     """
     Parameters
@@ -233,6 +235,19 @@ async def main():
             ]
         ).add_chan(server)
 
+        lf_contact_sensor_id = await SceneChannel(
+            True, "lf_contact_force", "json", "lf_contact_force", ["x", "y", "z"]
+        ).add_chan(server)
+        rf_contact_sensor_id = await SceneChannel(
+            True, "rf_contact_force", "json", "rf_contact_force", ["x", "y", "z"]
+        ).add_chan(server)
+        lh_contact_sensor_id = await SceneChannel(
+            True, "lh_contact_force", "json", "lh_contact_force", ["x", "y", "z"]
+        ).add_chan(server)
+        rh_contact_sensor_id = await SceneChannel(
+            True, "rh_contact_force", "json", "rh_contact_force", ["x", "y", "z"]
+        ).add_chan(server)
+
         normS_chan_id = await SceneChannel(
             False,
             "normal_viz",
@@ -289,6 +304,54 @@ async def main():
             vis_q[0:3] = np.array(base_pos)
             vis_q[3:7] = np.array(base_ori)  # quaternion [x,y,z,w]
             vis_q[7:] = np.array(msg.joint_positions)
+
+            await server.send_message(
+                lf_contact_sensor_id,
+                now,
+                json.dumps(
+                    {
+                        "x": msg.lf_contact_force.x,
+                        "y": msg.lf_contact_force.y,
+                        "z": msg.lf_contact_force.z,
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                rf_contact_sensor_id,
+                now,
+                json.dumps(
+                    {
+                        "x": msg.rf_contact_force.x,
+                        "y": msg.rf_contact_force.y,
+                        "z": msg.rf_contact_force.z,
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                lh_contact_sensor_id,
+                now,
+                json.dumps(
+                    {
+                        "x": msg.lh_contact_force.x,
+                        "y": msg.lh_contact_force.y,
+                        "z": msg.lh_contact_force.z,
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                rh_contact_sensor_id,
+                now,
+                json.dumps(
+                    {
+                        "x": msg.rh_contact_force.x,
+                        "y": msg.rh_contact_force.y,
+                        "z": msg.rh_contact_force.z,
+                    }
+                ).encode("utf8"),
+            )
 
             json_bytes = json.dumps(
                 {
@@ -983,6 +1046,11 @@ def process_data_saver(visualize_type):
         for frame_name in viz_curr_trajectories.keys():
             pos_msg = getattr(msg, frame_name)
             data_saver.add(f"{frame_name}", [pos_msg.x, pos_msg.y, pos_msg.z])
+
+        data_saver.add("lf_contact_force", [msg.lf_contact_force.x, msg.lf_contact_force.y, msg.lf_contact_force.z])
+        data_saver.add("rf_contact_force", [msg.rf_contact_force.x, msg.rf_contact_force.y, msg.rf_contact_force.z])
+        data_saver.add("lh_contact_force" , [msg.lh_contact_force.x, msg.lh_contact_force.y, msg.lh_contact_force.z])
+        data_saver.add("rh_contact_force" , [msg.rh_contact_force.x, msg.rh_contact_force.y, msg.rh_contact_force.z])
 
     elif visualize_type == "none":
         data_saver.add("time", msg.time)
