@@ -16,6 +16,9 @@ from scipy.spatial.transform import Rotation as R
 cwd = os.getcwd()
 sys.path.append(cwd)
 
+from util.python_utils.util import so3_from_vec_to_vec
+
+
 from mcap_protobuf.writer import Writer
 from UI.visualization_toolbox import update_robot_transform, update_2d_transform, update_3d_transform, get_rgba, COLOR_RGBA_MAP, rot_to_quat
 from google.protobuf.wrappers_pb2 import FloatValue, BoolValue, Int32Value
@@ -111,6 +114,7 @@ def main():
 
     time = []
     base_pos, base_ori, joint_positions = [], [], []
+
     total_iterations, fddp_feasible = [], []
     
     vis_3d_object_names = [
@@ -186,9 +190,19 @@ def main():
         "left_knee_frame_costs",
         "right_knee_frame_costs",
         "torso_link_frame_costs",
+        "left_hand_contact_costs",
+        "right_hand_contact_costs",
+        "left_foot_contact_costs",
+        "right_foot_contact_costs",
     ]
 
     mpc_horizon = 4
+
+    single_value_names = [
+        "b_fddp_feasible",
+        "total_iterations",
+        "solve_duration",
+    ]
 
     vis_3d_dict = {}
     vis_horizon_dict = {}
@@ -196,10 +210,11 @@ def main():
     vis_curr_spheres_dict = {}
     vis_arrows_dict = {}
     vis_sensor_arrows_dict = {}
+    single_value_dict = {}
 
     for oname in vis_3d_object_names:
         vis_3d_dict[oname] = []
-    
+
     for oname in vis_horzon_object_names:
         vis_horizon_dict[oname] = []
     
@@ -217,7 +232,10 @@ def main():
     for oname in arrows_sensor_object_names:
         vis_sensor_arrows_dict[oname] = []
     
-    print(f"Debugging vis_sensor_arrows_dict: {vis_sensor_arrows_dict}")
+    # print(f"Debugging vis_sensor_arrows_dict: {vis_sensor_arrows_dict}")
+
+    for oname in single_value_names:
+        single_value_dict[oname] = []
 
     # Read and collect all data from pkl file
     with open(cwd + "/experiment_data/debug.pkl", "rb") as f:
@@ -228,8 +246,6 @@ def main():
                 base_pos.append(d["est_base_joint_pos"])
                 base_ori.append(d["est_base_joint_ori"])
                 joint_positions.append(d["joint_positions"])
-                total_iterations.append(d["total_iterations"])
-                fddp_feasible.append(d["b_fddp_feasible"][0])
 
                 for oname in vis_3d_object_names:
                     vis_3d_dict[oname].append(d[oname])
@@ -250,6 +266,10 @@ def main():
                 for oname in arrows_sensor_object_names:
                     vis_sensor_arrows_dict[oname].append(d[oname])
 
+                for oname in single_value_names: #fddp solve statistics
+                    single_value_dict[oname].append(d[oname])
+
+
             except EOFError:
                 break
 
@@ -269,20 +289,21 @@ def main():
     # send data to mcap file
     with open(cwd + "/experiment_data/" + robot_name + "_foxglove.mcap", "wb") as f, Writer(f) as mcap_writer:
         for i in range(len(time)):
-
-            mcap_writer.write_message(
-                "fddp_feasible",
-                BoolValue(value=fddp_feasible[i]),
-                int(time[i] * 1e9),
-                int(time[i] * 1e9),
-            )
-
-            mcap_writer.write_message(
-                "total_iterations",
-                Int32Value(value=total_iterations[i]),
-                int(time[i] * 1e9),
-                int(time[i] * 1e9),
-            )
+            for oname, ovalue in single_value_dict.items():
+                if isinstance(ovalue[i], bool):
+                    val = BoolValue(value=ovalue[i])
+                elif isinstance(ovalue[i], int):
+                    val = Int32Value(value=ovalue[i])
+                elif isinstance(ovalue[i], float):
+                    val = FloatValue(value=ovalue[i])
+                else:
+                    raise ValueError(f"Unsupported type for {oname}: {type(ovalue[i])}")
+                mcap_writer.write_message(
+                    oname,
+                    val,
+                    int(time[i] * 1e9),
+                    int(time[i] * 1e9),
+                )
             # Update all transforms (to visualize URDF)
             vis_q[0:3] = np.array(base_pos[i])
             vis_q[3:7] = np.array(base_ori[i])  # quaternion [x,y,z,w]
@@ -327,7 +348,7 @@ def main():
                     int(time[i] * 1e9),
                     int(time[i] * 1e9),
                 )
-            
+
             for vname, vval in vis_arrows_dict.items():
                 mcap_writer.write_message(
                     vname,
@@ -389,41 +410,39 @@ def main():
                     ori_data = [0, 0, 0, 1]  # Do i need a rot?
                 elif arrow_name == "r_hand_rf":
                     pos_data = vis_3d_dict["rhand_pos"][i]
-                    ori_data = [0, 0, 0, 1] 
+                    ori_data = [0, 0, 0, 1]
                 
                 for knot_index in range(mpc_horizon):
-                    
+
                     knot_arrow_name = f"{arrow_name}_{knot_index}"
                     if knot_arrow_name in vis_arrows_dict and len(vis_arrows_dict[knot_arrow_name]) > i:
                         force_data = vis_arrows_dict[knot_arrow_name][i]
                         if np.all(np.array(force_data) == 0.0):
                             continue
-                        # print(f"Debugging force_data for {knot_arrow_name} at index {i}: {force_data}")
+                        so3_up_to_ori = so3_from_vec_to_vec(np.array([1, 0, 0]), np.array(force_data))
                     else:
                         print(f"Warning: {knot_arrow_name} not found or index {i} out of range in vis_arrows_dict.")
                         continue
-                    
+
                     transform.parent_frame_id = "world"
                     transform.child_frame_id = knot_arrow_name
-                    
+
                     transform.translation.x = pos_data[0]
                     transform.translation.y = pos_data[1]
                     transform.translation.z = pos_data[2]
-                    
-                    from scipy.spatial.transform import Rotation as R
-                    Ry = R.from_euler("y", -np.pi / 2).as_matrix()
-                    q_cmd_arrow = rot_to_quat(Ry)
+
+                    q_cmd_arrow = rot_to_quat(so3_up_to_ori)
                     transform.rotation.x = q_cmd_arrow[0]
                     transform.rotation.y = q_cmd_arrow[1]
                     transform.rotation.z = q_cmd_arrow[2]
                     transform.rotation.w = q_cmd_arrow[3]
-                    
+
                     mcap_writer.write_message(
                         "transforms", transform, int(time[i] * 1e9), int(time[i] * 1e9)
                     )
                     transform.rotation.Clear()
                     transform.translation.Clear()
-                    
+
                     arrow_scene = create_arrow_scene(
                         knot_arrow_name,
                         force_data[0],

@@ -150,12 +150,14 @@ message pnc_msg {
   repeated float lhand_ori = 98;
   repeated float rhand_ori = 99;
 
-  repeated bool b_fddp_feasible = 100;
+  bool b_fddp_feasible = 100;
+  float solve_duration = 101;
 
-  Pos lf_contact_force = 101;
-  Pos rf_contact_force = 102;
-  Pos lh_contact_force = 103;
-  Pos rh_contact_force = 104;
+  Pos lf_contact_force = 102;
+  Pos rf_contact_force = 103;
+  Pos lh_contact_force = 104;
+  Pos rh_contact_force = 105;
+
 }
 
 message rs_teleop_msg {

@@ -94,3 +94,23 @@ def rot_to_quat(rot):
 
     """
     return np.copy(R.from_matrix(rot).as_quat())
+
+def compute_quat_to_vec(force_data):
+    force_norm = np.linalg.norm(force_data)
+    force_data /= force_norm
+    rot_ang = np.arccos(force_data.dot(np.array([0, 0, 1])))
+    rot_ax = np.cross(force_data, np.array([0, 0, 1]))
+    rot_ax /= np.linalg.norm(rot_ax)
+    ax_hat = np.array(
+        [
+            [0, -rot_ax[2], rot_ax[1]],
+            [rot_ax[2], 0, -rot_ax[0]],
+            [-rot_ax[1], rot_ax[0], 0],
+        ]
+    )
+    R_rot_force = (
+            np.eye(3)
+            + np.sin(rot_ang) * ax_hat
+            + (1 - np.cos(rot_ang)) * ax_hat @ ax_hat
+    )
+    return rot_to_quat(R_rot_force)

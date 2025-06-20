@@ -256,7 +256,8 @@ void G1DataManager::SendData()
   // =============================================================
   // MPC Feasibility
   // =============================================================
-  msg.add_b_fddp_feasible(data_->b_fddp_feasible_);
+  msg.set_b_fddp_feasible(data_->b_fddp_feasible_);
+  msg.set_solve_duration(data_->solve_duration_);
 
   // =============================================================
   // MPC Desired Poses

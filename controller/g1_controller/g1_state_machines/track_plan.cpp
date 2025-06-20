@@ -255,6 +255,7 @@ void TrackPlan::Compute() {
       // dm->data_->r_hand_rf_ = data_out.contact_forces["right_rubber_hand_contact"];
 
       dm->data_->b_fddp_feasible_ = data_out.b_fddp_feasible;
+      dm->data_->solve_duration_ = data_out.solve_duration;
 
       // dm->data_->frame_curr_pose_ = data_out.frame_curr_pose;
     #endif

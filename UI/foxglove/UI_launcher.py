@@ -81,7 +81,7 @@ elif args.visualizer == "foxglove":
 
     # local tools to manage Foxglove scenes
     from plot.foxglove_utils import SceneChannel, ShapeScene
-    from UI.visualization_toolbox import update_robot_transform
+    from UI.visualization_toolbox import update_robot_transform, compute_quat_to_vec
 
     scene_schema = b64encode(
         build_file_descriptor_set(SceneUpdate).SerializeToString()
@@ -139,7 +139,7 @@ async def main():
                     arrows_scene.add_shape(f"{name}_{i}", *shape_params)
                 else:
                     arrows_scene.add_shape(f"{name}_{i}", *shape_ghost_params)
-                
+
         des_traj_scene = ShapeScene()
         for frame_name, (rgba_color, scale) in viz_des_trajectories.items():
             des_traj_scene.add_shape(
@@ -216,7 +216,7 @@ async def main():
         ).add_chan(server)
 
         mpc_fddp_feasible = await SceneChannel(
-            True, "fddp_feasible", "json", "fddp_feasible", ["value"]
+            True, "b_fddp_feasible", "json", "fddp_feasible", ["value"]
         ).add_chan(server)
 
         grfs_chan_id = await SceneChannel(
@@ -582,7 +582,7 @@ async def main():
                 now,
                 json.dumps(
                     {
-                        "value": msg.b_fddp_feasible[0],
+                        "value": msg.b_fddp_feasible,
                     }
                 ).encode("utf8"),
             )
@@ -604,7 +604,7 @@ async def main():
                 )
 
             if hasattr(msg, "l_foot_rf") and hasattr(msg, "r_foot_rf") and hasattr(msg, "l_hand_rf") and hasattr(msg, "r_hand_rf"):
-                
+
                 # for i in range(len(msg.l_foot_rf)):
                 #     print(f"Debug l_foot_rf[{i}]: x={msg.l_foot_rf[i].x}, y={msg.l_foot_rf[i].y}, z={msg.l_foot_rf[i].z}")
 
@@ -674,7 +674,7 @@ async def main():
                     transform.parent_frame_id = "world"
                     transform.timestamp.FromNanoseconds(now)
                     # Child name is passed later as it is dependent on the horizon index, but i don't want to recompute transform each time
-                    
+
                     # Determine the transform based on the object type
                     if obj.startswith("l_foot_rf"):
                         if np.linalg.norm(msg.lfoot_ori) == 0:
@@ -722,32 +722,14 @@ async def main():
 
                     for i in range(len(getattr(msg, obj))):
                         force_dir = np.array([
-                            getattr(msg, obj)[i].x, 
-                            getattr(msg, obj)[i].y, 
+                            getattr(msg, obj)[i].x,
+                            getattr(msg, obj)[i].y,
                             getattr(msg, obj)[i].z
                         ])
 
                         if np.all(force_dir != 0.0):
                             force_norm = np.linalg.norm(force_dir)
-
-                            # compute axis and angle of rotation to align z with force direction
-                            force_dir /= force_norm
-                            rot_ang = np.arccos(force_dir.dot(np.array([0, 0, 1])))
-                            rot_ax = np.cross(force_dir, np.array([0, 0, 1]))
-                            rot_ax /= np.linalg.norm(rot_ax)
-                            ax_hat = np.array(
-                                [
-                                    [0, -rot_ax[2], rot_ax[1]],
-                                    [rot_ax[2], 0, -rot_ax[0]],
-                                    [-rot_ax[1], rot_ax[0], 0],
-                                ]
-                            )
-                            R_rot_force = (
-                                np.eye(3)
-                                + np.sin(rot_ang) * ax_hat
-                                + (1 - np.cos(rot_ang)) * ax_hat @ ax_hat
-                            )
-                            quat_force = rot_to_quat(R_rot_force)
+                            quat_force = compute_quat_to_vec(force_dir)
 
                             force_magnitude = force_norm / 1200.0
                             arrows_scene.scale(f"{obj}_{i}", quat_force, force_magnitude, now)
@@ -1037,8 +1019,9 @@ def process_data_saver(visualize_type):
                 data_saver.add(f"l_hand_rf_{i}", [msg.l_hand_rf[i].x, msg.l_hand_rf[i].y, msg.l_hand_rf[i].z])
                 data_saver.add(f"r_hand_rf_{i}", [msg.r_hand_rf[i].x, msg.r_hand_rf[i].y, msg.r_hand_rf[i].z])
 
-        data_saver.add("b_fddp_feasible", list(msg.b_fddp_feasible))
+        data_saver.add("b_fddp_feasible", msg.b_fddp_feasible)
         data_saver.add("total_iterations", msg.total_iterations)
+        data_saver.add("solve_duration", msg.solve_duration)
 
         for frame_name in viz_des_trajectories.keys():
             pos_msg = getattr(msg, frame_name)

@@ -116,6 +116,7 @@ class HumanoidMulticontactTracker{
         double ureg_weight_;
         double xbound_weight_;
         double com_tracking_weight_;
+        double friction_weight_;
 
         Eigen::VectorXd terminal_xreg_weights_;
         double terminal_xreg_weight_;
