@@ -79,7 +79,7 @@ elif args.visualizer == "foxglove":
 
     # local tools to manage Foxglove scenes
     from plot.foxglove_utils import SceneChannel, ShapeScene
-    from UI.visualization_toolbox import update_robot_transform
+    from UI.visualization_toolbox import update_robot_transform, compute_quat_to_vec
 
     scene_schema = b64encode(
         build_file_descriptor_set(SceneUpdate).SerializeToString()
@@ -666,25 +666,7 @@ async def main():
 
                         if np.all(force_dir != 0.0):
                             force_norm = np.linalg.norm(force_dir)
-
-                            # compute axis and angle of rotation to align z with force direction
-                            force_dir /= force_norm
-                            rot_ang = np.arccos(force_dir.dot(np.array([0, 0, 1])))
-                            rot_ax = np.cross(force_dir, np.array([0, 0, 1]))
-                            rot_ax /= np.linalg.norm(rot_ax)
-                            ax_hat = np.array(
-                                [
-                                    [0, -rot_ax[2], rot_ax[1]],
-                                    [rot_ax[2], 0, -rot_ax[0]],
-                                    [-rot_ax[1], rot_ax[0], 0],
-                                ]
-                            )
-                            R_rot_force = (
-                                np.eye(3)
-                                + np.sin(rot_ang) * ax_hat
-                                + (1 - np.cos(rot_ang)) * ax_hat @ ax_hat
-                            )
-                            quat_force = rot_to_quat(R_rot_force)
+                            quat_force = compute_quat_to_vec(force_dir)
 
                             force_magnitude = force_norm / 1200.0
                             arrows_scene.scale(f"{obj}_{i}", quat_force, force_magnitude, now)

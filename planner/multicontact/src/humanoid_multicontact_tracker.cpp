@@ -376,9 +376,9 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
 
         if(frame_name.find("right_rubber") != std::string::npos){
             // contact_frame_pose.rotation() = Eigen::Matrix3d::Identity();
-            contact_frame_pose.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
-        }else if(frame_name.find("left_rubber") != std::string::npos){
             contact_frame_pose.rotation() = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
+        }else if(frame_name.find("left_rubber") != std::string::npos){
+            contact_frame_pose.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
             // contact_frame_pose.rotation() = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
             // contact_frame_pose.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
             // contact_frame_pose.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
@@ -419,7 +419,7 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
         else{
             rotation = Eigen::Matrix3d::Identity();
         }
-        crocoddyl::FrictionCone surf_cone(rotation, mu_, 4, false);
+        crocoddyl::FrictionCone surf_cone(rotation, mu_, 4, true);
         crocoddyl::ActivationBounds bounds(surf_cone.get_lb(), surf_cone.get_ub());
         std::shared_ptr<crocoddyl::ActivationModelAbstract> surf_activation_friction = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(bounds);
         std::shared_ptr<crocoddyl::ResidualModelAbstract> surf_residual = std::make_shared<crocoddyl::ResidualModelContactFrictionCone>(state_, model_full_.getFrameId(frame_name), surf_cone, actuation_->get_nu());
@@ -899,7 +899,11 @@ std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> const HumanoidMult
         for (const auto& contact_pair : contacts_data) {
             const std::string& name = contact_pair.first;
             const auto& contact = contact_pair.second;
-            contact_forces[name] = mpc_utils::fromPinocchioForce(contact->f);
+            auto joint = state_->get_pinocchio()->frames[contact->frame].parent;
+            // auto oMf = pinocchio_data_->oMi[joint] * contact->jMf;
+            auto fiMo = pinocchio::SE3(contact->pinocchio->oMi[joint].rotation().transpose(), contact->jMf.translation());
+            auto force =  fiMo.actInv(contact->f);
+            contact_forces[name] = mpc_utils::fromPinocchioForce(force);
         }
 
         forces_trajectory.push_back(contact_forces);

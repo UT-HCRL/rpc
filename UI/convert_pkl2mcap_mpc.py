@@ -13,6 +13,8 @@ import numpy as np
 
 from scipy.spatial.transform import Rotation as R
 
+from util.python_utils.util import so3_from_vec_to_vec
+
 cwd = os.getcwd()
 sys.path.append(cwd)
 
@@ -111,7 +113,6 @@ def main():
 
     time = []
     base_pos, base_ori, joint_positions = [], [], []
-    total_iterations, fddp_feasible = [], []
 
     vis_3d_object_names = [
         "lfoot_pos", 
@@ -175,6 +176,10 @@ def main():
         "left_knee_frame_costs",
         "right_knee_frame_costs",
         "torso_link_frame_costs",
+        "left_hand_contact_costs",
+        "right_hand_contact_costs",
+        "left_foot_contact_costs",
+        "right_foot_contact_costs",
     ]
 
     mpc_horizon = 4
@@ -382,7 +387,7 @@ def main():
                         force_data = vis_arrows_dict[knot_arrow_name][i]
                         if np.all(np.array(force_data) == 0.0):
                             continue
-                        # print(f"Debugging force_data for {knot_arrow_name} at index {i}: {force_data}")
+                        so3_up_to_ori = so3_from_vec_to_vec(np.array([1, 0, 0]), np.array(force_data))
                     else:
                         print(f"Warning: {knot_arrow_name} not found or index {i} out of range in vis_arrows_dict.")
                         continue
@@ -394,9 +399,7 @@ def main():
                     transform.translation.y = pos_data[1]
                     transform.translation.z = pos_data[2]
 
-                    from scipy.spatial.transform import Rotation as R
-                    Ry = R.from_euler("y", -np.pi / 2).as_matrix()
-                    q_cmd_arrow = rot_to_quat(Ry)
+                    q_cmd_arrow = rot_to_quat(so3_up_to_ori)
                     transform.rotation.x = q_cmd_arrow[0]
                     transform.rotation.y = q_cmd_arrow[1]
                     transform.rotation.z = q_cmd_arrow[2]

@@ -104,6 +104,28 @@ def ExpToQuat(exp):
         ret[3] = 1.0
     return np.copy(ret)
 
+def so3_from_vec_to_vec(vec1, vec2):
+    """
+    Parameters
+    ----------
+    vec1 (np.array): 3D vector
+    vec2 (np.array): 3D vector
+
+    Returns
+    -------
+    rot_mat (SO3): rotation matrix that rotates vec1 to vec2
+    """
+    if np.linalg.norm(vec1) < 1e-3 or np.linalg.norm(vec2) < 1e-3:
+        return 0.0, 0.0
+
+    vec1 = vec1 / np.linalg.norm(vec1)
+    vec2 = vec2 / np.linalg.norm(vec2)
+
+    rot, _ = R.align_vectors(vec2, vec1)
+    rot_mat = rot.as_matrix()
+
+    return rot_mat
+
 
 def weighted_pinv(A, W, rcond=1e-15):
     return np.dot(
