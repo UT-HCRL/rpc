@@ -332,10 +332,8 @@ void G1Controller::_SaveData() {
       tci_container_->task_map_["com_z_task"]
           ->CurrentPos(); // notice if this is base height
 
-  dm->data_->lfoot_pos_ =
-      tci_container_->task_map_["lf_pos_task"]->CurrentPos();
-  dm->data_->rfoot_pos_ =
-      tci_container_->task_map_["rf_pos_task"]->CurrentPos();
+  dm->data_->lfoot_pos_ = robot_->GetLinkIsometry(g1_link::l_foot_contact).translation();
+  dm->data_->rfoot_pos_ = robot_->GetLinkIsometry(g1_link::r_foot_contact).translation();
   dm->data_->lfoot_ori_ =
       tci_container_->task_map_["lf_ori_task"]->CurrentPos();
   dm->data_->rfoot_ori_ =

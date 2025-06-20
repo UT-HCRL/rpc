@@ -133,12 +133,15 @@ async def main():
         arrows_scene = ShapeScene()
         shape_params = ["arrows", [0, 0, 1, 1.0], [0.03, 0.1, 0.08]]
         shape_ghost_params = ["arrows", [0, 0, 1, 0.2], [0.03, 0.1, 0.08]]
+        shape_sensor_params = ["arrows", [0, 1, 0, 1.0], [0.03, 0.1, 0.08]]
         for name in crocoddyl_forces:
             for i in range(mpc_horizon):
                 if i == 0:
                     arrows_scene.add_shape(f"{name}_{i}", *shape_params)
                 else:
                     arrows_scene.add_shape(f"{name}_{i}", *shape_ghost_params)
+        for name in contact_sensor_forces:
+            arrows_scene.add_shape(name, *shape_sensor_params)
 
         des_traj_scene = ShapeScene()
         for frame_name, (rgba_color, scale) in viz_des_trajectories.items():
@@ -353,14 +356,17 @@ async def main():
                 ).encode("utf8"),
             )
 
-            json_bytes = json.dumps(
-                {
-                    "x": list(msg.lfoot_pos)[0],
-                    "y": list(msg.lfoot_pos)[1],
-                    "z": list(msg.lfoot_pos)[2],
-                }
-            ).encode("utf8")
-            await server.send_message(lf_pos_chan_id, now, json_bytes)
+            await server.send_message(
+                lf_pos_chan_id, 
+                now, 
+                json.dumps(
+                    {
+                        "x": list(msg.lfoot_pos)[0],
+                        "y": list(msg.lfoot_pos)[1],
+                        "z": list(msg.lfoot_pos)[2],
+                    }
+                ).encode("utf8")
+            )
 
             await server.send_message(
                 rf_pos_chan_id,
@@ -669,7 +675,82 @@ async def main():
 
             Ry = R.from_euler("y", -np.pi / 2).as_matrix()
 
-            if hasattr(msg, "l_foot_rf") and hasattr(msg, "r_foot_rf") and msg.l_foot_rf and msg.r_foot_rf:
+            if hasattr(msg, "lf_contact_force") and hasattr(msg, "rf_contact_force") and hasattr(msg, "lh_contact_force") and hasattr(msg, "rh_contact_force"):
+                for obj in contact_sensor_forces:
+                    transform.parent_frame_id = "world"
+                    transform.timestamp.FromNanoseconds(now)
+
+                    # Determine the transform based on the object type
+                    if obj.startswith("lf"):
+                        if np.linalg.norm(msg.lfoot_ori) == 0:
+                            lfoot_ori = [0, 0, 0, 1] 
+                        else:
+                            lfoot_ori = msg.lfoot_ori
+                        R_foot = R.from_quat(lfoot_ori).as_matrix()
+                        transform.translation.x = msg.lfoot_pos[0]
+                        transform.translation.y = msg.lfoot_pos[1]
+                        transform.translation.z = msg.lfoot_pos[2]
+                    elif obj.startswith("rf"):
+                        if np.linalg.norm(msg.rfoot_ori) == 0:
+                            rfoot_ori = [0, 0, 0, 1]
+                        else:
+                            rfoot_ori = msg.rfoot_ori
+                        R_foot = R.from_quat(rfoot_ori).as_matrix()
+                        transform.translation.x = msg.rfoot_pos[0]
+                        transform.translation.y = msg.rfoot_pos[1]
+                        transform.translation.z = msg.rfoot_pos[2]
+                    elif obj.startswith("lh"):
+                        if np.linalg.norm(msg.lhand_ori) == 0:
+                            lhand_ori = [0, 0, 0, 1]
+                        else:
+                            lhand_ori = msg.lhand_ori
+                        R_foot = R.from_quat(lhand_ori).as_matrix()
+                        transform.translation.x = msg.lhand_pos[0]
+                        transform.translation.y = msg.lhand_pos[1]
+                        transform.translation.z = msg.lhand_pos[2]
+                    elif obj.startswith("rh"):
+                        if np.linalg.norm(msg.rhand_ori) == 0:
+                            rhand_ori = [0, 0, 0, 1]
+                        else:
+                            rhand_ori = msg.rhand_ori
+                        R_foot = R.from_quat(rhand_ori).as_matrix()
+                        transform.translation.x = msg.rhand_pos[0]
+                        transform.translation.y = msg.rhand_pos[1]
+                        transform.translation.z = msg.rhand_pos[2]
+                    
+                    transform.rotation.x = 0
+                    transform.rotation.y = 0
+                    transform.rotation.z = 0
+                    transform.rotation.w = 1
+
+                    force_dir = np.array([
+                        getattr(msg, obj).x,
+                        getattr(msg, obj).y,
+                        getattr(msg, obj).z
+                    ])
+
+                    if np.all(force_dir != 0.0):
+                        force_norm = np.linalg.norm(force_dir)
+                        quat_force = compute_quat_to_vec(force_dir)
+
+                        force_magnitude = force_norm / 1200.0
+                        arrows_scene.scale(f"{obj}", quat_force, force_magnitude, now)
+
+                    else:
+                        arrows_scene.scale(f"{obj}", [0, 0, 0, 1], 0.0, now)
+                    
+                    transform.child_frame_id = f"{obj}"
+                    tasks.append(
+                        server.send_message(tf_chan_id, now, transform.SerializeToString())
+                    )
+                    await server.send_message(
+                        normS_chan_id, now, arrows_scene.serialized_msg(f"{obj}")
+                    )
+                    transform.rotation.Clear()
+                    transform.translation.Clear()
+
+
+            if hasattr(msg, "l_foot_rf") and hasattr(msg, "r_foot_rf"):
                 for obj in crocoddyl_forces:
                     transform.parent_frame_id = "world"
                     transform.timestamp.FromNanoseconds(now)
@@ -733,13 +814,17 @@ async def main():
 
                             force_magnitude = force_norm / 1200.0
                             arrows_scene.scale(f"{obj}_{i}", quat_force, force_magnitude, now)
-                            transform.child_frame_id = f"{obj}_{i}"
-                            tasks.append(
-                                server.send_message(tf_chan_id, now, transform.SerializeToString())
-                            )
-                            await server.send_message(
-                                normS_chan_id, now, arrows_scene.serialized_msg(f"{obj}_{i}")
-                            )
+
+                        else:
+                            arrows_scene.scale(f"{obj}_{i}", [0, 0, 0, 1], 0.0, now)
+                        
+                        transform.child_frame_id = f"{obj}_{i}"
+                        tasks.append(
+                            server.send_message(tf_chan_id, now, transform.SerializeToString())
+                        )
+                        await server.send_message(
+                            normS_chan_id, now, arrows_scene.serialized_msg(f"{obj}_{i}")
+                        )
             
             for frame_name in viz_des_trajectories.keys():
                 # Build the transform message

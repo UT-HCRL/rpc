@@ -125,10 +125,10 @@ running_costs:
       pos: 10000.0
       rot: 0.0
     left_ankle_roll_link: 
-      pos: 0.0
-      rot: 1000.0
+      pos: 10000.0
+      rot: 10000.0
     right_ankle_roll_link: 
-      pos: 0.0
+      pos: 1000.0
       rot: 1000.0
     left_knee_link: 
       pos: 1000.0
@@ -175,10 +175,10 @@ terminal_costs:
       pos: 100.0
       rot: 0.0
     left_ankle_roll_link:
-      pos: 10.0
-      rot: 100.0
+      pos: 1000.0
+      rot: 1000.0
     right_ankle_roll_link:
-      pos: 10.0
+      pos: 100.0
       rot: 100.0
     left_knee_link:
       pos: 1000.0
