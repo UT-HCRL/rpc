@@ -89,75 +89,65 @@ void TrackPlan::FirstVisit() {
   std::cout << "g1_states::kTrackPlan" << std::endl;
   state_machine_start_time_ = sp_->current_time_;
 
-  run_threads_ = true;
-  compute_thread_ = std::thread(&TrackPlan::Compute, this);
-
-}
-
-void TrackPlan::OneStep() {
-  static auto last_time = std::chrono::steady_clock::now();
-  const double desired_period = 1.0 / desired_frequency_;
-
-  auto current_time = std::chrono::steady_clock::now();
-  std::chrono::duration<double> elapsed_time = current_time - last_time;
-
-  if (elapsed_time.count() >= desired_period) {
-    {
-      std::lock_guard<std::mutex> lock(data_mutex_);
-      if (has_new_data_) {
-        std::cout << "[DEBUG] New data available for OneStep." << std::endl;
-        new_q = mpc_q_;
-        new_q_dot = mpc_q_dot_;
-        new_tau = mpc_tau_;
-        has_new_data_ = false;
-
-        ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(
-          new_q.tail(g1_mpc_->getQ0Size()), 
-          new_q_dot.tail(g1_mpc_->getQ0Size()), 
-          new_tau
-        );
-      } else {
-        std::cout << "[DEBUG] No new data available for OneStep." << std::endl;
-      }
-    }
-    last_time = current_time;
-  } else {
-    double sleep_time = desired_period - elapsed_time.count();
-    std::cout << "[DEBUG] Sleeping for " << sleep_time << " seconds to maintain desired frequency." << std::endl;
-    std::this_thread::sleep_for(std::chrono::duration<double>(sleep_time));
+  if (b_wait_complete_){
+    std::cout << "Waiting for MPC to complete solution before stepping MuJoCo physics." << std::endl;
+  }else{
+    run_threads_ = true;
+    compute_thread_ = std::thread(&TrackPlan::Compute, this);
   }
 }
 
-// void TrackPlan::OneStep() {
-//   static auto last_time = std::chrono::steady_clock::now();
-//   const double desired_period = 1.0 / desired_frequency_;
+void TrackPlan::OneStep() {
 
-//   auto current_time = std::chrono::steady_clock::now();
-//   std::chrono::duration<double> elapsed_time = current_time - last_time;
+  if (b_wait_complete_){
+    ComputeSync(); // Compute Sync is called on the same thread to 
+                   // ensure that the MPC solution is ready before stepping MuJoCo physics.
 
-//   if (elapsed_time.count() >= desired_period) {
-//     {
-//       ComputeSync();
-//       new_q = mpc_q_;
-//       new_q_dot = mpc_q_dot_;
-//       new_tau = mpc_tau_;
-//       has_new_data_ = false;
+    // std::this_thread::sleep_for(std::chrono::milliseconds(40)); // NOTE: Add sleep to simulate worse performance
 
-//       ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(
-//         new_q.tail(g1_mpc_->getQ0Size()), 
-//         new_q_dot.tail(g1_mpc_->getQ0Size()), 
-//         new_tau
-//       );
-      
-//     }
-//     last_time = current_time;
-//   } else {
-//     double sleep_time = desired_period - elapsed_time.count();
-//     std::cout << "[DEBUG] Sleeping for " << sleep_time << " seconds to maintain desired frequency." << std::endl;
-//     std::this_thread::sleep_for(std::chrono::duration<double>(sleep_time));
-//   }
+    new_q = mpc_q_;
+    new_q_dot = mpc_q_dot_;
+    new_tau = mpc_tau_;
+    ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(
+        new_q.tail(g1_mpc_->getQ0Size()),
+        new_q_dot.tail(g1_mpc_->getQ0Size()),
+        new_tau
+    );
+  }
+  else{
+    static auto last_time = std::chrono::steady_clock::now();
+    const double desired_period = 1.0 / desired_frequency_;
 
-// }
+    auto current_time = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_time = current_time - last_time;
+
+    if (elapsed_time.count() >= desired_period) {
+      {
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        if (has_new_data_) {
+          // std::cout << "[DEBUG] New data available for OneStep." << std::endl;
+          new_q = mpc_q_;
+          new_q_dot = mpc_q_dot_;
+          new_tau = mpc_tau_;
+          has_new_data_ = false;
+
+          ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(
+            new_q.tail(g1_mpc_->getQ0Size()), 
+            new_q_dot.tail(g1_mpc_->getQ0Size()), 
+            new_tau
+          );
+        } else {
+          // std::cout << "[DEBUG] No new data available for OneStep." << std::endl;
+        }
+      }
+      last_time = current_time;
+    } else {
+      double sleep_time = desired_period - elapsed_time.count();
+      // std::cout << "[DEBUG] Sleeping for " << sleep_time << " seconds to maintain desired frequency." << std::endl;
+      std::this_thread::sleep_for(std::chrono::duration<double>(sleep_time));
+    }
+  }
+}
 
 void TrackPlan::ComputeSync(){
 
@@ -475,9 +465,11 @@ void TrackPlan::Compute() {
 
 void TrackPlan::LastVisit() {
 
-  run_threads_ = false;
-  if (compute_thread_.joinable()) {
-    compute_thread_.join();
+  if(!b_wait_complete_) {
+    run_threads_ = false;
+    if (compute_thread_.joinable()) {
+      compute_thread_.join();
+    }
   }
 
 }

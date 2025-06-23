@@ -32,12 +32,14 @@ public:
 
 private:
 
-  float desired_frequency_ = 100.0; // Hz
+  float desired_frequency_ = 20.0; // Hz | Just used for fixed rate stepping
 
   std::unique_ptr<HumanoidMulticontactTracker> g1_mpc_;
 
   std::thread compute_thread_;
   std::atomic<bool> run_threads_{false};
+
+  bool b_wait_complete_{true}; // [true, false] <-> [wait for MPC to complete, use fixed rate stepping]
 
   std::mutex data_mutex_;
   Eigen::VectorXd mpc_q_;
