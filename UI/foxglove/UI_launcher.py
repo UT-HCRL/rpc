@@ -286,15 +286,15 @@ async def main():
                 base_pos = msg.est_base_joint_pos
                 base_ori = msg.est_base_joint_ori
             vis_q = pin.neutral(model)
-            vis_q[0:3] = np.array(base_pos)
-            vis_q[3:7] = np.array(base_ori)  # quaternion [x,y,z,w]
+            vis_q[0:3] = np.array([base_pos.x, base_pos.y, base_pos.z])  # position [x,y,z]
+            vis_q[3:7] = np.array([base_ori.x, base_ori.y, base_ori.z, base_ori.w])  # quaternion [x,y,z,w]
             vis_q[7:] = np.array(msg.joint_positions)
 
             json_bytes = json.dumps(
                 {
-                    "x": list(msg.lfoot_pos)[0],
-                    "y": list(msg.lfoot_pos)[1],
-                    "z": list(msg.lfoot_pos)[2],
+                    "x": msg.lfoot_pos.x,
+                    "y": msg.lfoot_pos.y,
+                    "z": msg.lfoot_pos.z,
                 }
             ).encode("utf8")
             await server.send_message(lf_pos_chan_id, now, json_bytes)
@@ -304,9 +304,9 @@ async def main():
                 now,
                 json.dumps(
                     {
-                        "x": list(msg.rfoot_pos)[0],
-                        "y": list(msg.rfoot_pos)[1],
-                        "z": list(msg.rfoot_pos)[2],
+                        "x": msg.rfoot_pos.x,
+                        "y": msg.rfoot_pos.y,
+                        "z": msg.rfoot_pos.z,
                     }
                 ).encode("utf8"),
             )
@@ -316,9 +316,9 @@ async def main():
                 now,
                 json.dumps(
                     {
-                        "x": list(msg.lhand_pos)[0],
-                        "y": list(msg.lhand_pos)[1],
-                        "z": list(msg.lhand_pos)[2],
+                        "x": msg.lhand_pos.x,
+                        "y": msg.lhand_pos.y,
+                        "z": msg.lhand_pos.z,
                     }
                 ).encode("utf8"),
             )
@@ -328,9 +328,9 @@ async def main():
                 now,
                 json.dumps(
                     {
-                        "x": list(msg.rhand_pos)[0],
-                        "y": list(msg.rhand_pos)[1],
-                        "z": list(msg.rhand_pos)[2],
+                        "x": msg.rhand_pos.x,
+                        "y": msg.rhand_pos.y,
+                        "z": msg.rhand_pos.z,
                     }
                 ).encode("utf8"),
             )
@@ -614,41 +614,41 @@ async def main():
 
                     # Determine the transform based on the object type
                     if obj.startswith("l_foot_rf"):
-                        if np.linalg.norm(msg.lfoot_ori) == 0:
+                        if np.linalg.norm([msg.lfoot_ori.x, msg.lfoot_ori.y, msg.lfoot_ori.z, msg.lfoot_ori.w]) == 0:
                             lfoot_ori = [0, 0, 0, 1] 
                         else:
-                            lfoot_ori = msg.lfoot_ori
+                            lfoot_ori = [msg.lfoot_ori.x, msg.lfoot_ori.y, msg.lfoot_ori.z, msg.lfoot_ori.w]
                         R_foot = R.from_quat(lfoot_ori).as_matrix()
-                        transform.translation.x = msg.lfoot_pos[0]
-                        transform.translation.y = msg.lfoot_pos[1]
-                        transform.translation.z = msg.lfoot_pos[2]
+                        transform.translation.x = msg.lfoot_pos.x
+                        transform.translation.y = msg.lfoot_pos.y
+                        transform.translation.z = msg.lfoot_pos.z
                     elif obj.startswith("r_foot_rf"):
-                        if np.linalg.norm(msg.rfoot_ori) == 0:
+                        if np.linalg.norm([msg.rfoot_ori.x, msg.rfoot_ori.y, msg.rfoot_ori.z, msg.rfoot_ori.w]) == 0:
                             rfoot_ori = [0, 0, 0, 1]
                         else:
-                            rfoot_ori = msg.rfoot_ori
+                            rfoot_ori = [msg.rfoot_ori.x, msg.rfoot_ori.y, msg.rfoot_ori.z, msg.rfoot_ori.w]
                         R_foot = R.from_quat(rfoot_ori).as_matrix()
-                        transform.translation.x = msg.rfoot_pos[0]
-                        transform.translation.y = msg.rfoot_pos[1]
-                        transform.translation.z = msg.rfoot_pos[2]
+                        transform.translation.x = msg.rfoot_pos.x
+                        transform.translation.y = msg.rfoot_pos.y
+                        transform.translation.z = msg.rfoot_pos.z
                     elif obj.startswith("l_hand_rf"):
-                        if np.linalg.norm(msg.lhand_ori) == 0:
+                        if np.linalg.norm([msg.lhand_ori.x, msg.lhand_ori.y, msg.lhand_ori.z, msg.lhand_ori.w]) == 0:
                             lhand_ori = [0, 0, 0, 1]
                         else:
-                            lhand_ori = msg.lhand_ori
+                            lhand_ori = [msg.lhand_ori.x, msg.lhand_ori.y, msg.lhand_ori.z, msg.lhand_ori.w]
                         R_foot = R.from_quat(lhand_ori).as_matrix()
-                        transform.translation.x = msg.lhand_pos[0]
-                        transform.translation.y = msg.lhand_pos[1]
-                        transform.translation.z = msg.lhand_pos[2]
+                        transform.translation.x = msg.lhand_pos.x
+                        transform.translation.y = msg.lhand_pos.y
+                        transform.translation.z = msg.lhand_pos.z
                     elif obj.startswith("r_hand_rf"):
-                        if np.linalg.norm(msg.rhand_ori) == 0:
+                        if np.linalg.norm([msg.rhand_ori.x, msg.rhand_ori.y, msg.rhand_ori.z, msg.rhand_ori.w]) == 0:
                             rhand_ori = [0, 0, 0, 1]
                         else:
-                            rhand_ori = msg.rhand_ori
+                            rhand_ori = [msg.rhand_ori.x, msg.rhand_ori.y, msg.rhand_ori.z, msg.rhand_ori.w]
                         R_foot = R.from_quat(rhand_ori).as_matrix()
-                        transform.translation.x = msg.rhand_pos[0]
-                        transform.translation.y = msg.rhand_pos[1]
-                        transform.translation.z = msg.rhand_pos[2]
+                        transform.translation.x = msg.rhand_pos.x
+                        transform.translation.y = msg.rhand_pos.y
+                        transform.translation.z = msg.rhand_pos.z
 
                     # Rotate transform since arrow points in +x direction
                     q_cmd_arrow = rot_to_quat(Ry)
@@ -743,8 +743,11 @@ with open(pnc_path) as yaml_file:
     except yaml.YAMLError as exc:
         print(exc)
 
+# socket.setsockopt(zmq.MAXMSGSIZE, 1024 * 1024)  # 1 MB message size
+# socket.setsockopt(zmq.RCVHWM, 2000)
 socket.connect(ip_address)
 socket.setsockopt_string(zmq.SUBSCRIBE, "")
+# socket.subscribe(b"")   # subscribe to all messages
 
 if args.b_use_plotjuggler:
     pj_context = zmq.Context()
@@ -918,15 +921,15 @@ def process_data_saver(visualize_type):
 
     elif visualize_type == "foxglove":
         data_saver.add("time", msg.time)
-        data_saver.add("est_base_joint_pos", list(msg.est_base_joint_pos))
-        data_saver.add("est_base_joint_ori", list(msg.est_base_joint_ori))
+        data_saver.add("est_base_joint_pos", list([msg.est_base_joint_pos.x, msg.est_base_joint_pos.y, msg.est_base_joint_pos.z]))
+        data_saver.add("est_base_joint_ori", list([msg.est_base_joint_ori.x, msg.est_base_joint_ori.y, msg.est_base_joint_ori.z, msg.est_base_joint_ori.w]))
         data_saver.add("joint_positions", list(msg.joint_positions))
-        data_saver.add("lfoot_pos", list(msg.lfoot_pos))
-        data_saver.add("rfoot_pos", list(msg.rfoot_pos))
-        data_saver.add("lfoot_ori", list(msg.lfoot_ori))
-        data_saver.add("rfoot_ori", list(msg.rfoot_ori))
-        data_saver.add("lhand_pos", list(msg.lhand_pos))
-        data_saver.add("rhand_pos", list(msg.rhand_pos))
+        data_saver.add("lfoot_pos", list([msg.lfoot_pos.x, msg.lfoot_pos.y, msg.lfoot_pos.z]))
+        data_saver.add("rfoot_pos", list([msg.rfoot_pos.x, msg.rfoot_pos.y, msg.rfoot_pos.z]))
+        data_saver.add("lfoot_ori", list([msg.lfoot_ori.x, msg.lfoot_ori.y, msg.lfoot_ori.z, msg.lfoot_ori.w]))
+        data_saver.add("rfoot_ori", list([msg.rfoot_ori.x, msg.rfoot_ori.y, msg.rfoot_ori.z, msg.rfoot_ori.w]))
+        data_saver.add("lhand_pos", list([msg.lhand_pos.x, msg.lhand_pos.y, msg.lhand_pos.z]))
+        data_saver.add("rhand_pos", list([msg.rhand_pos.x, msg.rhand_pos.y, msg.rhand_pos.z]))
         data_saver.add("xreg_costs", list(msg.xreg_costs))
         data_saver.add("ureg_costs", list(msg.ureg_costs))
         data_saver.add("xbound_costs", list(msg.xbound_costs))
@@ -961,13 +964,17 @@ def process_data_saver(visualize_type):
                 data_saver.add(f"predicted_torso_{i}", [0.0, 0.0, 0.0])
                 data_saver.add(f"predicted_lhand_{i}", [0.0, 0.0, 0.0])
                 data_saver.add(f"predicted_rhand_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"predicted_lankle_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"predicted_rankle_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"predicted_lknee_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"predicted_rknee_{i}", [0.0, 0.0, 0.0])
         else:
             for i in range(len(msg.predicted_torso)):
                 data_saver.add(f"predicted_torso_{i}", [msg.predicted_torso[i].x, msg.predicted_torso[i].y, msg.predicted_torso[i].z])
-            #     data_saver.add(f"predicted_lankle_{i}", [msg.predicted_lankle[i].x, msg.predicted_lankle[i].y, msg.predicted_lankle[i].z])
-            #     data_saver.add(f"predicted_rankle_{i}", [msg.predicted_rankle[i].x, msg.predicted_rankle[i].y, msg.predicted_rankle[i].z])
-            #     data_saver.add(f"predicted_lknee_{i}", [msg.predicted_lknee[i].x, msg.predicted_lknee[i].y, msg.predicted_lknee[i].z])
-            #     data_saver.add(f"predicted_rknee_{i}", [msg.predicted_rknee[i].x, msg.predicted_rknee[i].y, msg.predicted_rknee[i].z])
+                data_saver.add(f"predicted_lankle_{i}", [msg.predicted_lankle[i].x, msg.predicted_lankle[i].y, msg.predicted_lankle[i].z])
+                data_saver.add(f"predicted_rankle_{i}", [msg.predicted_rankle[i].x, msg.predicted_rankle[i].y, msg.predicted_rankle[i].z])
+                data_saver.add(f"predicted_lknee_{i}", [msg.predicted_lknee[i].x, msg.predicted_lknee[i].y, msg.predicted_lknee[i].z])
+                data_saver.add(f"predicted_rknee_{i}", [msg.predicted_rknee[i].x, msg.predicted_rknee[i].y, msg.predicted_rknee[i].z])
                 data_saver.add(f"predicted_lhand_{i}", [msg.predicted_lhand[i].x, msg.predicted_lhand[i].y, msg.predicted_lhand[i].z])
                 data_saver.add(f"predicted_rhand_{i}", [msg.predicted_rhand[i].x, msg.predicted_rhand[i].y, msg.predicted_rhand[i].z])
 
@@ -1029,7 +1036,13 @@ while True:
     msg.ParseFromString(encoded_msg)
 
     if args.visualizer != "none":
-        check_if_kf_estimator(msg.kf_base_joint_pos, msg.est_base_joint_pos)
+        if hasattr(msg, "kf_base_joint_pos") and hasattr(msg, "est_base_joint_pos"):
+            check_if_kf_estimator(msg.kf_base_joint_pos, msg.est_base_joint_pos)
+        elif hasattr(msg, "est_base_joint_pos") and not hasattr(msg, "kf_base_joint_pos"):
+            b_using_kf_estimator = False
+            b_using_non_kf_estimator = True
+        else:
+            raise ValueError("Message does not contain kf_base_joint_pos or est_base_joint_pos")
 
         if b_using_kf_estimator:
             base_pos = msg.kf_base_joint_pos
@@ -1038,8 +1051,8 @@ while True:
             base_pos = msg.est_base_joint_pos
             base_ori = msg.est_base_joint_ori
 
-        vis_q[0:3] = np.array(base_pos)
-        vis_q[3:7] = np.array(base_ori)  # quaternion [x,y,z,w]
+        vis_q[0:3] = np.array([base_pos.x, base_pos.y, base_pos.z])
+        vis_q[3:7] = np.array([base_ori.x, base_ori.y, base_ori.z, base_ori.w])  # quaternion [x,y,z,w]
         vis_q[7:] = np.array(msg.joint_positions)
 
         if args.visualizer == "meshcat":

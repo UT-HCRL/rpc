@@ -33,31 +33,20 @@ void G1DataManager::SendData()
 
   g1::pnc_msg msg;
   msg.set_time(data_->time_);
-  msg.set_phase(data_->phase_);
+  // msg.set_phase(data_->phase_);
 
-  for (int i(0); i < 3; ++i)
-  {
-    msg.add_est_base_joint_pos(data_->est_base_joint_pos_[i]);
-    msg.add_est_base_joint_ori(data_->est_base_joint_ori_[i]);
-    msg.add_kf_base_joint_pos(data_->kf_base_joint_pos_[i]);
-    msg.add_kf_base_joint_ori(data_->kf_base_joint_ori_[i]);
-    msg.add_des_com_pos(data_->des_com_pos_[i]);
-    msg.add_act_com_pos(data_->act_com_pos_[i]);
-    msg.add_lfoot_pos(data_->lfoot_pos_[i]);
-    msg.add_rfoot_pos(data_->rfoot_pos_[i]);
-    msg.add_lfoot_ori(data_->lfoot_ori_[i]);
-    msg.add_rfoot_ori(data_->rfoot_ori_[i]);
-    msg.add_lhand_pos(data_->lhand_pos_[i]);
-    msg.add_rhand_pos(data_->rhand_pos_[i]);
-    msg.add_lhand_ori(data_->lhand_ori_[i]);
-    msg.add_rhand_ori(data_->rhand_ori_[i]);
-  }
-  msg.add_est_base_joint_ori(data_->est_base_joint_ori_[3]);
-  msg.add_kf_base_joint_ori(data_->kf_base_joint_ori_[3]);
-  msg.add_lfoot_ori(data_->lfoot_ori_[3]);
-  msg.add_rfoot_ori(data_->rfoot_ori_[3]);
-  msg.add_lhand_ori(data_->lhand_ori_[3]);
-  msg.add_rhand_ori(data_->rhand_ori_[3]);
+  g1::Pos base_pos_msg;
+  base_pos_msg.set_x(data_->est_base_joint_pos_[0]);
+  base_pos_msg.set_y(data_->est_base_joint_pos_[1]);
+  base_pos_msg.set_z(data_->est_base_joint_pos_[2]);
+  msg.mutable_est_base_joint_pos()->CopyFrom(base_pos_msg);
+
+  g1::Quat base_ori_msg;
+  base_ori_msg.set_x(data_->est_base_joint_ori_[0]);
+  base_ori_msg.set_y(data_->est_base_joint_ori_[1]);
+  base_ori_msg.set_z(data_->est_base_joint_ori_[2]);
+  base_ori_msg.set_w(data_->est_base_joint_ori_[3]);
+  msg.mutable_est_base_joint_ori()->CopyFrom(base_ori_msg);
 
   for (int i(0); i < data_->joint_positions_.size(); i++)
   {
@@ -65,65 +54,67 @@ void G1DataManager::SendData()
     msg.add_joint_velocities(data_->joint_velocities_[i]);
   }
 
-  for (int i(0); i < data_->lfoot_rf_cmd_.size(); i++)
-    msg.add_lfoot_rf_cmd(data_->lfoot_rf_cmd_[i]);
+  g1::Pos lfoot_pos_msg;
+  lfoot_pos_msg.set_x(data_->lfoot_pos_[0]);
+  lfoot_pos_msg.set_y(data_->lfoot_pos_[1]);
+  lfoot_pos_msg.set_z(data_->lfoot_pos_[2]);
+  msg.mutable_lfoot_pos()->CopyFrom(lfoot_pos_msg);
 
-  for (int i(0); i < data_->rfoot_rf_cmd_.size(); i++)
-    msg.add_rfoot_rf_cmd(data_->rfoot_rf_cmd_[i]);
+  g1::Pos rfoot_pos_msg;
+  rfoot_pos_msg.set_x(data_->rfoot_pos_[0]);
+  rfoot_pos_msg.set_y(data_->rfoot_pos_[1]);
+  rfoot_pos_msg.set_z(data_->rfoot_pos_[2]);
+  msg.mutable_rfoot_pos()->CopyFrom(rfoot_pos_msg);
+
+  g1::Quat lfoot_ori_msg;
+  lfoot_ori_msg.set_x(data_->lfoot_ori_[0]);
+  lfoot_ori_msg.set_y(data_->lfoot_ori_[1]);
+  lfoot_ori_msg.set_z(data_->lfoot_ori_[2]);
+  lfoot_ori_msg.set_w(data_->lfoot_ori_[3]);
+  msg.mutable_lfoot_ori()->CopyFrom(lfoot_ori_msg);
+
+  g1::Quat rfoot_ori_msg;
+  rfoot_ori_msg.set_x(data_->rfoot_ori_[0]);
+  rfoot_ori_msg.set_y(data_->rfoot_ori_[1]);
+  rfoot_ori_msg.set_z(data_->rfoot_ori_[2]);
+  rfoot_ori_msg.set_w(data_->rfoot_ori_[3]);
+  msg.mutable_rfoot_ori()->CopyFrom(rfoot_ori_msg);
+
+  g1::Pos lhand_pos_msg;
+  lhand_pos_msg.set_x(data_->lhand_pos_[0]);
+  lhand_pos_msg.set_y(data_->lhand_pos_[1]);
+  lhand_pos_msg.set_z(data_->lhand_pos_[2]);
+  msg.mutable_lhand_pos()->CopyFrom(lhand_pos_msg);
+
+  g1::Pos rhand_pos_msg;
+  rhand_pos_msg.set_x(data_->rhand_pos_[0]);
+  rhand_pos_msg.set_y(data_->rhand_pos_[1]);
+  rhand_pos_msg.set_z(data_->rhand_pos_[2]);
+  msg.mutable_rhand_pos()->CopyFrom(rhand_pos_msg);
+
+  g1::Quat lhand_ori_msg;
+  lhand_ori_msg.set_x(data_->lhand_ori_[0]);
+  lhand_ori_msg.set_y(data_->lhand_ori_[1]);
+  lhand_ori_msg.set_z(data_->lhand_ori_[2]);
+  lhand_ori_msg.set_w(data_->lhand_ori_[3]);
+  msg.mutable_lhand_ori()->CopyFrom(lhand_ori_msg);
+
+  g1::Quat rhand_ori_msg;
+  rhand_ori_msg.set_x(data_->rhand_ori_[0]);
+  rhand_ori_msg.set_y(data_->rhand_ori_[1]);
+  rhand_ori_msg.set_z(data_->rhand_ori_[2]);
+  rhand_ori_msg.set_w(data_->rhand_ori_[3]);
+  msg.mutable_rhand_ori()->CopyFrom(rhand_ori_msg);
+
+  // for (int i(0); i < data_->lfoot_rf_cmd_.size(); i++)
+  //   msg.add_lfoot_rf_cmd(data_->lfoot_rf_cmd_[i]);
+  //
+  // for (int i(0); i < data_->rfoot_rf_cmd_.size(); i++)
+  //   msg.add_rfoot_rf_cmd(data_->rfoot_rf_cmd_[i]);
 
   // contact sensing measurements
   msg.set_b_lfoot(data_->b_lfoot_);
   msg.set_b_rfoot(data_->b_rfoot_);
-  msg.set_lfoot_volt_normal_raw(data_->lfoot_volt_normal_raw_);
-  msg.set_rfoot_volt_normal_raw(data_->rfoot_volt_normal_raw_);
-  msg.set_lfoot_rf_normal(data_->lfoot_rf_normal_);
-  msg.set_rfoot_rf_normal(data_->rfoot_rf_normal_);
-  msg.set_lfoot_rf_normal_filt(data_->lfoot_rf_normal_filt_);
-  msg.set_rfoot_rf_normal_filt(data_->rfoot_rf_normal_filt_);
-
-  for (int i(0); i < 2; i++)
-  {
-    msg.add_est_icp(data_->est_icp[i]);
-    msg.add_des_icp(data_->des_icp[i]);
-    msg.add_des_cmp(data_->des_cmp[i]);
-    msg.add_com_xy_weight(data_->com_xy_weight[i]);
-    msg.add_com_xy_kp(data_->com_xy_kp[i]);
-    msg.add_com_xy_kd(data_->com_xy_kd[i]);
-    msg.add_com_xy_ki(data_->com_xy_ki[i]);
-  }
-
-  msg.set_com_z_weight(data_->com_z_weight);
-  msg.set_com_z_kp(data_->com_z_kp);
-  msg.set_com_z_kd(data_->com_z_kd);
-
-  for (int i(0); i < 3; i++)
-  {
-    msg.add_torso_ori_weight(data_->torso_ori_weight[i]);
-    msg.add_torso_ori_kp(data_->torso_ori_kp[i]);
-    msg.add_torso_ori_kd(data_->torso_ori_kd[i]);
-
-    msg.add_lf_pos_weight(data_->lf_pos_weight[i]);
-    msg.add_lf_pos_kp(data_->lf_pos_kp[i]);
-    msg.add_lf_pos_kd(data_->lf_pos_kd[i]);
-
-    msg.add_rf_pos_weight(data_->rf_pos_weight[i]);
-    msg.add_rf_pos_kp(data_->rf_pos_kp[i]);
-    msg.add_rf_pos_kd(data_->rf_pos_kd[i]);
-
-    msg.add_lf_ori_weight(data_->lf_ori_weight[i]);
-    msg.add_lf_ori_kp(data_->lf_ori_kp[i]);
-    msg.add_lf_ori_kd(data_->lf_ori_kd[i]);
-
-    msg.add_rf_ori_weight(data_->rf_ori_weight[i]);
-    msg.add_rf_ori_kp(data_->rf_ori_kp[i]);
-    msg.add_rf_ori_kd(data_->rf_ori_kd[i]);
-  }
-
-  for (int i(0); i < 4; i++)
-  {
-    // quaternion in order (w,x,y,z)
-    msg.add_quat_world_local(data_->quat_world_local_.coeffs()[i]);
-  }
 
   // =============================================================
   // MPC variables
@@ -233,7 +224,7 @@ void G1DataManager::SendData()
   msg.set_solve_duration(data_->solve_duration_);
 
   // =============================================================
-  // MPC Desired Poses
+  // MPC Desired Positions obtained from Offline Plan
   // =============================================================
   g1::Pos torso_des_pos_msg;
   torso_des_pos_msg.set_x(data_->torso_des_pos_(0));
@@ -323,37 +314,37 @@ void G1DataManager::SendData()
     msg.add_predicted_torso()->CopyFrom(t_predicted_frame_msg);
   }
 
-  // for (int i(0); i < data_->left_ankle_frame_costs_.size(); i++){
-  //   g1::Pos la_predicted_frame_msg;
-  //   la_predicted_frame_msg.set_x(data_->predicted_left_ankle_roll_pos_[i](0));
-  //   la_predicted_frame_msg.set_y(data_->predicted_left_ankle_roll_pos_[i](1));
-  //   la_predicted_frame_msg.set_z(data_->predicted_left_ankle_roll_pos_[i](2));
-  //   msg.add_predicted_lankle()->CopyFrom(la_predicted_frame_msg);
-  // }
-  //
-  // for (int i(0); i < data_->right_ankle_frame_costs_.size(); i++){
-  //   g1::Pos ra_predicted_frame_msg;
-  //   ra_predicted_frame_msg.set_x(data_->predicted_right_ankle_roll_pos_[i](0));
-  //   ra_predicted_frame_msg.set_y(data_->predicted_right_ankle_roll_pos_[i](1));
-  //   ra_predicted_frame_msg.set_z(data_->predicted_right_ankle_roll_pos_[i](2));
-  //   msg.add_predicted_rankle()->CopyFrom(ra_predicted_frame_msg);
-  // }
-  //
-  // for (int i(0); i < data_->left_knee_frame_costs_.size(); i++){
-  //   g1::Pos lk_predicted_frame_msg;
-  //   lk_predicted_frame_msg.set_x(data_->predicted_left_knee_pos_[i](0));
-  //   lk_predicted_frame_msg.set_y(data_->predicted_left_knee_pos_[i](1));
-  //   lk_predicted_frame_msg.set_z(data_->predicted_left_knee_pos_[i](2));
-  //   msg.add_predicted_lknee()->CopyFrom(lk_predicted_frame_msg);
-  // }
-  //
-  // for (int i(0); i < data_->right_knee_frame_costs_.size(); i++){
-  //   g1::Pos rk_predicted_frame_msg;
-  //   rk_predicted_frame_msg.set_x(data_->predicted_right_knee_pos_[i](0));
-  //   rk_predicted_frame_msg.set_y(data_->predicted_right_knee_pos_[i](1));
-  //   rk_predicted_frame_msg.set_z(data_->predicted_right_knee_pos_[i](2));
-  //   msg.add_predicted_rknee()->CopyFrom(rk_predicted_frame_msg);
-  // }
+  for (int i(0); i < data_->left_ankle_frame_costs_.size(); i++){
+    g1::Pos la_predicted_frame_msg;
+    la_predicted_frame_msg.set_x(data_->predicted_left_ankle_roll_pos_[i](0));
+    la_predicted_frame_msg.set_y(data_->predicted_left_ankle_roll_pos_[i](1));
+    la_predicted_frame_msg.set_z(data_->predicted_left_ankle_roll_pos_[i](2));
+    msg.add_predicted_lankle()->CopyFrom(la_predicted_frame_msg);
+  }
+
+  for (int i(0); i < data_->right_ankle_frame_costs_.size(); i++){
+    g1::Pos ra_predicted_frame_msg;
+    ra_predicted_frame_msg.set_x(data_->predicted_right_ankle_roll_pos_[i](0));
+    ra_predicted_frame_msg.set_y(data_->predicted_right_ankle_roll_pos_[i](1));
+    ra_predicted_frame_msg.set_z(data_->predicted_right_ankle_roll_pos_[i](2));
+    msg.add_predicted_rankle()->CopyFrom(ra_predicted_frame_msg);
+  }
+
+  for (int i(0); i < data_->left_knee_frame_costs_.size(); i++){
+    g1::Pos lk_predicted_frame_msg;
+    lk_predicted_frame_msg.set_x(data_->predicted_left_knee_pos_[i](0));
+    lk_predicted_frame_msg.set_y(data_->predicted_left_knee_pos_[i](1));
+    lk_predicted_frame_msg.set_z(data_->predicted_left_knee_pos_[i](2));
+    msg.add_predicted_lknee()->CopyFrom(lk_predicted_frame_msg);
+  }
+
+  for (int i(0); i < data_->right_knee_frame_costs_.size(); i++){
+    g1::Pos rk_predicted_frame_msg;
+    rk_predicted_frame_msg.set_x(data_->predicted_right_knee_pos_[i](0));
+    rk_predicted_frame_msg.set_y(data_->predicted_right_knee_pos_[i](1));
+    rk_predicted_frame_msg.set_z(data_->predicted_right_knee_pos_[i](2));
+    msg.add_predicted_rknee()->CopyFrom(rk_predicted_frame_msg);
+  }
 
   for (int i(0); i < data_->left_hand_frame_costs_.size(); i++){
     g1::Pos lh_predicted_frame_msg;

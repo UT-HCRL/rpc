@@ -24,7 +24,7 @@ contact_detection:
 
 state_estimator:
   b_cheater_mode: true ## true: use simulation groundtruth states
-  state_estimator_type: kf ## 1. default (IMU + Leg kinematics) 2. kf
+  state_estimator_type: default ## 1. default (IMU + Leg kinematics) 2. kf
   b_use_marg_filter: false   # only used when kf is set to true
 
   foot_reference_frame: 1 #0: left foot, 1: right foot

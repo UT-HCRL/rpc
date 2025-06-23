@@ -60,7 +60,7 @@ namespace mpc_utils {
     }
 
     struct MPCData{
-        int total_iterations;
+        int total_iterations = 0;
         std::vector<double> xReg_costs;
         std::vector<double> uReg_costs;
         std::vector<double> xBound_costs;
@@ -81,13 +81,13 @@ namespace mpc_utils {
         std::vector<double> right_hand_contact_costs;
         std::vector<double> left_foot_contact_costs;
         std::vector<double> right_foot_contact_costs;
-        bool b_fddp_feasible;
-        float solve_duration;
+        bool b_fddp_feasible = false;
+        float solve_duration = 0.0f;
 
         std::unordered_map<std::string, Eigen::Vector3d> frame_current_pos;
 
-        Eigen::Vector3d com_ref_pos;
-        Eigen::Vector3d com_curr_pos;
+        Eigen::Vector3d com_ref_pos = Eigen::Vector3d::Zero();
+        Eigen::Vector3d com_curr_pos = Eigen::Vector3d::Zero();
 
         std::unordered_map<std::string, Eigen::Vector3d> contact_forces;
         std::unordered_map<std::string, Eigen::Vector3d> predicted_frame_positions;

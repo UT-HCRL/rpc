@@ -320,18 +320,6 @@ void G1Controller::_SaveData() {
 #if B_USE_ZMQ
   G1DataManager *dm = G1DataManager::GetDataManager();
 
-  // task data for meshcat visualize
-  dm->data_->des_com_pos_.head<2>() =
-      tci_container_->task_map_["com_xy_task"]->DesiredPos();
-  dm->data_->des_com_pos_.tail<1>() =
-      tci_container_->task_map_["com_z_task"]
-          ->DesiredPos(); // notice if this is base height
-  dm->data_->act_com_pos_.head<2>() =
-      tci_container_->task_map_["com_xy_task"]->CurrentPos();
-  dm->data_->act_com_pos_.tail<1>() =
-      tci_container_->task_map_["com_z_task"]
-          ->CurrentPos(); // notice if this is base height
-
   dm->data_->lfoot_pos_ =
       tci_container_->task_map_["lf_pos_task"]->CurrentPos();
   dm->data_->rfoot_pos_ =
@@ -360,67 +348,31 @@ void G1Controller::_SaveData() {
   rot.bottomRightCorner<3, 3>() =
       tci_container_->task_map_["lf_ori_task"]->Rot().transpose();
   if (ihwbc_ != nullptr)
-    dm->data_->lfoot_rf_cmd_ =
-        rot * tci_container_->force_task_map_["lf_force_task"]
-                  ->CmdRf(); // global quantity
-  // TODO move equivalent of wbic_data_ to WBC instead of just WBIC
-  else if (wbic_ != nullptr)
-    dm->data_->lfoot_rf_cmd_ = rot * static_cast<WBIC *>(wbic_)
-                                         ->GetWBICData()
-                                         ->rf_cmd_.head<6>(); // global quantity
+  //   dm->data_->lfoot_rf_cmd_ =
+  //       rot * tci_container_->force_task_map_["lf_force_task"]
+  //                 ->CmdRf(); // global quantity
+  // // TODO move equivalent of wbic_data_ to WBC instead of just WBIC
+  // else if (wbic_ != nullptr)
+  //   dm->data_->lfoot_rf_cmd_ = rot * static_cast<WBIC *>(wbic_)
+  //                                        ->GetWBICData()
+  //                                        ->rf_cmd_.head<6>(); // global quantity
 
   rot.topLeftCorner<3, 3>() =
       tci_container_->task_map_["rf_ori_task"]->Rot().transpose();
   rot.bottomRightCorner<3, 3>() =
       tci_container_->task_map_["rf_ori_task"]->Rot().transpose();
-  if (ihwbc_ != nullptr) {
-    dm->data_->rfoot_rf_cmd_ =
-        rot * tci_container_->force_task_map_["rf_force_task"]
-                  ->CmdRf(); // global quantity
-  } else if (wbic_ != nullptr)
-    dm->data_->rfoot_rf_cmd_ = rot * static_cast<WBIC *>(wbic_)
-                                         ->GetWBICData()
-                                         ->rf_cmd_.tail<6>(); // global quantity
+  // if (ihwbc_ != nullptr) {
+  //   dm->data_->rfoot_rf_cmd_ =
+  //       rot * tci_container_->force_task_map_["rf_force_task"]
+  //                 ->CmdRf(); // global quantity
+  // } else if (wbic_ != nullptr)
+  //   dm->data_->rfoot_rf_cmd_ = rot * static_cast<WBIC *>(wbic_)
+  //                                        ->GetWBICData()
+  //                                        ->rf_cmd_.tail<6>(); // global quantity
 
   // IHWBC task weight, kp, kd, ki for plotting
   // TODO:clean up this
   if (ihwbc_ != nullptr) {
-    dm->data_->com_xy_weight =
-        tci_container_->task_map_["com_xy_task"]->Weight();
-    dm->data_->com_xy_kp = tci_container_->task_map_["com_xy_task"]->Kp();
-    dm->data_->com_xy_kd = tci_container_->task_map_["com_xy_task"]->Kd();
-    dm->data_->com_xy_ki = tci_container_->task_map_["com_xy_task"]->Ki();
-
-    dm->data_->com_z_weight =
-        tci_container_->task_map_["com_z_task"]->Weight()[0];
-    dm->data_->com_z_kp = tci_container_->task_map_["com_z_task"]->Kp()[0];
-    dm->data_->com_z_kd = tci_container_->task_map_["com_z_task"]->Kd()[0];
-
-    dm->data_->torso_ori_weight =
-        tci_container_->task_map_["torso_ori_task"]->Weight();
-    dm->data_->torso_ori_kp = tci_container_->task_map_["torso_ori_task"]->Kp();
-    dm->data_->torso_ori_kd = tci_container_->task_map_["torso_ori_task"]->Kd();
-
-    dm->data_->lf_pos_weight =
-        tci_container_->task_map_["lf_pos_task"]->Weight();
-    dm->data_->lf_pos_kp = tci_container_->task_map_["lf_pos_task"]->Kp();
-    dm->data_->lf_pos_kd = tci_container_->task_map_["lf_pos_task"]->Kd();
-
-    dm->data_->rf_pos_weight =
-        tci_container_->task_map_["rf_pos_task"]->Weight();
-    dm->data_->rf_pos_kp = tci_container_->task_map_["rf_pos_task"]->Kp();
-    dm->data_->rf_pos_kd = tci_container_->task_map_["rf_pos_task"]->Kd();
-
-    dm->data_->lf_ori_weight =
-        tci_container_->task_map_["lf_ori_task"]->Weight();
-    dm->data_->lf_ori_kp = tci_container_->task_map_["lf_ori_task"]->Kp();
-    dm->data_->lf_ori_kd = tci_container_->task_map_["lf_ori_task"]->Kd();
-
-    dm->data_->rf_ori_weight =
-        tci_container_->task_map_["rf_ori_task"]->Weight();
-    dm->data_->rf_ori_kp = tci_container_->task_map_["rf_ori_task"]->Kp();
-    dm->data_->rf_ori_kd = tci_container_->task_map_["rf_ori_task"]->Kd();
-
     dm->data_->joint_pos_des =  joint_pos_cmd_;
     dm->data_->joint_vel_des =  joint_vel_cmd_;
     dm->data_->joint_trq_des =  joint_trq_cmd_;

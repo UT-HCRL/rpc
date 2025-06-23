@@ -238,28 +238,28 @@ void TrackPlan::Compute() {
       dm->data_->left_foot_contact_costs_ = data_out.left_foot_contact_costs;
       dm->data_->right_foot_contact_costs_ = data_out.right_foot_contact_costs;
 
+      dm->data_->l_foot_rf_.resize(g1_mpc_->getNhorizon());
+      dm->data_->r_foot_rf_.resize(g1_mpc_->getNhorizon());
+      dm->data_->l_hand_rf_.resize(g1_mpc_->getNhorizon());
+      dm->data_->r_hand_rf_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_torso_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_left_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_right_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_left_knee_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_right_knee_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_left_rubber_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_right_rubber_pos_.resize(g1_mpc_->getNhorizon());
       for (int i = 0; i < g1_mpc_->getNhorizon(); ++i) {
-        dm->data_->l_foot_rf_.resize(g1_mpc_->getNhorizon());
-        dm->data_->r_foot_rf_.resize(g1_mpc_->getNhorizon());
-        dm->data_->l_hand_rf_.resize(g1_mpc_->getNhorizon());
-        dm->data_->r_hand_rf_.resize(g1_mpc_->getNhorizon());
         dm->data_->l_foot_rf_[i] = data_out.contact_forces["l_foot_contact_contact_" + std::to_string(i)];
         dm->data_->r_foot_rf_[i] = data_out.contact_forces["r_foot_contact_contact_" + std::to_string(i)];
         dm->data_->l_hand_rf_[i] = data_out.contact_forces["left_rubber_hand_contact_" + std::to_string(i)];
         dm->data_->r_hand_rf_[i] = data_out.contact_forces["right_rubber_hand_contact_" + std::to_string(i)];
         // predicted frame positions
-        dm->data_->predicted_torso_pos_.resize(g1_mpc_->getNhorizon());
-        // dm->data_->predicted_left_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
-        // dm->data_->predicted_right_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
-        // dm->data_->predicted_left_knee_pos_.resize(g1_mpc_->getNhorizon());
-        // dm->data_->predicted_right_knee_pos_.resize(g1_mpc_->getNhorizon());
-        dm->data_->predicted_left_rubber_pos_.resize(g1_mpc_->getNhorizon());
-        dm->data_->predicted_right_rubber_pos_.resize(g1_mpc_->getNhorizon());
         dm->data_->predicted_torso_pos_[i] = data_out.predicted_frame_positions["torso_primitive_shape_" + std::to_string(i)];
-        // dm->data_->predicted_left_ankle_roll_pos_[i] = data_out.predicted_frame_positions["left_ankle_roll_link_" + std::to_string(i)];
-        // dm->data_->predicted_right_ankle_roll_pos_[i] = data_out.predicted_frame_positions["right_ankle_roll_link_" + std::to_string(i)];
-        // dm->data_->predicted_left_knee_pos_[i] = data_out.predicted_frame_positions["left_knee_link_" + std::to_string(i)];
-        // dm->data_->predicted_right_knee_pos_[i] = data_out.predicted_frame_positions["right_knee_link_" + std::to_string(i)];
+        dm->data_->predicted_left_ankle_roll_pos_[i] = data_out.predicted_frame_positions["left_ankle_roll_link_" + std::to_string(i)];
+        dm->data_->predicted_right_ankle_roll_pos_[i] = data_out.predicted_frame_positions["right_ankle_roll_link_" + std::to_string(i)];
+        dm->data_->predicted_left_knee_pos_[i] = data_out.predicted_frame_positions["left_knee_link_" + std::to_string(i)];
+        dm->data_->predicted_right_knee_pos_[i] = data_out.predicted_frame_positions["right_knee_link_" + std::to_string(i)];
         dm->data_->predicted_left_rubber_pos_[i] = data_out.predicted_frame_positions["left_rubber_hand_" + std::to_string(i)];
         dm->data_->predicted_right_rubber_pos_[i] = data_out.predicted_frame_positions["right_rubber_hand_" + std::to_string(i)];
       }
@@ -301,6 +301,7 @@ void TrackPlan::Compute() {
     data_out.left_foot_contact_costs.clear();
     data_out.right_foot_contact_costs.clear();
     data_out.contact_forces.clear();
+    data_out.predicted_frame_positions.clear();
 
     {
       std::lock_guard<std::mutex> lock(data_mutex_);

@@ -188,6 +188,10 @@ def main():
         "predicted_torso",
         "predicted_lhand",
         "predicted_rhand",
+        "predicted_lankle",
+        "predicted_rankle",
+        "predicted_lknee",
+        "predicted_rknee",
     ]
 
     single_value_names = [
