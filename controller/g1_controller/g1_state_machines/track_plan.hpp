@@ -24,11 +24,15 @@ public:
 
   StateId GetNextState() override;
 
+  void ComputeSync();
+
   void SetParameters(const YAML::Node &node) override;
 
   void DoTrackPlan() { b_tracking_plan_ = true; }
 
 private:
+
+  float desired_frequency_ = 100.0; // Hz
 
   std::unique_ptr<HumanoidMulticontactTracker> g1_mpc_;
 
