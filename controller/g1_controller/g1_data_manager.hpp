@@ -100,7 +100,7 @@ public:
   Eigen::VectorXd joint_trq_des;
 
   // MPC Costs:
-  int total_iterations_;
+  int total_iterations_ = 0;
   std::vector<double> xReg_costs_;
   std::vector<double> uReg_costs_;
   std::vector<double> xBound_costs_;
@@ -148,6 +148,12 @@ public:
   // MPC solve statistics
   bool b_fddp_feasible_ = false;
   float solve_duration_ = 0.0f;
+
+  // Contact sensors
+  Eigen::Vector3d lf_contact_force_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d rf_contact_force_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d lh_contact_force_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d rh_contact_force_ = Eigen::Vector3d::Zero();
 
   // MPC PredictedFrame Positions
   std::vector<Eigen::Vector3d> predicted_torso_pos_ = {Eigen::Vector3d::Zero()};

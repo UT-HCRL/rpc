@@ -49,6 +49,8 @@ viz_curr_trajectories = {
     "right_knee_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03])
 }
 
+contact_sensor_forces = ["lf_contact_force", "rf_contact_force", "lh_contact_force", "rh_contact_force"]
+
 def rot_to_quat(rot):
     """
     Parameters
@@ -131,12 +133,15 @@ async def main():
         arrows_scene = ShapeScene()
         shape_params = ["arrows", [0, 0, 1, 1.0], [0.03, 0.1, 0.08]]
         shape_ghost_params = ["arrows", [0, 0, 1, 0.2], [0.03, 0.1, 0.08]]
+        shape_sensor_params = ["arrows", [0, 1, 0, 1.0], [0.03, 0.1, 0.08]]
         for name in crocoddyl_forces:
             for i in range(mpc_horizon):
                 if i == 0:
                     arrows_scene.add_shape(f"{name}_{i}", *shape_params)
                 else:
                     arrows_scene.add_shape(f"{name}_{i}", *shape_ghost_params)
+        for name in contact_sensor_forces:
+            arrows_scene.add_shape(name, *shape_sensor_params)
 
         des_traj_scene = ShapeScene()
         for frame_name, (rgba_color, scale) in viz_des_trajectories.items():
@@ -214,7 +219,7 @@ async def main():
         ).add_chan(server)
 
         mpc_fddp_feasible = await SceneChannel(
-            True, "fddp_feasible", "json", "fddp_feasible", ["value"]
+            True, "b_fddp_feasible", "json", "fddp_feasible", ["value"]
         ).add_chan(server)
 
         grfs_chan_id = await SceneChannel(
@@ -231,6 +236,19 @@ async def main():
             [
             f"r_hand_rf_{i}_{axis}" for i in range(mpc_horizon) for axis in ["x", "y", "z"]
             ]
+        ).add_chan(server)
+
+        lf_contact_sensor_id = await SceneChannel(
+            True, "lf_contact_force", "json", "lf_contact_force", ["x", "y", "z"]
+        ).add_chan(server)
+        rf_contact_sensor_id = await SceneChannel(
+            True, "rf_contact_force", "json", "rf_contact_force", ["x", "y", "z"]
+        ).add_chan(server)
+        lh_contact_sensor_id = await SceneChannel(
+            True, "lh_contact_force", "json", "lh_contact_force", ["x", "y", "z"]
+        ).add_chan(server)
+        rh_contact_sensor_id = await SceneChannel(
+            True, "rh_contact_force", "json", "rh_contact_force", ["x", "y", "z"]
         ).add_chan(server)
 
         normS_chan_id = await SceneChannel(
@@ -298,6 +316,65 @@ async def main():
                 }
             ).encode("utf8")
             await server.send_message(lf_pos_chan_id, now, json_bytes)
+            await server.send_message(
+                lf_contact_sensor_id,
+                now,
+                json.dumps(
+                    {
+                        "x": msg.lf_contact_force.x,
+                        "y": msg.lf_contact_force.y,
+                        "z": msg.lf_contact_force.z,
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                rf_contact_sensor_id,
+                now,
+                json.dumps(
+                    {
+                        "x": msg.rf_contact_force.x,
+                        "y": msg.rf_contact_force.y,
+                        "z": msg.rf_contact_force.z,
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                lh_contact_sensor_id,
+                now,
+                json.dumps(
+                    {
+                        "x": msg.lh_contact_force.x,
+                        "y": msg.lh_contact_force.y,
+                        "z": msg.lh_contact_force.z,
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                rh_contact_sensor_id,
+                now,
+                json.dumps(
+                    {
+                        "x": msg.rh_contact_force.x,
+                        "y": msg.rh_contact_force.y,
+                        "z": msg.rh_contact_force.z,
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                lf_pos_chan_id,
+                now,
+                json.dumps(
+                    {
+                        "x": msg.lfoot_pos.x,
+                        "y": msg.lfoot_pos.y,
+                        "z": msg.lfoot_pos.z,
+                    }
+                ).encode("utf8")
+            )
 
             await server.send_message(
                 rf_pos_chan_id,
@@ -606,7 +683,82 @@ async def main():
 
             Ry = R.from_euler("y", -np.pi / 2).as_matrix()
 
-            if hasattr(msg, "l_foot_rf") and hasattr(msg, "r_foot_rf") and msg.l_foot_rf and msg.r_foot_rf:
+            if hasattr(msg, "lf_contact_force") and hasattr(msg, "rf_contact_force") and hasattr(msg, "lh_contact_force") and hasattr(msg, "rh_contact_force"):
+                for obj in contact_sensor_forces:
+                    transform.parent_frame_id = "world"
+                    transform.timestamp.FromNanoseconds(now)
+
+                    # Determine the transform based on the object type
+                    if obj.startswith("lf"):
+                        if np.linalg.norm([msg.lfoot_ori.x, msg.lfoot_ori.y, msg.lfoot_ori.z, msg.lfoot_ori.w]) == 0:
+                            lfoot_ori = [0, 0, 0, 1]
+                        else:
+                            lfoot_ori = [msg.lfoot_ori.x, msg.lfoot_ori.y, msg.lfoot_ori.z, msg.lfoot_ori.w]
+                        R_foot = R.from_quat(lfoot_ori).as_matrix()
+                        transform.translation.x = msg.lfoot_pos.x
+                        transform.translation.y = msg.lfoot_pos.y
+                        transform.translation.z = msg.lfoot_pos.z
+                    elif obj.startswith("rf"):
+                        if np.linalg.norm([msg.rfoot_ori.x, msg.rfoot_ori.y, msg.rfoot_ori.z, msg.rfoot_ori.w]) == 0:
+                            rfoot_ori = [0, 0, 0, 1]
+                        else:
+                            rfoot_ori = [msg.rfoot_ori.x, msg.rfoot_ori.y, msg.rfoot_ori.z, msg.rfoot_ori.w]
+                        R_foot = R.from_quat(rfoot_ori).as_matrix()
+                        transform.translation.x = msg.rfoot_pos.x
+                        transform.translation.y = msg.rfoot_pos.y
+                        transform.translation.z = msg.rfoot_pos.z
+                    elif obj.startswith("lh"):
+                        if np.linalg.norm([msg.lhand_ori.x, msg.lhand_ori.y, msg.lhand_ori.z, msg.lhand_ori.w]) == 0:
+                            lhand_ori = [0, 0, 0, 1]
+                        else:
+                            lhand_ori = [msg.lhand_ori.x, msg.lhand_ori.y, msg.lhand_ori.z, msg.lhand_ori.w]
+                        R_foot = R.from_quat(lhand_ori).as_matrix()
+                        transform.translation.x = msg.lhand_pos.x
+                        transform.translation.y = msg.lhand_pos.y
+                        transform.translation.z = msg.lhand_pos.z
+                    elif obj.startswith("rh"):
+                        if np.linalg.norm([msg.rhand_ori.x, msg.rhand_ori.y, msg.rhand_ori.z, msg.rhand_ori.w]) == 0:
+                            rhand_ori = [0, 0, 0, 1]
+                        else:
+                            rhand_ori = [msg.rhand_ori.x, msg.rhand_ori.y, msg.rhand_ori.z, msg.rhand_ori.w]
+                        R_foot = R.from_quat(rhand_ori).as_matrix()
+                        transform.translation.x = msg.rhand_pos.x
+                        transform.translation.y = msg.rhand_pos.y
+                        transform.translation.z = msg.rhand_pos.z
+
+                    transform.rotation.x = 0
+                    transform.rotation.y = 0
+                    transform.rotation.z = 0
+                    transform.rotation.w = 1
+
+                    force_dir = np.array([
+                        getattr(msg, obj).x,
+                        getattr(msg, obj).y,
+                        getattr(msg, obj).z
+                    ])
+
+                    if np.all(force_dir != 0.0):
+                        force_norm = np.linalg.norm(force_dir)
+                        quat_force = compute_quat_to_vec(force_dir)
+
+                        force_magnitude = force_norm / 1200.0
+                        arrows_scene.scale(f"{obj}", quat_force, force_magnitude, now)
+
+                    else:
+                        arrows_scene.scale(f"{obj}", [0, 0, 0, 1], 0.0, now)
+
+                    transform.child_frame_id = f"{obj}"
+                    tasks.append(
+                        server.send_message(tf_chan_id, now, transform.SerializeToString())
+                    )
+                    await server.send_message(
+                        normS_chan_id, now, arrows_scene.serialized_msg(f"{obj}")
+                    )
+                    transform.rotation.Clear()
+                    transform.translation.Clear()
+
+
+            if hasattr(msg, "l_foot_rf") and hasattr(msg, "r_foot_rf"):
                 for obj in crocoddyl_forces:
                     transform.parent_frame_id = "world"
                     transform.timestamp.FromNanoseconds(now)
@@ -670,13 +822,17 @@ async def main():
 
                             force_magnitude = force_norm / 1200.0
                             arrows_scene.scale(f"{obj}_{i}", quat_force, force_magnitude, now)
-                            transform.child_frame_id = f"{obj}_{i}"
-                            tasks.append(
-                                server.send_message(tf_chan_id, now, transform.SerializeToString())
-                            )
-                            await server.send_message(
-                                normS_chan_id, now, arrows_scene.serialized_msg(f"{obj}_{i}")
-                            )
+
+                        else:
+                            arrows_scene.scale(f"{obj}_{i}", [0, 0, 0, 1], 0.0, now)
+
+                        transform.child_frame_id = f"{obj}_{i}"
+                        tasks.append(
+                            server.send_message(tf_chan_id, now, transform.SerializeToString())
+                        )
+                        await server.send_message(
+                            normS_chan_id, now, arrows_scene.serialized_msg(f"{obj}_{i}")
+                        )
             
             for frame_name in viz_des_trajectories.keys():
                 # Build the transform message
@@ -743,11 +899,8 @@ with open(pnc_path) as yaml_file:
     except yaml.YAMLError as exc:
         print(exc)
 
-# socket.setsockopt(zmq.MAXMSGSIZE, 1024 * 1024)  # 1 MB message size
-# socket.setsockopt(zmq.RCVHWM, 2000)
 socket.connect(ip_address)
 socket.setsockopt_string(zmq.SUBSCRIBE, "")
-# socket.subscribe(b"")   # subscribe to all messages
 
 if args.b_use_plotjuggler:
     pj_context = zmq.Context()
@@ -988,6 +1141,11 @@ def process_data_saver(visualize_type):
         for frame_name in viz_curr_trajectories.keys():
             pos_msg = getattr(msg, frame_name)
             data_saver.add(f"{frame_name}", [pos_msg.x, pos_msg.y, pos_msg.z])
+
+        data_saver.add("lf_contact_force", [msg.lf_contact_force.x, msg.lf_contact_force.y, msg.lf_contact_force.z])
+        data_saver.add("rf_contact_force", [msg.rf_contact_force.x, msg.rf_contact_force.y, msg.rf_contact_force.z])
+        data_saver.add("lh_contact_force" , [msg.lh_contact_force.x, msg.lh_contact_force.y, msg.lh_contact_force.z])
+        data_saver.add("rh_contact_force" , [msg.rh_contact_force.x, msg.rh_contact_force.y, msg.rh_contact_force.z])
 
     elif visualize_type == "none":
         data_saver.add("time", msg.time)

@@ -13,10 +13,11 @@ import numpy as np
 
 from scipy.spatial.transform import Rotation as R
 
-from util.python_utils.util import so3_from_vec_to_vec
-
 cwd = os.getcwd()
 sys.path.append(cwd)
+
+from util.python_utils.util import so3_from_vec_to_vec
+
 
 from mcap_protobuf.writer import Writer
 from UI.visualization_toolbox import update_robot_transform, update_2d_transform, update_3d_transform, get_rgba, COLOR_RGBA_MAP, rot_to_quat
@@ -134,14 +135,25 @@ def main():
         "right_knee_curr_pos",
         "left_rubber_hand_curr_pos",
         "right_rubber_hand_curr_pos",
-        "torso_curr_pos"
+        "torso_curr_pos",
+        "lf_contact_force",
+        "rf_contact_force",
+        "lh_contact_force",
+        "rh_contact_force"
     ]
 
     arrows_fddp_object_names = [
         "l_foot_rf",
         "r_foot_rf",
         "l_hand_rf",
-        "r_hand_rf",
+        "r_hand_rf"
+    ]
+
+    arrows_sensor_object_names = [
+        "lf_contact_force",
+        "rf_contact_force",
+        "lh_contact_force",
+        "rh_contact_force"
     ]
 
     spheres_des_object_names = [
@@ -205,6 +217,7 @@ def main():
     vis_des_spheres_dict = {}
     vis_curr_spheres_dict = {}
     vis_arrows_dict = {}
+    vis_sensor_arrows_dict = {}
     predicted_object_dict = {}
     single_value_dict = {}
 
@@ -224,6 +237,11 @@ def main():
         for i in range(mpc_horizon):
             vis_arrows_dict[f"{oname}_{i}"] = []
             print(f"Debugging vis_arrows_dict[{oname}_{i}]: {vis_arrows_dict[f'{oname}_{i}']}")
+
+    for oname in arrows_sensor_object_names:
+        vis_sensor_arrows_dict[oname] = []
+
+    # print(f"Debugging vis_sensor_arrows_dict: {vis_sensor_arrows_dict}")
 
     for oname in predicted_object_names:
         for i in range(mpc_horizon):
@@ -258,12 +276,16 @@ def main():
                     for i in range(mpc_horizon):
                         vis_arrows_dict[f"{oname}_{i}"].append(d[f"{oname}_{i}"])
 
+                for oname in arrows_sensor_object_names:
+                    vis_sensor_arrows_dict[oname].append(d[oname])
+
                 for oname in predicted_object_names: #predicted frame positions
                     for i in range(mpc_horizon):
                         predicted_object_dict[f"{oname}_{i}"].append(d[f"{oname}_{i}"])
 
                 for oname in single_value_names: #fddp solve statistics
                     single_value_dict[oname].append(d[oname])
+
 
             except EOFError:
                 break
@@ -278,9 +300,6 @@ def main():
     for frame_id in spheres_des_object_names:
         scenes_dict[frame_id] = create_sphere_scene(frame_id, get_rgba("red"), sized=0.03)
 
-    # for frame_id in spheres_curr_object_names:
-    #     scenes_dict[frame_id] = create_sphere_scene(frame_id, get_rgba("blue"), sized=0.03)
-        
     for frame_name in predicted_object_names:
         for i in range(mpc_horizon):
             alpha = np.maximum(1 - 0.2*i, 0.02)
@@ -357,6 +376,14 @@ def main():
                     int(time[i] * 1e9),
                 )
 
+            # for vname, vval in vis_sensor_arrows_dict.items():
+            #     mcap_writer.write_message(
+            #         vname,
+            #         Point3(x=vval[i][0], y=vval[i][1], z=vval[i][2]),
+            #         int(time[i] * 1e9),
+            #         int(time[i] * 1e9),
+            #     )
+
             for cname, cval in vis_horizon_dict.items():
                 for knot_index, knot_value in enumerate(cval[i]):
                     name = f"{cname}_N_{knot_index}"
@@ -407,19 +434,27 @@ def main():
                     ori_data = vis_3d_dict["rfoot_ori"][i]
                 elif arrow_name == "l_hand_rf":
                     pos_data = vis_3d_dict["lhand_pos"][i]
-                    ori_data = [0, 0, 0, 1]  # Do i need a rot?
+                    ori_data = [0, 0, 0, 1]
                 elif arrow_name == "r_hand_rf":
                     pos_data = vis_3d_dict["rhand_pos"][i]
                     ori_data = [0, 0, 0, 1]
                 
                 for knot_index in range(mpc_horizon):
-
                     knot_arrow_name = f"{arrow_name}_{knot_index}"
                     if knot_arrow_name in vis_arrows_dict and len(vis_arrows_dict[knot_arrow_name]) > i:
                         force_data = vis_arrows_dict[knot_arrow_name][i]
-                        if np.all(np.array(force_data) == 0.0):
-                            continue
-                        so3_up_to_ori = so3_from_vec_to_vec(np.array([1, 0, 0]), np.array(force_data))
+                        if np.all(np.array(force_data) != 0.0):
+                            so3_up_to_ori = so3_from_vec_to_vec(np.array([1, 0, 0]), np.array(force_data))
+                            q_cmd_arrow = rot_to_quat(so3_up_to_ori)
+                            transform.rotation.x = q_cmd_arrow[0]
+                            transform.rotation.y = q_cmd_arrow[1]
+                            transform.rotation.z = q_cmd_arrow[2]
+                            transform.rotation.w = q_cmd_arrow[3]
+                        else:
+                            transform.rotation.x = 0
+                            transform.rotation.y = 0
+                            transform.rotation.z = 0
+                            transform.rotation.w = 1
                     else:
                         print(f"Warning: {knot_arrow_name} not found or index {i} out of range in vis_arrows_dict.")
                         continue
@@ -431,29 +466,82 @@ def main():
                     transform.translation.y = pos_data[1]
                     transform.translation.z = pos_data[2]
 
-                    q_cmd_arrow = rot_to_quat(so3_up_to_ori)
-                    transform.rotation.x = q_cmd_arrow[0]
-                    transform.rotation.y = q_cmd_arrow[1]
-                    transform.rotation.z = q_cmd_arrow[2]
-                    transform.rotation.w = q_cmd_arrow[3]
-
                     mcap_writer.write_message(
                         "transforms", transform, int(time[i] * 1e9), int(time[i] * 1e9)
                     )
                     transform.rotation.Clear()
                     transform.translation.Clear()
 
-                    arrow_scene = create_arrow_scene(
-                        knot_arrow_name,
-                        force_data[0],
-                        force_data[1],
-                        force_data[2],
-                        get_rgba("s_blue" if knot_index == 0 else "blue")
-                    )
+                    if np.all(np.array(force_data) < 1e-6):
+                        arrow_scene = create_arrow_scene(
+                            knot_arrow_name,
+                            force_data[0],
+                            force_data[1],
+                            force_data[2],
+                            [0.0, 0.0, 1.0, 0.0]  # Transparent arrow if no force
+                        )
+                    else:
+                        arrow_scene = create_arrow_scene(
+                            knot_arrow_name,
+                            force_data[0],
+                            force_data[1],
+                            force_data[2],
+                            get_rgba("s_blue" if knot_index == 0 else "blue")
+                        )
                     arrow_scene.entities[0].timestamp.FromNanoseconds(int(time[i] * 1e9))
                     mcap_writer.write_message(
                         f"{knot_arrow_name}_arrow_marker", arrow_scene, int(time[i] * 1e9), int(time[i] * 1e9)
                     )
+
+            for arrow_name in arrows_sensor_object_names:
+                if arrow_name == "lf_contact_force":
+                    pos_data = vis_3d_dict["lfoot_pos"][i]
+                    ori_data = vis_3d_dict["lfoot_ori"][i]
+                elif arrow_name == "rf_contact_force":
+                    pos_data = vis_3d_dict["rfoot_pos"][i]
+                    ori_data = vis_3d_dict["rfoot_ori"][i]
+                elif arrow_name == "lh_contact_force":
+                    pos_data = vis_3d_dict["lhand_pos"][i]
+                    ori_data = [0, 0, 0, 1]
+                elif arrow_name == "rh_contact_force":
+                    pos_data = vis_3d_dict["rhand_pos"][i]
+                    ori_data = [0, 0, 0, 1]
+
+                force_data = vis_sensor_arrows_dict[arrow_name][i]
+                transform.parent_frame_id = "world"
+                transform.child_frame_id = arrow_name
+                transform.translation.x = pos_data[0]
+                transform.translation.y = pos_data[1]
+                transform.translation.z = pos_data[2]
+                transform.rotation.x = 0
+                transform.rotation.y = 0
+                transform.rotation.z = 0
+                transform.rotation.w = 1
+                mcap_writer.write_message(
+                    "transforms", transform, int(time[i] * 1e9), int(time[i] * 1e9)
+                )
+                transform.rotation.Clear()
+                transform.translation.Clear()
+                if np.all(np.array(force_data) < 1e-6):
+                    arrow_scene = create_arrow_scene(
+                        arrow_name,
+                        force_data[0],
+                        force_data[1],
+                        force_data[2],
+                        [0.0, 0.0, 1.0, 0.0]  # Transparent arrow if no force
+                    )
+                else:
+                    arrow_scene = create_arrow_scene(
+                        arrow_name,
+                        force_data[0],
+                        force_data[1],
+                        force_data[2],
+                        get_rgba("s_yellow")
+                    )
+                arrow_scene.entities[0].timestamp.FromNanoseconds(int(time[i] * 1e9))
+                mcap_writer.write_message(
+                    f"{arrow_name}_arrow_marker", arrow_scene, int(time[i] * 1e9), int(time[i] * 1e9)
+                )
 
         mcap_writer.finish()
 

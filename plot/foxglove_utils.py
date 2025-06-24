@@ -12,6 +12,7 @@ def SubtopicGen(names):
 class ShapeScene:
     def __init__(self):
         self.shapes = {}
+        self.shapes_alphas = {}
 
     def add_shape(self, name, shape, color, size):
         shape_update = SceneUpdate()
@@ -34,6 +35,7 @@ class ShapeScene:
             shape_model.size.z = size[2]
         # update dictionary of shapes to visualize
         self.shapes[name] = shape_update
+        self.shapes_alphas[name] = color[3]
 
     def update(self, name, timestamp):
         self.shapes[name].entities[0].timestamp.FromNanoseconds(timestamp)
@@ -50,6 +52,12 @@ class ShapeScene:
         self.shapes[name].entities[0].arrows[
             0
         ].shaft_length = force_magnitude  # scale down
+
+        if force_magnitude < 1e-6:
+            self.shapes[name].entities[0].arrows[0].color.a = 0.0
+        else:
+            self.shapes[name].entities[0].arrows[0].color.a = self.shapes_alphas[name]
+           
 
     def serialized_msg(self, name):
         return self.shapes[name].SerializeToString()

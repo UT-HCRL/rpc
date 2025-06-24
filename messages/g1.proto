@@ -114,4 +114,10 @@ message pnc_msg {
   Pos right_knee_des_pos = 67;
   Pos left_rubber_hand_des_pos = 68;
   Pos right_rubber_hand_des_pos = 69;
+
+  // Sensed contact forces
+  Pos lf_contact_force = 70;
+  Pos rf_contact_force = 71;
+  Pos lh_contact_force = 72;
+  Pos rh_contact_force = 73;
 }

@@ -130,3 +130,10 @@ initial_config:
   right_zero_joint: 0.
   right_one_joint: 0.
   right_two_joint: 0.
+
+## Assumption [LF, RF, LH, RH] 
+contact_sensor_frames:
+  - left_ankle_roll_link
+  - right_ankle_roll_link
+  - left_wrist_yaw_link
+  - right_wrist_yaw_link

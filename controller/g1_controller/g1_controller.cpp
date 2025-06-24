@@ -320,10 +320,9 @@ void G1Controller::_SaveData() {
 #if B_USE_ZMQ
   G1DataManager *dm = G1DataManager::GetDataManager();
 
-  dm->data_->lfoot_pos_ =
-      tci_container_->task_map_["lf_pos_task"]->CurrentPos();
-  dm->data_->rfoot_pos_ =
-      tci_container_->task_map_["rf_pos_task"]->CurrentPos();
+  // task data for meshcat visualize
+  dm->data_->lfoot_pos_ = robot_->GetLinkIsometry(g1_link::l_foot_contact).translation();
+  dm->data_->rfoot_pos_ = robot_->GetLinkIsometry(g1_link::r_foot_contact).translation();
   dm->data_->lfoot_ori_ =
       tci_container_->task_map_["lf_ori_task"]->CurrentPos();
   dm->data_->rfoot_ori_ =
@@ -370,8 +369,6 @@ void G1Controller::_SaveData() {
   //                                        ->GetWBICData()
   //                                        ->rf_cmd_.tail<6>(); // global quantity
 
-  // IHWBC task weight, kp, kd, ki for plotting
-  // TODO:clean up this
   if (ihwbc_ != nullptr) {
     dm->data_->joint_pos_des =  joint_pos_cmd_;
     dm->data_->joint_vel_des =  joint_vel_cmd_;
