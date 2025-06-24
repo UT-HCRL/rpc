@@ -22,6 +22,7 @@
     <mesh file="meshes/navy_door_765x1450_collision_7.obj"/>
   </asset>
   <worldbody>
+    <geom name="vertical_plane_at_y" type="plane" size="2 2 0.1" pos="0 0.34 0" quat="0.707 -0.707 0 0" rgba="0 1 0 0.5" contype="0" conaffinity="0"/>
     <body name="navy_door_765x1450" pos="0.32 0 0">
       <geom mesh="navy_door_765x1450_0" material="0.615686_0.811765_0.929412_0.000000_0.000000" class="visual" euler="0 0 1.57"/>
       <geom mesh="navy_door_765x1450_1" material="0.498039_0.498039_0.498039_0.000000_0.000000" class="visual" euler="0 0 1.57"/>
