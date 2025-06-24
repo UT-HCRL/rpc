@@ -120,4 +120,8 @@ message pnc_msg {
   Pos rf_contact_force = 71;
   Pos lh_contact_force = 72;
   Pos rh_contact_force = 73;
+
+  bool b_lhand = 74;
+  bool b_rhand = 75;
+
 }

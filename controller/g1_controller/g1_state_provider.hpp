@@ -29,6 +29,8 @@ public:
 
   bool b_lf_contact_;
   bool b_rf_contact_;
+  bool b_lh_contact_;
+  bool b_rh_contact_;
   bool b_request_change_swing_leg_;
   int b_swing_leg_;
 

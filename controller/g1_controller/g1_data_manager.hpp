@@ -43,6 +43,8 @@ public:
 
   bool b_lfoot_ = false;
   bool b_rfoot_ = false;
+  bool b_lhand_ = false;
+  bool b_rhand_ = false;
   double lfoot_volt_normal_raw_ = 0.;
   double rfoot_volt_normal_raw_ = 0.;
   double lfoot_rf_normal_ = 0.;

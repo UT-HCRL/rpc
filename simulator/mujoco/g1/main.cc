@@ -545,8 +545,8 @@ bool CopySensorData() {
   for(int i = 0; i < d->ncon; i++){
       mjContact &con = d->contact[i];
 
-      mj_contactForce(m, d, i, force);
-      
+      mj_contactForce(m, d, i, force);  // get force in the contact frame
+
       std::pair<bool, int> sensor_contact_pair = CheckContact(m->geom_bodyid[con.geom[0]], m->geom_bodyid[con.geom[1]]);
       bool sensor_contact = sensor_contact_pair.first;
       int b_flags = sensor_contact_pair.second;

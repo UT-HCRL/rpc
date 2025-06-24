@@ -26,6 +26,8 @@ G1StateEstimator::G1StateEstimator(PinocchioRobotSystem *robot,
   // assume start with double support
   sp_->b_lf_contact_ = true;
   sp_->b_rf_contact_ = true;
+  sp_->b_lh_contact_ = false;
+  sp_->b_rh_contact_ = false;
 
   R_imu_base_com_ =
       robot_->GetLinkIsometry(g1_link::imu_in_torso).linear().transpose() *
@@ -299,6 +301,8 @@ void G1StateEstimator::UpdateGroundTruthSensorData(
     dm->data_->est_icp = sp_->dcm_.head<2>();
     dm->data_->b_lfoot_ = sp_->b_lf_contact_;
     dm->data_->b_rfoot_ = sp_->b_rf_contact_;
+    dm->data_->b_lhand_ = sp_->b_lh_contact_;
+    dm->data_->b_rhand_ = sp_->b_rh_contact_;
 
     dm->data_->lf_contact_force_ = sensor_data->lf_contact_force_;
     dm->data_->rf_contact_force_ = sensor_data->rf_contact_force_;

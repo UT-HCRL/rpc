@@ -115,6 +115,8 @@ void G1DataManager::SendData()
   // contact sensing measurements
   msg.set_b_lfoot(data_->b_lfoot_);
   msg.set_b_rfoot(data_->b_rfoot_);
+  msg.set_b_lhand(data_->b_lhand_);
+  msg.set_b_rhand(data_->b_rhand_);
 
   // =============================================================
   // Sensor Data
