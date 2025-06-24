@@ -43,9 +43,9 @@ private:
   bool b_wait_complete_{false}; // [true, false] <-> [wait for MPC to complete, use fixed rate stepping]
 
   std::mutex data_mutex_;
-  Eigen::VectorXd mpc_q_;
-  Eigen::VectorXd mpc_q_dot_;
-  Eigen::VectorXd mpc_tau_;
+  Eigen::Matrix<double, 27, 1> mpc_q_;
+  Eigen::Matrix<double, 27, 1> mpc_q_dot_;
+  Eigen::Matrix<double, 27, 1> mpc_tau_;
   bool has_new_data_;
 
   G1ControlArchitecture *ctrl_arch_;

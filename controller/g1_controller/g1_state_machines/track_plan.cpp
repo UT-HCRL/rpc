@@ -109,8 +109,8 @@ void TrackPlan::OneStep() {
     new_q_dot = mpc_q_dot_;
     new_tau = mpc_tau_;
     ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(
-        new_q.tail(g1_mpc_->getQ0Size()),
-        new_q_dot.tail(g1_mpc_->getQ0Size()),
+        new_q,
+        new_q_dot,
         new_tau
     );
   }
@@ -132,8 +132,8 @@ void TrackPlan::OneStep() {
           has_new_data_ = false;
 
           ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(
-            new_q.tail(g1_mpc_->getQ0Size()), 
-            new_q_dot.tail(g1_mpc_->getQ0Size()), 
+            new_q,
+            new_q_dot,
             new_tau
           );
         } else {
@@ -307,8 +307,8 @@ void TrackPlan::ComputeSync(){
     data_out.right_foot_contact_costs.clear();
     data_out.contact_forces.clear();
 
-    mpc_q_ = xs_out[0].head(xs_out[0].size() / 2);
-    mpc_q_dot_ = xs_out[0].tail(xs_out[0].size() / 2);
+    mpc_q_ = xs_out[0].head(robot_->GetQ().size()).tail(robot_->NumActiveDof()); // q_joints
+    mpc_q_dot_ = xs_out[0].tail(robot_->NumActiveDof());  // qdot_joints
     mpc_tau_ = us_out[0];
 
 }
@@ -443,8 +443,8 @@ void TrackPlan::Compute() {
 
       {
         std::lock_guard<std::mutex> lock(data_mutex_);
-        mpc_q_ = xs_out[0].head(xs_out[0].size() / 2);
-        mpc_q_dot_ = xs_out[0].tail(xs_out[0].size() / 2);
+        mpc_q_ = xs_out[0].head(robot_->GetQ().size()).tail(robot_->NumActiveDof());  // q_joints
+        mpc_q_dot_ = xs_out[0].tail(robot_->NumActiveDof());  // qdot_joints
         mpc_tau_ = us_out[0];
         has_new_data_ = true;
       }
