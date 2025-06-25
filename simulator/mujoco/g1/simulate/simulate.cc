@@ -1529,6 +1529,7 @@ void UiEvent(mjuiState* state) {
       case mjKEY_P:
         if (sim->interrupt_handler_) {
           sim->interrupt_handler_->PressP();
+          sim->mpc_trigger_ = true;
         } else {
           std::cout << "[Mujoco Sim] Interrupt Handler Error!" << '\n';
         }

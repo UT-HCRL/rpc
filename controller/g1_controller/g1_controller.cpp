@@ -311,7 +311,10 @@ void G1Controller::GetCommand(void *command) {
 
   joint_trq_cmd_prev_ = joint_trq_cmd_;
 
-  if (sp_->count_ % sp_->data_save_freq_ == 0) {
+  if (sp_->state_ == g1_states::kTrackPlan) {
+      this->_SaveData();
+  }
+  else if (sp_->count_ % sp_->data_save_freq_ == 0) {
     this->_SaveData();
   }
 }

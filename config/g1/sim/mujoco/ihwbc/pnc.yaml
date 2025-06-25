@@ -1,6 +1,7 @@
 env: mujoco
 wbc_type: ihwbc
 servo_dt: 0.00125
+mpc_dt: 0.0125
 ip_address: "tcp://127.0.0.1:5557"
 teleop_ip_address: "tcp://10.157.137.100:5555"
 

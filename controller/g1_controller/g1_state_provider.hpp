@@ -8,6 +8,7 @@ public:
   ~G1StateProvider() = default;
 
   // servo dt should be set outside of controller
+  double mpc_dt_;
   double servo_dt_;
   int data_save_freq_;
 
