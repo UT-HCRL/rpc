@@ -122,7 +122,8 @@ def main():
         "rfoot_ori",
         "lhand_pos", 
         "rhand_pos", 
-        "torso_des_pos", 
+        "torso_des_pos",
+        "com_curr_pos",
         "left_rubber_hand_des_pos", 
         "right_rubber_hand_des_pos", 
         "left_ankle_roll_des_pos", 
@@ -163,7 +164,7 @@ def main():
         "left_ankle_roll_des_pos", 
         "right_ankle_roll_des_pos", 
         "left_knee_des_pos", 
-        "right_knee_des_pos"
+        "right_knee_des_pos",
     ]
 
     spheres_curr_object_names = [
@@ -173,7 +174,8 @@ def main():
         "right_knee_curr_pos",
         "left_rubber_hand_curr_pos",
         "right_rubber_hand_curr_pos",
-        "torso_curr_pos"
+        "torso_curr_pos",
+        "com_curr_pos",
     ]
 
     vis_horzon_object_names = [
@@ -299,6 +301,12 @@ def main():
     scenes_dict = {}
     for frame_id in spheres_des_object_names:
         scenes_dict[frame_id] = create_sphere_scene(frame_id, get_rgba("red"), sized=0.03)
+
+    for frame_id in spheres_curr_object_names:
+        if frame_id == "com_curr_pos":
+            scenes_dict[frame_id] = create_sphere_scene(frame_id, get_rgba("s_black"), sized=0.03)
+        else:
+            scenes_dict[frame_id] = create_sphere_scene(frame_id, get_rgba("blue"), sized=0.03)
 
     for frame_name in predicted_object_names:
         for i in range(mpc_horizon):
