@@ -510,13 +510,21 @@ def main():
                 force_data = vis_sensor_arrows_dict[arrow_name][i]
                 transform.parent_frame_id = "world"
                 transform.child_frame_id = arrow_name
+                if np.all(np.array(force_data) != 0.0):
+                    so3_up_to_ori = so3_from_vec_to_vec(np.array([1, 0, 0]), np.array(force_data))
+                    quat_sensor_arrow = rot_to_quat(so3_up_to_ori)
+                    transform.rotation.x = quat_sensor_arrow[0]
+                    transform.rotation.y = quat_sensor_arrow[1]
+                    transform.rotation.z = quat_sensor_arrow[2]
+                    transform.rotation.w = quat_sensor_arrow[3]
+                else:
+                    transform.rotation.x = 0
+                    transform.rotation.y = 0
+                    transform.rotation.z = 0
+                    transform.rotation.w = 1
                 transform.translation.x = pos_data[0]
                 transform.translation.y = pos_data[1]
                 transform.translation.z = pos_data[2]
-                transform.rotation.x = 0
-                transform.rotation.y = 0
-                transform.rotation.z = 0
-                transform.rotation.w = 1
                 mcap_writer.write_message(
                     "transforms", transform, int(time[i] * 1e9), int(time[i] * 1e9)
                 )

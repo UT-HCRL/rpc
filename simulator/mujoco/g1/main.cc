@@ -407,8 +407,7 @@ void SetInitialConfig(mjModel *m, mjData *d,
   // mju_copy(d->qpos, m->key_qpos, m->nq);
 }
 
-void SetContactMap(const mjModel *m,
-                   std::vector<int> &mj_contact_sensor_ids) {
+void SetContactMap(const mjModel *m) {
 
   // set foot contact map
   mj_contact_sensor_ids_.clear();
@@ -536,6 +535,8 @@ bool CopySensorData() {
 
   // Reset internal contact sensor flags and forces
   mjtNum force[6];
+  Eigen::Vector3d c_lin_force;
+  Eigen::Vector3d w_lin_force;
   mj_contact_sensor_flags_.clear();
   mj_contact_sensor_flags_.resize(4, false);
   mj_contact_sensor_forces_.clear();
@@ -551,8 +552,27 @@ bool CopySensorData() {
       bool sensor_contact = sensor_contact_pair.first;
       int b_flags = sensor_contact_pair.second;
       if (sensor_contact) {
+        double flip_sign = 1.0;
+        Eigen::Matrix3d con_frame;
+
+        // check if we need to flip force direction
+        std::string contact_body0 = mj_id2name(m, mjOBJ_BODY, m->geom_bodyid[con.geom[0]]);
+        std::string contact_body1 = mj_id2name(m, mjOBJ_BODY, m->geom_bodyid[con.geom[1]]);
+        if (std::string(contact_body0).find("wrist") != std::string::npos ||
+        std::string(contact_body1).find("wrist") != std::string::npos) {
+          flip_sign = -1.0; // flip sign for reaction force of hands on door
+        }
+
+        // convert contact force to world frame
+        w_lin_force.setZero();
+        c_lin_force << force[0], force[1], force[2]; // forces in contact frame
+        con_frame << con.frame[0], con.frame[1], con.frame[2],
+                    con.frame[3], con.frame[4], con.frame[5],
+                    con.frame[6], con.frame[7], con.frame[8];
+        w_lin_force = con_frame.transpose() * flip_sign * c_lin_force; // convert to world frame
+
         mj_contact_sensor_flags_[b_flags] = true;
-        mj_contact_sensor_forces_[b_flags] = Eigen::Vector3d(force[0], force[1], force[2]);
+        mj_contact_sensor_forces_[b_flags] += w_lin_force;
       }
   }
 
@@ -866,8 +886,11 @@ void PhysicsThread(mj::Simulate *sim, const char *filename) {
 
       // Initialise sensor data
       //**********************************************
-      SetContactMap(m, mj_contact_sensor_ids_);
+      SetContactMap(m);
       //**********************************************
+
+      // Increase force vector length
+      m->vis.map.force = 0.1;
 
       // lock the sim mutex
       const std::unique_lock<std::recursive_mutex> lock(sim->mtx);
