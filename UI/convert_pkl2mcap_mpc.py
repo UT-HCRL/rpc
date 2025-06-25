@@ -124,7 +124,8 @@ def main():
         "rhand_pos", 
         "torso_des_pos",
         "com_curr_pos",
-        "left_rubber_hand_des_pos", 
+        "com_des_pos",
+        "left_rubber_hand_des_pos",
         "right_rubber_hand_des_pos", 
         "left_ankle_roll_des_pos", 
         "right_ankle_roll_des_pos", 
@@ -165,6 +166,7 @@ def main():
         "right_ankle_roll_des_pos", 
         "left_knee_des_pos", 
         "right_knee_des_pos",
+        "com_des_pos",
     ]
 
     spheres_curr_object_names = [

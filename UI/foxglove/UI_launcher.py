@@ -37,6 +37,7 @@ viz_des_trajectories = {
     "torso_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
     "left_knee_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
     "right_knee_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
+    "com_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
 }
 
 viz_curr_trajectories = {

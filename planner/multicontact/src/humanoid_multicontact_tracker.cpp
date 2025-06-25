@@ -577,7 +577,7 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         if(cost_mask_[2]) {
             for(size_t i = 0; i < N + 1; i++){
                 com_residual_[i]->set_reference(desired_com[i]);
-
+                data_out.com_ref_pos =desired_com[i];
             }
         }
         if(cost_mask_[3]) {
@@ -707,7 +707,7 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         if(cost_mask_[2]) data_out.com_costs.push_back(getCostValue("CoMTracking", i));
     }
 
-    if(cost_mask_[2]) data_out.com_curr_pos =  pinocchio::centerOfMass(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
+    data_out.com_curr_pos =  pinocchio::centerOfMass(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
 
     if(cost_mask_[3]) {
         for(size_t i = 0; i < N + 1; i++){
