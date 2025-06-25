@@ -160,4 +160,7 @@ class HumanoidMulticontactTracker{
         //### DARE TEMP VARIABLES ###
         Eigen::MatrixXd K_DARE_;
 
+        //### FUNC UTILS ###
+        void printModelContacts() const;
+
 };

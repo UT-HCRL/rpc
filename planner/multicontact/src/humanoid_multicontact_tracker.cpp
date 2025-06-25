@@ -309,10 +309,6 @@ void HumanoidMulticontactTracker::addFrameTrackingCost(const std::string& frame_
     pinocchio::forwardKinematics(model_full_, *pinocchio_data_, q);
     pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
 
-    // pinocchio::SE3 current_pose = data_full_.oMf[model_full_.getFrameId(frame_name)];
-    // std::cout << "current_pose which will be desired is: " << current_pose.translation().transpose() << std::endl;
-    // std::cout << "current_pose rotation is: " << current_pose.rotation().eulerAngles(0, 1, 2).transpose() << std::endl;
-
     Eigen::Vector3d torso_pos = {0.0340706, -8.68116e-05, 0.696563};
     Eigen::Vector3d torso_rot = {0, 0, 0};
     pinocchio::SE3 current_pose = pinocchio::SE3(Eigen::AngleAxisd(torso_rot[0], Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(torso_rot[1], Eigen::Vector3d::UnitY()) * Eigen::AngleAxisd(torso_rot[2], Eigen::Vector3d::UnitZ()), torso_pos);
@@ -411,7 +407,7 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
             // rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
             // rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
             // rotation = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
-            std::cout << "Friction cone Z axis: " << rotation.col(2).transpose() << std::endl;
+            // std::cout << "Friction cone Z axis: " << rotation.col(2).transpose() << std::endl;
             // rotation = LH_rotation_;
             std::string contact_suffix;
             contact_suffix = (phase == mpc_utils::Phase::Running) ? "_contact" : "_contact_terminal";
@@ -465,8 +461,10 @@ void HumanoidMulticontactTracker::activateContacts(const std::vector<std::string
     for (const auto& frame_name : frame_names) {
         for (size_t i = 0; i < N_horizon_; i++) {
             running_contact_models_[i]->changeContactStatus(frame_name + "_contact", true);
+            running_cost_model_[i]->changeCostStatus(frame_name + "_friction_cone", true);
         }
         terminal_contact_models_->changeContactStatus(frame_name + "_contact_terminal", true);
+        terminal_cost_model_->changeCostStatus(frame_name + "_friction_cone", true);
     }
 }
  
@@ -522,9 +520,9 @@ void HumanoidMulticontactTracker::setFrames(const std::vector<std::string>& fram
     frame_names_ = frame_names;
     for (const auto& frame_name : frame_names_) {
         if (model_full_.existFrame(frame_name)) {
-            std::cout << "Frame " << frame_name << " exists in the model." << std::endl;
+            // std::cout << "Frame " << frame_name << " exists in the model." << std::endl;
         } else {
-            std::cout << "Frame " << frame_name << " does not exist in the model." << std::endl;
+            std::cout << "[Crocoddyl] Error: Frame " << frame_name << " does not exist in the model." << std::endl;
         }
     }
 }
@@ -542,7 +540,7 @@ void HumanoidMulticontactTracker::initializeSolver(){
     for(std::size_t i = 0; i < N_horizon_; ++i) {
         runningModelsWithEuler.push_back(std::make_shared<crocoddyl::IntegratedActionModelEuler>(running_DAMS_[i], dt_));
     }
-    std::shared_ptr<crocoddyl::ActionModelAbstract> terminalModelWithEuler = std::make_shared<crocoddyl::IntegratedActionModelEuler>(terminal_DAM, dt_);
+    std::shared_ptr<crocoddyl::ActionModelAbstract> terminalModelWithEuler = std::make_shared<crocoddyl::IntegratedActionModelEuler>(terminal_DAM, 0);
 
     std::vector<std::shared_ptr<crocoddyl::ActionModelAbstract>> running_models; // TODO move running_models to class property?
     for(std::size_t i = 0; i < N_horizon_; ++i) {
@@ -632,7 +630,7 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
     }else{
 
         if (contact_trigger) {
-            std::cout << " HERE IS DELETING CONTACT \n";
+            std::cout << "\n\n\n\n[Crocoddyl] Here contact switch happens\n";
             std::vector<std::string> to_remove = {"l_foot_contact"};
             std::vector<std::string> to_add = {"left_rubber_hand"};
             pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
@@ -641,6 +639,8 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             deactivateContacts(to_remove);
             activateContacts(to_add);
 
+            // printModelContacts();
+            
             // change initial torque guess at contact with quasi-static solution with new contact states
             xs_out[0].tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv());
             std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
@@ -663,26 +663,21 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
                 for (const auto& frame_name : frame_targets_) {
                     const pinocchio::SE3 temp = desired_frames[i][frame_name.first];
                     if(!isContactActive(frame_name.first)){
+                        // std::cout << "Contact for frame " << frame_name.first << " is not active, setting reference to desired pose." << std::endl;
+                        if (frame_name.first == "left_ankle_roll_link") {
+                            // std::cout << "Reference for left ankle: " << temp.translation().transpose() << std::endl;
+                        }
                         frame_residuals_[i][frame_name.first]->set_reference(temp);
                     }
                 }
             }
         }
 
-        fddp_->setCandidate(xs_out, us, true);
         auto start_time = std::chrono::high_resolution_clock::now();
         fddp_->solve(xs_out, us, max_iter_);
         getEigenForceFromSolver();
         auto end_time = std::chrono::high_resolution_clock::now();
         solve_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-        // std::cout << "Solver duration: " << duration << " ms" << std::endl;
-        // avg_solve_time_ = (avg_solve_time_ * iteration + duration) / (iteration + 1);
-        // iteration++;
-        // if(iteration% 10 == 0) {
-        //     std::cout << "Iteration: " << iteration << ", Average solver time: " << avg_solve_time_ << " ms" << std::endl;
-        // }
-        // std::cout << "Problem is " << (fddp_->get_is_feasible() ? "Feasible" : "Infeasible") 
-        //       << ", Iterations: " << fddp_->get_iter() << "\n";
 
     }
     fddp_->get_is_feasible() ? data_out.b_fddp_feasible = true : data_out.b_fddp_feasible = false;
@@ -930,4 +925,46 @@ std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> const HumanoidMult
     
     return forces_trajectory;
 
+}
+
+void HumanoidMulticontactTracker::printModelContacts() const{
+
+    std::cout << "\n\n\n--------\n\n\n";
+
+    auto running_models = problem_->get_runningModels();
+    for (std::size_t i = 0; i < running_models.size(); ++i) {
+        auto integrated_model = std::dynamic_pointer_cast<crocoddyl::IntegratedActionModelEuler>(running_models[i]);
+        if (!integrated_model || !integrated_model->get_differential()) {
+            continue;
+        }
+
+        auto contact_model = std::dynamic_pointer_cast<crocoddyl::DifferentialActionModelContactFwdDynamics>(integrated_model->get_differential());
+        if (!contact_model) {
+            continue;
+        }
+
+        const auto& contacts = contact_model->get_contacts()->get_contacts();
+        for (const auto& contact_pair : contacts) {
+            const std::string& name = contact_pair.first;
+            const auto& contact = contact_pair.second;
+            std::cout << "Contact: " << name << " at step " << i << " is " 
+                        << (contact->active ? "active" : "inactive") << "." << std::endl;
+        }
+    }
+    auto terminal_models = problem_->get_terminalModel();
+    auto integrated_terminal_model = std::dynamic_pointer_cast<crocoddyl::IntegratedActionModelEuler>(terminal_models);
+    if (integrated_terminal_model && integrated_terminal_model->get_differential()) {
+        auto terminal_contact_model = std::dynamic_pointer_cast<crocoddyl::DifferentialActionModelContactFwdDynamics>(integrated_terminal_model->get_differential());
+        if (terminal_contact_model) {
+            const auto& contacts = terminal_contact_model->get_contacts()->get_contacts();
+            for (const auto& contact_pair : contacts) {
+                const std::string& name = contact_pair.first;
+                const auto& contact = contact_pair.second;
+                std::cout << "Terminal Contact: " << name << " is "
+                            << (contact->active ? "active" : "inactive") << "." << std::endl;
+            }
+        }
+    }
+
+    std::cout << "\n\n\n--------\n\n\n";
 }
