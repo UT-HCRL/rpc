@@ -137,3 +137,5 @@ contact_sensor_frames:
   - right_ankle_roll_link
   - left_wrist_yaw_link
   - right_wrist_yaw_link
+
+mpc_dt: 0.0125

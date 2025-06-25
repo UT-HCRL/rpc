@@ -108,6 +108,7 @@ class Simulate {
   mjData* d_ = nullptr;
 
   bool reset_gains_ = false;
+  bool mpc_trigger_ = false;
 
   InterruptHandler *interrupt_handler_ = nullptr;
 

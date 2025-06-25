@@ -104,6 +104,8 @@ std::vector<int> mj_contact_sensor_ids_;
 std::vector<bool> mj_contact_sensor_flags_;
 std::vector<Eigen::Vector3d> mj_contact_sensor_forces_;
 
+double mpc_dt_ = 0.0125; // MPC control frequency
+
 using Seconds = std::chrono::duration<double>;
 
 //---------------------------------------- plugin handling
@@ -428,6 +430,21 @@ void SetContactMap(const mjModel *m) {
 
 }
 
+void SetMPCRate(){
+
+  util::ReadParameter<double>(cfg_, "mpc_dt", mpc_dt_);
+  if (mpc_dt_ <= 0 || mpc_dt_ <= m->opt.timestep) {
+    mpc_dt_ = m->opt.timestep;
+    std::cerr << "[Mujoco sim] [WARNING] mpc_dt must be greater than zero and greater than the MuJoCo integration step (timestep).\nWill use mujoco timestep for the MPC." << std::endl;
+  }
+
+  std::cout << "[MuJoCo sim] model timestep: " << m->opt.timestep << " seconds" << std::endl;
+  std::cout << "[Mujoco sim] MPC_DT: " << mpc_dt_ << " seconds" << std::endl;
+  std::cout << "[Mujoco sim] Decimation will be: " << mpc_dt_ / m->opt.timestep
+            << " steps" << std::endl;
+
+}
+
 std::pair<bool, int> CheckContact(int b_id1, int b_id2) {
   for (size_t i = 0; i < mj_contact_sensor_ids_.size(); ++i) {
     if (b_id1 == mj_contact_sensor_ids_[i] || b_id2 == mj_contact_sensor_ids_[i]) {
@@ -618,6 +635,9 @@ void PhysicsLoop(mj::Simulate &sim) {
   std::chrono::time_point<mj::Simulate::Clock> syncCPU;
   mjtNum syncSim = 0;
 
+  int simCounter = 0;
+  int control_decimation = 0;
+
   //***************************************************
   // run until asked to exit (main simulation while loop)
   //***************************************************
@@ -698,8 +718,15 @@ void PhysicsLoop(mj::Simulate &sim) {
         // running
         if (sim.run) {
           //*****************************************************
-          if (CopySensorData())
+          if(CopySensorData() && !control_decimation){
             g1_interface->GetCommand(g1_sensor_data, g1_command);
+          }else{
+            if(CopySensorData() && (simCounter % control_decimation == 0)){
+              g1_interface->GetCommand(g1_sensor_data, g1_command);
+              simCounter = 0;
+            }
+            simCounter++;
+          }
           CopyCommand();
           //*****************************************************
 
@@ -784,6 +811,10 @@ void PhysicsLoop(mj::Simulate &sim) {
                 // reset gains
                 SetLowActuatorGains(mj_act_map_);
                 sim.reset_gains_ = false;
+              }
+
+              if(sim.mpc_trigger_ == true){
+                control_decimation = static_cast<int>(std::round(1/(m->opt.timestep / mpc_dt_))); // control decimation factor
               }
 
               // call mj_step
@@ -887,6 +918,11 @@ void PhysicsThread(mj::Simulate *sim, const char *filename) {
       // Initialise sensor data
       //**********************************************
       SetContactMap(m);
+      //**********************************************
+
+      // Set MPC rate
+      //**********************************************
+      SetMPCRate();
       //**********************************************
 
       // Increase force vector length

@@ -1149,15 +1149,15 @@ def process_data_saver(visualize_type):
 
     elif visualize_type == "none":
         data_saver.add("time", msg.time)
-        data_saver.add("est_base_joint_pos", list(msg.est_base_joint_pos))
-        data_saver.add("est_base_joint_ori", list(msg.est_base_joint_ori))
+        data_saver.add("est_base_joint_pos", list([msg.est_base_joint_pos.x, msg.est_base_joint_pos.y, msg.est_base_joint_pos.z]))
+        data_saver.add("est_base_joint_ori", list([msg.est_base_joint_ori.x, msg.est_base_joint_ori.y, msg.est_base_joint_ori.z, msg.est_base_joint_ori.w]))
         data_saver.add("joint_positions", list(msg.joint_positions))
-        data_saver.add("lfoot_pos", list(msg.lfoot_pos))
-        data_saver.add("rfoot_pos", list(msg.rfoot_pos))
-        data_saver.add("lfoot_ori", list(msg.lfoot_ori))
-        data_saver.add("rfoot_ori", list(msg.rfoot_ori))
-        data_saver.add("lhand_pos", list(msg.lhand_pos))
-        data_saver.add("rhand_pos", list(msg.rhand_pos))
+        data_saver.add("lfoot_pos", list([msg.lfoot_pos.x, msg.lfoot_pos.y, msg.lfoot_pos.z]))
+        data_saver.add("rfoot_pos", list([msg.rfoot_pos.x, msg.rfoot_pos.y, msg.rfoot_pos.z]))
+        data_saver.add("lfoot_ori", list([msg.lfoot_ori.x, msg.lfoot_ori.y, msg.lfoot_ori.z, msg.lfoot_ori.w]))
+        data_saver.add("rfoot_ori", list([msg.rfoot_ori.x, msg.rfoot_ori.y, msg.rfoot_ori.z, msg.rfoot_ori.w]))
+        data_saver.add("lhand_pos", list([msg.lhand_pos.x, msg.lhand_pos.y, msg.lhand_pos.z]))
+        data_saver.add("rhand_pos", list([msg.rhand_pos.x, msg.rhand_pos.y, msg.rhand_pos.z]))
         data_saver.add("xreg_costs", list(msg.xreg_costs))
         data_saver.add("ureg_costs", list(msg.ureg_costs))
         data_saver.add("xbound_costs", list(msg.xbound_costs))
@@ -1173,10 +1173,42 @@ def process_data_saver(visualize_type):
         data_saver.add("left_knee_frame_costs", list(msg.left_knee_frame_costs))
         data_saver.add("right_knee_frame_costs", list(msg.right_knee_frame_costs))
         data_saver.add("torso_link_frame_costs", list(msg.torso_link_frame_costs))
-        # data_saver.add("l_foot_rf", [msg.l_foot_rf.x, msg.l_foot_rf.y, msg.l_foot_rf.z])
-        # data_saver.add("r_foot_rf", [msg.r_foot_rf.x, msg.r_foot_rf.y, msg.r_foot_rf.z])
-        # data_saver.add("l_hand_rf", [msg.l_hand_rf.x, msg.l_hand_rf.y, msg.l_hand_rf.z])
-        # data_saver.add("r_hand_rf", [msg.r_hand_rf.x, msg.r_hand_rf.y, msg.r_hand_rf.z])
+
+        if len(msg.l_foot_rf) == 0:
+            for i in range(mpc_horizon):
+                data_saver.add(f"l_foot_rf_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"r_foot_rf_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"l_hand_rf_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"r_hand_rf_{i}", [0.0, 0.0, 0.0])
+        else:
+            for i in range(len(msg.l_foot_rf)):
+                data_saver.add(f"l_foot_rf_{i}", [msg.l_foot_rf[i].x, msg.l_foot_rf[i].y, msg.l_foot_rf[i].z])
+                data_saver.add(f"r_foot_rf_{i}", [msg.r_foot_rf[i].x, msg.r_foot_rf[i].y, msg.r_foot_rf[i].z])
+                data_saver.add(f"l_hand_rf_{i}", [msg.l_hand_rf[i].x, msg.l_hand_rf[i].y, msg.l_hand_rf[i].z])
+                data_saver.add(f"r_hand_rf_{i}", [msg.r_hand_rf[i].x, msg.r_hand_rf[i].y, msg.r_hand_rf[i].z])
+
+        if len(msg.predicted_torso) == 0:
+            for i in range(mpc_horizon):
+                data_saver.add(f"predicted_torso_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"predicted_lhand_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"predicted_rhand_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"predicted_lankle_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"predicted_rankle_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"predicted_lknee_{i}", [0.0, 0.0, 0.0])
+                data_saver.add(f"predicted_rknee_{i}", [0.0, 0.0, 0.0])
+        else:
+            for i in range(len(msg.predicted_torso)):
+                data_saver.add(f"predicted_torso_{i}", [msg.predicted_torso[i].x, msg.predicted_torso[i].y, msg.predicted_torso[i].z])
+                data_saver.add(f"predicted_lankle_{i}", [msg.predicted_lankle[i].x, msg.predicted_lankle[i].y, msg.predicted_lankle[i].z])
+                data_saver.add(f"predicted_rankle_{i}", [msg.predicted_rankle[i].x, msg.predicted_rankle[i].y, msg.predicted_rankle[i].z])
+                data_saver.add(f"predicted_lknee_{i}", [msg.predicted_lknee[i].x, msg.predicted_lknee[i].y, msg.predicted_lknee[i].z])
+                data_saver.add(f"predicted_rknee_{i}", [msg.predicted_rknee[i].x, msg.predicted_rknee[i].y, msg.predicted_rknee[i].z])
+                data_saver.add(f"predicted_lhand_{i}", [msg.predicted_lhand[i].x, msg.predicted_lhand[i].y, msg.predicted_lhand[i].z])
+                data_saver.add(f"predicted_rhand_{i}", [msg.predicted_rhand[i].x, msg.predicted_rhand[i].y, msg.predicted_rhand[i].z])
+
+        data_saver.add("b_fddp_feasible", msg.b_fddp_feasible)
+        data_saver.add("total_iterations", msg.total_iterations)
+        data_saver.add("solve_duration", msg.solve_duration)
 
         for frame_name in viz_des_trajectories.keys():
             pos_msg = getattr(msg, frame_name)
@@ -1184,6 +1216,11 @@ def process_data_saver(visualize_type):
         for frame_name in viz_curr_trajectories.keys():
             pos_msg = getattr(msg, frame_name)
             data_saver.add(f"{frame_name}", [pos_msg.x, pos_msg.y, pos_msg.z])
+
+        data_saver.add("lf_contact_force", [msg.lf_contact_force.x, msg.lf_contact_force.y, msg.lf_contact_force.z])
+        data_saver.add("rf_contact_force", [msg.rf_contact_force.x, msg.rf_contact_force.y, msg.rf_contact_force.z])
+        data_saver.add("lh_contact_force" , [msg.lh_contact_force.x, msg.lh_contact_force.y, msg.lh_contact_force.z])
+        data_saver.add("rh_contact_force" , [msg.rh_contact_force.x, msg.rh_contact_force.y, msg.rh_contact_force.z])
 
 
     data_saver.advance()

@@ -84,7 +84,12 @@ G1Interface::~G1Interface() {
 
 void G1Interface::GetCommand(void *sensor_data, void *command_data) {
   sp_->count_ = count_;
-  sp_->current_time_ = static_cast<double>(count_) * sp_->servo_dt_;
+  if (ctrl_arch_->locostate() == g1_states::kTrackPlan) {
+    sp_->current_time_ = static_cast<double>(count_) * sp_->mpc_dt_;
+  } else {
+    sp_->current_time_ = static_cast<double>(count_) * sp_->servo_dt_;
+  }
+  
   sp_->state_ = ctrl_arch_->locostate();
   sp_->prev_state_ = ctrl_arch_->prev_locostate();
 
@@ -114,7 +119,14 @@ void G1Interface::GetCommand(void *sensor_data, void *command_data) {
     g1_command->gripper_pos_cmd_ = sp_->gripper_pos_cmd_;
 
 #if B_USE_ZMQ
-  if (sp_->count_ % sp_->data_save_freq_ == 0) {
+  if (ctrl_arch_->locostate() == g1_states::kTrackPlan) {
+    // Save data at each iteration in TrackPlan state
+    G1DataManager *dm = G1DataManager::GetDataManager();
+    dm->data_->time_ = sp_->current_time_;
+    dm->data_->phase_ = sp_->state_;
+    dm->SendData();
+    }
+  else if (sp_->count_ % sp_->data_save_freq_ == 0) {
     G1DataManager *dm = G1DataManager::GetDataManager();
     dm->data_->time_ = sp_->current_time_;
     dm->data_->phase_ = sp_->state_;
@@ -174,6 +186,7 @@ void G1Interface::_SetParameters() {
     }
 
     // WBC controller frequency
+    sp_->mpc_dt_ = util::ReadParameter<double>(cfg_, "mpc_dt");
     sp_->servo_dt_ = util::ReadParameter<double>(cfg_, "servo_dt");
     sp_->data_save_freq_ = util::ReadParameter<int>(cfg_, "data_save_freq");
 

@@ -32,15 +32,15 @@ public:
 
 private:
 
-  float desired_frequency_ = 800.0; // Hz | Just used for fixed rate stepping
+  float desired_frequency_ = 100.0; // Hz | Just used for fixed rate stepping
   // NOTE: sp_->servo_dt_ is used for updating controller time!!
 
   std::unique_ptr<HumanoidMulticontactTracker> g1_mpc_;
 
   std::thread compute_thread_;
-  std::atomic<bool> run_threads_{false};
+  std::atomic<bool> run_threads_{true};
 
-  bool b_wait_complete_{false}; // [true, false] <-> [wait for MPC to complete, use fixed rate stepping]
+  bool b_wait_complete_{true}; // [true, false] <-> [wait for MPC to complete, use fixed rate stepping]
 
   std::mutex data_mutex_;
   Eigen::Matrix<double, 27, 1> mpc_q_;
