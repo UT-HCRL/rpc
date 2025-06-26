@@ -115,6 +115,7 @@ def main():
 
     time = []
     base_pos, base_ori, joint_positions = [], [], []
+    joint_pos_des, joint_vel_des, joint_trq_des = [], [], []
 
     vis_3d_object_names = [
         "lfoot_pos", 
@@ -222,6 +223,13 @@ def main():
         "solve_duration",
     ]
 
+    joint_info_names = [
+        "joint_positions",
+        "joint_pos_des",
+        "joint_vel_des",
+        "joint_trq_des",
+        ]
+
     vis_3d_dict = {}
     vis_horizon_dict = {}
     vis_des_spheres_dict = {}
@@ -230,13 +238,14 @@ def main():
     vis_sensor_arrows_dict = {}
     predicted_object_dict = {}
     single_value_dict = {}
+    joint_info_dict = {}
 
     for oname in vis_3d_object_names:
         vis_3d_dict[oname] = []
 
     for oname in vis_horzon_object_names:
         vis_horizon_dict[oname] = []
-    
+
     for oname in spheres_des_object_names:
         vis_des_spheres_dict[oname] = []
 
@@ -259,6 +268,9 @@ def main():
 
     for oname in single_value_names:
         single_value_dict[oname] = []
+
+    for oname in joint_info_names:
+        joint_info_dict[oname] = []
 
     # Read and collect all data from pkl file
     with open(cwd + "/experiment_data/debug.pkl", "rb") as f:
@@ -296,6 +308,8 @@ def main():
                 for oname in single_value_names: #fddp solve statistics
                     single_value_dict[oname].append(d[oname])
 
+                for oname in joint_info_names: # mpc joint level solution
+                    joint_info_dict[oname].append(d[oname])
 
             except EOFError:
                 break
@@ -406,6 +420,18 @@ def main():
                     mcap_writer.write_message(
                         name,
                         FloatValue(value=knot_value),
+                        int(time[i] * 1e9),
+                        int(time[i] * 1e9),
+                    )
+
+            # TODO: eventually create JointMessage for better visualization
+            for jinfo_name, jinfo_val in joint_info_dict.items():
+                curr_ji_val = jinfo_val[i]
+                for j_idx, ji_val in enumerate(curr_ji_val):
+                    name = f"{jinfo_name}_q_{j_idx}"
+                    mcap_writer.write_message(
+                        name,
+                        FloatValue(value=ji_val),
                         int(time[i] * 1e9),
                         int(time[i] * 1e9),
                     )

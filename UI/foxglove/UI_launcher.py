@@ -1139,6 +1139,15 @@ def process_data_saver(visualize_type):
                 data_saver.add(f"predicted_lhand_{i}", [msg.predicted_lhand[i].x, msg.predicted_lhand[i].y, msg.predicted_lhand[i].z])
                 data_saver.add(f"predicted_rhand_{i}", [msg.predicted_rhand[i].x, msg.predicted_rhand[i].y, msg.predicted_rhand[i].z])
 
+        if len(msg.joint_pos_des) == 0:
+            data_saver.add("joint_pos_des", [np.zeros(27)])
+            data_saver.add("joint_vel_des", [np.zeros(27)])
+            data_saver.add("joint_trq_des", [np.zeros(27)])
+        else:
+            data_saver.add("joint_pos_des", list(msg.joint_pos_des))
+            data_saver.add("joint_vel_des", list(msg.joint_vel_des))
+            data_saver.add("joint_trq_des", list(msg.joint_trq_des))
+
         data_saver.add("b_fddp_feasible", msg.b_fddp_feasible)
         data_saver.add("total_iterations", msg.total_iterations)
         data_saver.add("solve_duration", msg.solve_duration)

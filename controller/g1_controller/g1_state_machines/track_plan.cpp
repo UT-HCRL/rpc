@@ -207,6 +207,10 @@ void TrackPlan::ComputeSync(){
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
+    mpc_q_ = xs_out[0].head(robot_->GetQ().size()).tail(robot_->NumActiveDof()); // q_joints
+    mpc_q_dot_ = xs_out[0].tail(robot_->NumActiveDof());  // qdot_joints
+    mpc_tau_ = us_out[0];
+
     #if B_USE_ZMQ
       G1DataManager *dm = G1DataManager::GetDataManager();
       dm->data_->total_iterations_ = data_out.total_iterations;
@@ -289,6 +293,13 @@ void TrackPlan::ComputeSync(){
         dm->data_->predicted_right_rubber_pos_[i] = data_out.predicted_frame_positions["right_rubber_hand_" + std::to_string(i)];
       }
 
+      // save MPC joint positions, velocities, and torques
+      for (unsigned int i = 0; i < mpc_q_.size(); i++) {
+        dm->data_->joint_pos_des[i] = mpc_q_[i];
+        dm->data_->joint_pos_des[i] = mpc_q_dot_[i];
+        dm->data_->joint_pos_des[i] = mpc_tau_[i];
+      }
+
       dm->data_->b_fddp_feasible_ = data_out.b_fddp_feasible;
       dm->data_->solve_duration_ = data_out.solve_duration;
 
@@ -316,10 +327,6 @@ void TrackPlan::ComputeSync(){
     data_out.right_foot_contact_costs.clear();
     data_out.contact_forces.clear();
     data_out.predicted_frame_positions.clear();
-
-    mpc_q_ = xs_out[0].head(robot_->GetQ().size()).tail(robot_->NumActiveDof()); // q_joints
-    mpc_q_dot_ = xs_out[0].tail(robot_->NumActiveDof());  // qdot_joints
-    mpc_tau_ = us_out[0];
 
 }
 
