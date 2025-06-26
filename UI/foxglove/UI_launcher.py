@@ -27,7 +27,13 @@ parser.add_argument("--hw_or_sim", choices=["hw", "sim"], default="sim")
 args = parser.parse_args()
 
 crocoddyl_forces = ["l_foot_rf", "r_foot_rf", "l_hand_rf", "r_hand_rf"]
-mpc_horizon = 4 #FIXME: can this be dynamic or should we load the horizon from yaml?
+
+with open("config/g1/sim/mujoco/ihwbc/crocoddyl_params.yaml", "r") as yaml_file:
+    try:
+        config = yaml.safe_load(yaml_file)
+        mpc_horizon = config["mpc"]["horizon"]
+    except yaml.YAMLError as exc:
+        print(exc)
 
 viz_des_trajectories = {
     "left_ankle_roll_des_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),

@@ -10,6 +10,7 @@ import argparse
 import pickle
 import pinocchio as pin
 import numpy as np
+from ruamel import yaml
 
 from scipy.spatial.transform import Rotation as R
 
@@ -198,7 +199,12 @@ def main():
         "right_foot_contact_costs",
     ]
 
-    mpc_horizon = 4
+    with open("config/g1/sim/mujoco/ihwbc/crocoddyl_params.yaml", "r") as yaml_file:
+        try:
+            config = yaml.safe_load(yaml_file)
+            mpc_horizon = config["mpc"]["horizon"]
+        except yaml.YAMLError as exc:
+            print(exc)
 
     predicted_object_names = [
         "predicted_torso",
