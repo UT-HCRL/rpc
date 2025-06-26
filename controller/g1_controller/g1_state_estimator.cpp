@@ -6,6 +6,8 @@
 #include "controller/g1_controller/g1_interface.hpp"
 #include "controller/g1_controller/g1_state_estimator.hpp"
 #include "controller/g1_controller/g1_state_provider.hpp"
+#include "controller/g1_controller/g1_control_architecture.hpp"
+
 
 #if B_USE_ZMQ
 #include "controller/g1_controller/g1_data_manager.hpp"
@@ -198,7 +200,18 @@ void G1StateEstimator::Update(G1SensorData *sensor_data) {
   sp_->cam_est_ = robot_->GetHg().head<3>();
 
 #if B_USE_ZMQ
-  if (sp_->count_ % sp_->data_save_freq_ == 0) {
+  if (sp_->state_ == g1_states::kTrackPlan){
+    
+    G1DataManager *dm = G1DataManager::GetDataManager();
+    dm->data_->est_base_joint_pos_ = base_joint_pos;
+    Eigen::Quaterniond base_joint_quat(base_joint_ori_rot);
+    dm->data_->est_base_joint_ori_ = base_joint_quat.normalized().coeffs();
+
+    // Save joint pos data
+    dm->data_->joint_positions_ = sensor_data->joint_pos_;
+
+  }
+  else if (sp_->count_ % sp_->data_save_freq_ == 0) {
     // Save estimated floating base joint states
     G1DataManager *dm = G1DataManager::GetDataManager();
     dm->data_->est_base_joint_pos_ = base_joint_pos;
@@ -287,7 +300,25 @@ void G1StateEstimator::UpdateGroundTruthSensorData(
                   (1 - alpha) * sp_->dcm_vel_; // not being used in controller
 
 #if B_USE_ZMQ
-  if (sp_->count_ % sp_->data_save_freq_ == 0) {
+  if(sp_->state_ == g1_states::kTrackPlan) {
+
+    G1DataManager *dm = G1DataManager::GetDataManager();
+    dm->data_->est_base_joint_pos_ = sensor_data->base_joint_pos_;
+    dm->data_->est_base_joint_ori_ = sensor_data->base_joint_quat_;
+    dm->data_->joint_positions_ = sensor_data->joint_pos_;
+
+    dm->data_->b_lfoot_ = sensor_data->b_lf_contact_;
+    dm->data_->b_rfoot_ = sensor_data->b_rf_contact_;
+    dm->data_->b_lhand_ = sensor_data->b_lh_contact_;
+    dm->data_->b_rhand_ = sensor_data->b_rh_contact_;
+
+    dm->data_->lf_contact_force_ = sensor_data->lf_contact_force_;
+    dm->data_->rf_contact_force_ = sensor_data->rf_contact_force_;
+    dm->data_->lh_contact_force_ = sensor_data->lh_contact_force_;
+    dm->data_->rh_contact_force_ = sensor_data->rh_contact_force_;
+
+  }
+  else if (sp_->count_ % sp_->data_save_freq_ == 0) {
     G1DataManager *dm = G1DataManager::GetDataManager();
     // dm->data_->base_joint_pos_ = sensor_data->base_joint_pos_;
     // dm->data_->base_joint_ori_ = sensor_data->base_joint_quat_;
