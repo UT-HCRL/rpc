@@ -216,6 +216,7 @@ void HumanoidMulticontactTracker::loadCoMWeights(){
 
 void HumanoidMulticontactTracker::loadTrackingFramesWeights(){
     util::ReadParameter(params_, "tracking_frames", track_frame_names_);
+    util::ReadParameter(params_["running_costs"]["tracking_frames"], "w", frame_tracking_weight_);
     for (const auto& frame_name : track_frame_names_) {
         double w_frame;
         double wo_frame;
@@ -224,6 +225,7 @@ void HumanoidMulticontactTracker::loadTrackingFramesWeights(){
         mpc_utils::normalize_weights(w_frame, N_horizon_);
         frame_targets_[frame_name] = mpc_utils::from2DValues(w_frame, wo_frame);
     }
+    util::ReadParameter(params_["terminal_costs"]["tracking_frames"], "w", terminal_frame_tracking_weight_);
     for (const auto& frame_name : track_frame_names_) {
         double w_frame;
         double wo_frame;
@@ -267,12 +269,14 @@ void HumanoidMulticontactTracker::printWeights() const{
     std::cout << "ureg_weight_: " << ureg_weight_ << std::endl;
     std::cout << "xbound_weight_: " << xbound_weight_ << std::endl;
     std::cout << "com_tracking_weight_: " << com_tracking_weight_ << std::endl;
+    std::cout << "frame_tracking_weight_: " << frame_tracking_weight_ << std::endl;
 
     std::cout << "\n\n### Terminal costs weights ###\n" << std::endl;
     std::cout << "terminal_xreg_weights_: " << terminal_xreg_weights_.transpose() << std::endl;
     std::cout << "terminal_ureg_weight_: " << terminal_ureg_weight_ << std::endl;
     std::cout << "terminal_xbound_weight_: " << terminal_xbound_weight_ << std::endl;
     std::cout << "terminal_com_tracking_weight_: " << terminal_com_tracking_weight_ << std::endl;
+    std::cout << "terminal_frame_tracking_weight_: " << terminal_frame_tracking_weight_ << std::endl;
 }
 
 void HumanoidMulticontactTracker::setInitialJointConfiguration(const Eigen::VectorXd& q0) {
@@ -300,7 +304,7 @@ void HumanoidMulticontactTracker::addCoMCost(const double com_tracking_weight = 
     cost_model->addCost("CoMTracking", com_cost, com_tracking_weight);
 }
 
-void HumanoidMulticontactTracker::addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase = mpc_utils::Phase::Running, const int horizon_index){
+void HumanoidMulticontactTracker::addFrameTrackingCost(const std::string& frame_name, const double frame_tracking_weight=1.0, const mpc_utils::Phase phase = mpc_utils::Phase::Running, const int horizon_index){
 
     auto& cost_model = (phase == mpc_utils::Phase::Running) ? running_cost_model_[horizon_index] : terminal_cost_model_;
     mpc_utils::Weights2D frame_cost_weight = (phase == mpc_utils::Phase::Running) ? frame_targets_[frame_name] : frame_targets_terminal_[frame_name];
@@ -320,7 +324,7 @@ void HumanoidMulticontactTracker::addFrameTrackingCost(const std::string& frame_
     temp_weights << frame_cost_weight(0), frame_cost_weight(0), frame_cost_weight(0), frame_cost_weight(1), frame_cost_weight(1), frame_cost_weight(1);
     std::shared_ptr<crocoddyl::ActivationModelAbstract> frame_activation = std::make_shared<crocoddyl::ActivationModelWeightedQuad>(temp_weights);
     std::shared_ptr<crocoddyl::CostModelAbstract> goal_tracking_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, frame_activation, frame_residuals_[horizon_index][frame_name]);
-    cost_model->addCost("frame_" + frame_name, goal_tracking_cost, 1.0);
+    cost_model->addCost("frame_" + frame_name, goal_tracking_cost, frame_tracking_weight);
 
 }
 
@@ -373,9 +377,9 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
 
         if(frame_name.find("right_rubber") != std::string::npos){
             // contact_frame_pose.rotation() = Eigen::Matrix3d::Identity();
-            contact_frame_pose.rotation() = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
+            contact_frame_pose.rotation() = RH_rotation_;
         }else if(frame_name.find("left_rubber") != std::string::npos){
-            contact_frame_pose.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
+            contact_frame_pose.rotation() = LH_rotation_;
             // contact_frame_pose.rotation() = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
             // contact_frame_pose.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
             // contact_frame_pose.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
@@ -481,7 +485,7 @@ std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMu
     }
     if (cost_mask_[3]) {
         for (const auto& frame : frame_targets_) {
-            addFrameTrackingCost(frame.first, mpc_utils::Phase::Running, horizon_index);
+            addFrameTrackingCost(frame.first, frame_tracking_weight_, mpc_utils::Phase::Running, horizon_index);
         }
     }
     if (cost_mask_[4]) {
@@ -505,7 +509,7 @@ std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMu
     }
     if (cost_mask_[3]) {
         for (const auto& frame : frame_targets_terminal_) {
-            addFrameTrackingCost(frame.first, mpc_utils::Phase::Terminal, N_horizon_);
+            addFrameTrackingCost(frame.first, terminal_frame_tracking_weight_, mpc_utils::Phase::Terminal, N_horizon_);
         }
     }
     if (cost_mask_[4]) {

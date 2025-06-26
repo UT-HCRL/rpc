@@ -121,6 +121,7 @@ running_costs:
   CoM:
     w: 10000.0
   tracking_frames:
+    w: 1.0
     torso_primitive_shape: 
       pos: 10000.0
       rot: 0.0
@@ -171,6 +172,7 @@ terminal_costs:
   CoM:
     w: 3000.0
   tracking_frames:
+    w: 1.0
     torso_primitive_shape:
       pos: 1000.0
       rot: 0.0

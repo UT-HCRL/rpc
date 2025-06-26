@@ -55,7 +55,7 @@ class HumanoidMulticontactTracker{
         void addXBoundCost(const double x_bound_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addContactCosts(const std::vector<std::string>& frame_names, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addRegularizationCosts(const Eigen::VectorXd& xreg_weights, const double xreg_weight, const double ureg_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
-        void addFrameTrackingCost(const std::string& frame_name, const mpc_utils::Phase phase, const int horizon_index = 0);
+        void addFrameTrackingCost(const std::string& frame_name, const double frame_tracking_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
 
         void deactivateContacts(const std::vector<std::string>& frame_names);
         void activateContacts(const std::vector<std::string>& frame_names);
@@ -116,6 +116,7 @@ class HumanoidMulticontactTracker{
         double ureg_weight_;
         double xbound_weight_;
         double com_tracking_weight_;
+        double frame_tracking_weight_;
         double friction_weight_;
 
         Eigen::VectorXd terminal_xreg_weights_;
@@ -123,6 +124,7 @@ class HumanoidMulticontactTracker{
         double terminal_ureg_weight_;
         double terminal_xbound_weight_;
         double terminal_com_tracking_weight_;
+        double terminal_frame_tracking_weight_;
 
         std::shared_ptr<crocoddyl::CostModelAbstract> xreg_cost_;
         std::shared_ptr<crocoddyl::CostModelAbstract> ureg_cost_;
