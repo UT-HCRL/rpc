@@ -46,7 +46,8 @@ viz_curr_trajectories = {
     "right_rubber_hand_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03]),
     "torso_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03]),
     "left_knee_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03]),
-    "right_knee_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03])
+    "right_knee_curr_pos": ([1, 0, 0, 1], [0.03, 0.03, 0.03]),
+    "com_curr_pos": ([1, 0, 1, 1], [0.03, 0.03, 0.03]),
 }
 
 contact_sensor_forces = ["lf_contact_force", "rf_contact_force", "lh_contact_force", "rh_contact_force"]
