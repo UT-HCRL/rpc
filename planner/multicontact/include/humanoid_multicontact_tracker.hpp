@@ -59,6 +59,9 @@ class HumanoidMulticontactTracker{
 
         void deactivateContacts(const std::vector<std::string>& frame_names);
         void activateContacts(const std::vector<std::string>& frame_names);
+        void switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask);
+        std::vector<bool> computeSwitchingMask(int first_contact_index);
+        int computeContactIndex(const std::vector<std::string>& frame_names, std::vector<Eigen::VectorXd> us, std::vector<Eigen::VectorXd> xs);
 
         std::vector<std::vector<std::map<std::string, pinocchio::Force>>> const getForceFromSolver();
         std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> const getEigenForceFromSolver();
@@ -159,6 +162,8 @@ class HumanoidMulticontactTracker{
 
         //### DARE TEMP VARIABLES ###
         Eigen::MatrixXd K_DARE_;
+
+        bool already_switched_ = false;
 
         //### FUNC UTILS ###
         void printModelContacts() const;

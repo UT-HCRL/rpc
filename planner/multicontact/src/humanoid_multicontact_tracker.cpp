@@ -467,7 +467,92 @@ void HumanoidMulticontactTracker::activateContacts(const std::vector<std::string
         terminal_cost_model_->changeCostStatus(frame_name + "_friction_cone", true);
     }
 }
- 
+
+std::vector<bool> HumanoidMulticontactTracker::computeSwitchingMask(int first_contact_index){
+
+    std::vector<bool> contact_mask(N_horizon_ + 1, false);
+    
+    for (int i = first_contact_index; i < N_horizon_ + 1; i++) {
+        contact_mask[i] = true;
+    }
+
+    return contact_mask;
+    
+}
+
+void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask){
+
+    if(contact_mask.size() != N_horizon_ +1){
+        throw std::invalid_argument("contact_mask size must be equal to N_horizon_ + 1");
+    }
+
+    for (const auto& frame_name: active_frames) {
+        for(size_t i = 0; i < N_horizon_; i++) {
+            if(contact_mask[i]){
+                running_contact_models_[i]->changeContactStatus(frame_name + "_contact", true);
+                running_cost_model_[i]->changeCostStatus(frame_name + "_friction_cone", true);
+                frame_residuals_[i][frame_name]->set_reference(pinocchio_data_->oMf[model_full_.getFrameId(frame_name)]);
+            }
+        }
+        if(contact_mask[N_horizon_]) {
+            terminal_contact_models_->changeContactStatus(frame_name + "_contact_terminal", true);
+            terminal_cost_model_->changeCostStatus(frame_name + "_friction_cone", true);
+            frame_residuals_[N_horizon_][frame_name]->set_reference(pinocchio_data_->oMf[model_full_.getFrameId(frame_name)]);
+        }
+    }
+
+    for (const auto& frame_name: inactive_frames) {
+        for(size_t i = 0; i < N_horizon_; i++) {
+            if(contact_mask[i]){
+                running_contact_models_[i]->changeContactStatus(frame_name + "_contact", false);
+                running_cost_model_[i]->changeCostStatus(frame_name + "_friction_cone", false);
+            }
+        }
+        if(contact_mask[N_horizon_]) {
+            terminal_contact_models_->changeContactStatus(frame_name + "_contact_terminal", false);
+            terminal_cost_model_->changeCostStatus(frame_name + "_friction_cone", false);
+        }
+    }
+
+    //TODO: add logic to update beziers after re-activating contacts
+
+}
+
+int HumanoidMulticontactTracker::computeContactIndex(const std::vector<std::string>& frame_names, std::vector<Eigen::VectorXd> us, std::vector<Eigen::VectorXd> xs){
+    pinocchio::Data future_data(model_full_);
+    
+    // Plane parameters
+    const double plane_y = 0.317; //0.292125;
+    const double plane_tolerance = 0.005; // Epsilon for absolute plane detection
+    
+    for (std::size_t i = 0; i < xs.size(); ++i) {
+        Eigen::VectorXd q = xs[i].head(state_->get_nq());
+        Eigen::VectorXd v = xs[i].tail(state_->get_nv());
+        
+        pinocchio::forwardKinematics(model_full_, future_data, q, v);
+        pinocchio::updateFramePlacements(model_full_, future_data);
+        
+        for (const auto& frame_name : frame_names) {
+            if (!model_full_.existFrame(frame_name)) {
+                throw std::invalid_argument("Frame " + frame_name + " does not exist in the model.");
+            }
+            
+            pinocchio::SE3 frame_pose = future_data.oMf[model_full_.getFrameId(frame_name)];
+            double current_y = frame_pose.translation().y();
+            
+            // Absolute check: is the frame currently at/through the plane?
+            if (std::abs(current_y - plane_y) <= plane_tolerance) {
+                // std::cout << "PLANE CONTACT DETECTED! Step: " << i << ", Frame: " << frame_name
+                //          << " is at plane y=" << plane_y 
+                //          << " (current_y: " << current_y << ", distance: " << std::abs(current_y - plane_y) << ")" << std::endl;
+                return i;
+            }
+            
+        }
+    }
+    return -1;
+}
+
 std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMulticontactTracker::createMultiFrameActionModel(const std::vector<std::string>& frame_names, const int horizon_index){
 
     if (cost_mask_[0]) {
@@ -550,6 +635,8 @@ void HumanoidMulticontactTracker::initializeSolver(){
     problem_ = std::make_shared<crocoddyl::ShootingProblem>(x0_, running_models, terminalModelWithEuler);
     fddp_ = std::make_shared<crocoddyl::SolverFDDP>(problem_);
     if(enable_callbacks_) fddp_->setCallbacks({std::make_shared<crocoddyl::CallbackVerbose>()});
+    
+    std::cout << "\n[Crocoddyl] num of threads used: " << problem_->get_nthreads();
 
     // cost_callback_ = std::make_shared<CostRecorderCallback>();
     // std::vector<std::shared_ptr<crocoddyl::CallbackAbstract>> callbacks;
@@ -609,47 +696,46 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         // std::cout << "\n\nLxx [The one I set] :\n\n" << Q << std::endl;
         // computeDARE(xs, us);
 
-        // std::cout << "Desired torso frame position: " << desired_frames[0]["torso_primitive_shape"].translation().transpose() << std::endl;
-        // std::cout << "Desired ankle left frame position: " << desired_frames[0]["left_ankle_roll_link"].translation().transpose() << std::endl;
         pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
         pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
-        // std::cout << "Current torso frame position: " << pinocchio_data_->oMf[model_full_.getFrameId("torso_primitive_shape")].translation().transpose() << std::endl;
-        // std::cout << "Current ankle frame position: " << pinocchio_data_->oMf[model_full_.getFrameId("left_ankle_roll_link")].translation().transpose() << std::endl;
-        fddp_->setCandidate(xs, us, false);
+        // fddp_->setCandidate(xs, us, false); It should be already called by ->solve
         auto start_time = std::chrono::high_resolution_clock::now();
         fddp_->solve(xs, us, max_iter_);
         auto end_time = std::chrono::high_resolution_clock::now();
         solve_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
-        // auto contact_forces = getEigenForceFromSolver();
-        // const auto& f = contact_forces[0]["l_foot_contact"];
-        // std::cout << "l_foot contact force — linear: " << f.head<3>().transpose()
-        //           << ", angular: " << f.tail<3>().transpose() << std::endl;
-
-
     }else{
 
-        if (contact_trigger) {
-            std::cout << "\n\n\n\n[Crocoddyl] Here contact switch happens\n";
+        int contact_mask_index = computeContactIndex({"left_rubber_hand"}, us_out, xs_out);
+        if(contact_mask_index != -1){
+            std::cout << "Detected contact switch in the horizon! \n";
             std::vector<std::string> to_remove = {"l_foot_contact"};
             std::vector<std::string> to_add = {"left_rubber_hand"};
             pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
             pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
 
-            deactivateContacts(to_remove);
-            activateContacts(to_add);
+            std::vector<bool> contact_mask = computeSwitchingMask(contact_mask_index);
+            switchContacts(to_add, to_remove, contact_mask);
+            std::cout << "Contact mask: ";
+            for (const auto& mask : contact_mask) {
+                std::cout << mask << " ";
+            }
+            std::cout << std::endl;
 
-            // printModelContacts();
-            
+            // deactivateContacts(to_remove);
+            // activateContacts(to_add);
+
             // change initial torque guess at contact with quasi-static solution with new contact states
-            xs_out[0].tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv());
-            std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
-            us_out = problem_->quasiStatic_xs(xs);
+            if(!already_switched_){
+                std::cout << "Using quasi-static this iteration \n";
+                xs_out[0].tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv());
+                std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
+                us_out = problem_->quasiStatic_xs(xs);
+            }
+            already_switched_ = true;
         }
 
-        // std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
         std::vector<Eigen::VectorXd> us = us_out;
-        // xs.push_back(xs_out[0]);
         problem_->set_x0(xs_out[0]);
 
         if(cost_mask_[2]) {
@@ -724,9 +810,6 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             data_out.contact_forces[contact_id] = contact_forces[i][contacts.first].head<3>(); // TODO: add terminal also
         }
     }
-    // for(const auto& contacts : running_contact_models_[0]->get_contacts()) {
-    //     data_out.contact_forces[contacts.first] = contact_forces[0][contacts.first].head<3>();
-    // }
 
     // save predicted end effector positions
     for (int i = 0; i < N; ++i) {

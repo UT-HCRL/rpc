@@ -23,7 +23,7 @@ Initialize::~Initialize() {
 }
 
 void Initialize::FirstVisit() {
-  std::cout << "g1_states::kInitialize" << std::endl;
+  std::cout << "[State Machine] g1_states::kInitialize" << std::endl;
   state_machine_start_time_ = sp_->current_time_;
   init_joint_pos_ = robot_->GetJointPos();
   min_jerk_curves_ = new MinJerkCurveVec(

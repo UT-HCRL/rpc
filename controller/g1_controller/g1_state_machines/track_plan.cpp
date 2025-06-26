@@ -53,7 +53,6 @@ TrackPlan::TrackPlan(const StateId state_id,
 
   pkl_reader_->parse();
 
-  std::cout << " before getCompositeBezierCurves\n";
   std::vector<pkl_utils::CompositeBezierCurve> bezier_curves = pkl_reader_->getCompositeBezierCurves();
   std::vector<std::shared_ptr<pkl_utils::CompositeBezierCurve>> bezier_curves_ptrs;
   // Convert to pointers
@@ -63,7 +62,6 @@ TrackPlan::TrackPlan(const StateId state_id,
 
   std::vector<std::string> target_names = g1_mpc_->getTargetFrameNames();
   bezier_curves_mgr_ = std::make_unique<pkl_utils::BezierCurvesManager>(bezier_curves_ptrs, target_names);
-  std::cout<<"Getting CoM from PickleReader\n";
   com_des_ =  pkl_reader_->getCoM();
 
   // for(const auto& com : com_des_) {
@@ -273,6 +271,15 @@ void TrackPlan::ComputeSync(){
       dm->data_->r_foot_rf_.resize(g1_mpc_->getNhorizon());
       dm->data_->l_hand_rf_.resize(g1_mpc_->getNhorizon());
       dm->data_->r_hand_rf_.resize(g1_mpc_->getNhorizon());
+
+      dm->data_->predicted_torso_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_left_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_right_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_left_knee_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_right_knee_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_left_rubber_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_right_rubber_pos_.resize(g1_mpc_->getNhorizon());
+
       for (int i = 0; i < g1_mpc_->getNhorizon(); ++i) {
         dm->data_->l_foot_rf_[i] = data_out.contact_forces["l_foot_contact_contact_" + std::to_string(i)];
         dm->data_->r_foot_rf_[i] = data_out.contact_forces["r_foot_contact_contact_" + std::to_string(i)];
@@ -452,6 +459,15 @@ void TrackPlan::Compute() {
       dm->data_->r_foot_rf_.resize(g1_mpc_->getNhorizon());
       dm->data_->l_hand_rf_.resize(g1_mpc_->getNhorizon());
       dm->data_->r_hand_rf_.resize(g1_mpc_->getNhorizon());
+
+      dm->data_->predicted_torso_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_left_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_right_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_left_knee_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_right_knee_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_left_rubber_pos_.resize(g1_mpc_->getNhorizon());
+      dm->data_->predicted_right_rubber_pos_.resize(g1_mpc_->getNhorizon());
+
       for (int i = 0; i < g1_mpc_->getNhorizon(); ++i) {
         dm->data_->l_foot_rf_[i] = data_out.contact_forces["l_foot_contact_contact_" + std::to_string(i)];
         dm->data_->r_foot_rf_[i] = data_out.contact_forces["r_foot_contact_contact_" + std::to_string(i)];
@@ -532,7 +548,6 @@ StateId TrackPlan::GetNextState() {
 }
 
 void TrackPlan::SetParameters(const YAML::Node &node) {
-  std::cerr << "TrackPlan::SetParameters not implemented" << std::endl;
 }
 
 void logToFile(std::ofstream& f_duration, std::ofstream& f_iterations, std::ofstream& f_costs, const mpc_utils::MPCData &data_out, const std::string& duration, int count) {

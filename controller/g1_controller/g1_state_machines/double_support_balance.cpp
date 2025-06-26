@@ -20,7 +20,7 @@ DoubleSupportBalance::DoubleSupportBalance(const StateId state_id,
 }
 
 void DoubleSupportBalance::FirstVisit() {
-  std::cout << "g1_states: kDoubleSupportBalance" << std::endl;
+  std::cout << "[State Machine] g1_states::kDoubleSupportBalance" << std::endl;
   state_machine_start_time_ = sp_->current_time_;
 
   // reset flags
@@ -92,12 +92,12 @@ StateId DoubleSupportBalance::GetNextState() {
   }
 
   if (b_replay_recorded_plan_) {
-    std::cout << " Next state is kReplayRecordedPlan" << std::endl;
+    std::cout << "[State Machine] Next state is kReplayRecordedPlan" << std::endl;
     return g1_states::kReplayRecordedPlan;
   }
 
   if (b_track_plan_) {
-    std::cout << " Next state is kTrackPlan" << std::endl;
+    std::cout << "[State Machine] Next state is kTrackPlan" << std::endl;
     return g1_states::kTrackPlan;
   }
 

@@ -300,8 +300,8 @@ public:
         for (size_t i = 0; i < composite_bez_list.size(); ++i) {
             py::object obj = composite_bez_list[i];
 
-            std::cout << "[PKL_READER] - Object " << i << ": "
-                    << std::string(py::str(obj.get_type())) << std::endl;
+            // std::cout << "[PKL_READER] - Object " << i << ": "
+            //         << std::string(py::str(obj.get_type())) << std::endl;
 
             // for all the beziers inside the object:
             std::vector<BezierCurve> beziers;

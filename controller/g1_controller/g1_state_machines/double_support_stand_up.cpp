@@ -27,7 +27,7 @@ DoubleSupportStandUp::DoubleSupportStandUp(const StateId state_id,
 }
 
 void DoubleSupportStandUp::FirstVisit() {
-  std::cout << "g1_states::kDoubleSupportStandUp" << std::endl;
+  std::cout << "[State Machine] g1_states::kDoubleSupportStandUp" << std::endl;
   state_machine_start_time_ = sp_->current_time_;
 
   // update contact state

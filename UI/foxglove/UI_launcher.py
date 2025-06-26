@@ -218,10 +218,13 @@ async def main():
             True, "torso_link_frame_costs", "json", "torso_link_frame_costs", [f"N_{i}" for i in range(mpc_horizon)]
         ).add_chan(server)
 
+        # MPC Info
         mpc_fddp_feasible = await SceneChannel(
             True, "b_fddp_feasible", "json", "fddp_feasible", ["value"]
         ).add_chan(server)
-
+        mpc_solve_duration = await SceneChannel(
+            True, "solve_duration", "json", "solve_duration", ["value"]
+        ).add_chan(server)
         grfs_chan_id = await SceneChannel(
             True, "GRFs", "json", "normal",
             [
@@ -419,6 +422,16 @@ async def main():
                 json.dumps(
                     {
                         "value": msg.total_iterations,
+                    }
+                ).encode("utf8"),
+            )
+
+            await server.send_message(
+                mpc_solve_duration,
+                now,
+                json.dumps(
+                    {
+                        "value": msg.solve_duration,
                     }
                 ).encode("utf8"),
             )
@@ -726,10 +739,11 @@ async def main():
                         transform.translation.y = msg.rhand_pos.y
                         transform.translation.z = msg.rhand_pos.z
 
-                    transform.rotation.x = 0
-                    transform.rotation.y = 0
-                    transform.rotation.z = 0
-                    transform.rotation.w = 1
+                    q_cmd_arrow = rot_to_quat(Ry)
+                    transform.rotation.x = q_cmd_arrow[0]
+                    transform.rotation.y = q_cmd_arrow[1]
+                    transform.rotation.z = q_cmd_arrow[2]
+                    transform.rotation.w = q_cmd_arrow[3]
 
                     force_dir = np.array([
                         getattr(msg, obj).x,

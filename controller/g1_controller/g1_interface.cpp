@@ -119,7 +119,7 @@ void G1Interface::GetCommand(void *sensor_data, void *command_data) {
     g1_command->gripper_pos_cmd_ = sp_->gripper_pos_cmd_;
 
 #if B_USE_ZMQ
-  if (ctrl_arch_->locostate() == g1_states::kTrackPlan) {
+  if (sp_->state_ == g1_states::kTrackPlan) {
     // Save data at each iteration in TrackPlan state
     G1DataManager *dm = G1DataManager::GetDataManager();
     dm->data_->time_ = sp_->current_time_;

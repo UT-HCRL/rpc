@@ -236,12 +236,9 @@ def main():
     for oname in arrows_fddp_object_names:
         for i in range(mpc_horizon):
             vis_arrows_dict[f"{oname}_{i}"] = []
-            print(f"Debugging vis_arrows_dict[{oname}_{i}]: {vis_arrows_dict[f'{oname}_{i}']}")
 
     for oname in arrows_sensor_object_names:
         vis_sensor_arrows_dict[oname] = []
-
-    # print(f"Debugging vis_sensor_arrows_dict: {vis_sensor_arrows_dict}")
 
     for oname in predicted_object_names:
         for i in range(mpc_horizon):
