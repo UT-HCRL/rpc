@@ -675,6 +675,66 @@ void HumanoidMulticontactTracker::initializeSolver(){
 
 }
 
+void HumanoidMulticontactTracker::changeWeightedQuadRotWeight(const std::string frame_name,
+                                                   std::vector<bool> &contact_mask) {
+    VectorXd debug_rot_weights;
+    debug_rot_weights.resize(N_horizon_ + 1);
+
+    // update cost weights in running and terminal cost models
+    if (frame_targets_.find(frame_name) != frame_targets_.end()) {
+        for (size_t i = 0; i < N_horizon_; ++i) {
+
+            // get respective activation
+            auto activation = std::dynamic_pointer_cast<crocoddyl::ActivationModelWeightedQuad>(
+                running_cost_model_[i]->get_costs().at("frame_" + frame_name)->cost->get_activation());
+            if (!activation) {
+                std::cout << "Running activation is not of type ActivationModelWeightedQuad." << std::endl;
+            }
+
+            double pos_weight = frame_targets_[frame_name][0];
+            double rot_weight = 0.;
+            Eigen::VectorXd temp_weights(6);
+
+            // if hand is in contact, foot gets swing weights
+            if (contact_mask[i]) {
+                rot_weight = tracking_swing_rot_weight_;
+                temp_weights << pos_weight, pos_weight, pos_weight, rot_weight, rot_weight, rot_weight;
+            } else {
+                rot_weight = tracking_contact_rot_weight_;
+                temp_weights << pos_weight, pos_weight, pos_weight, rot_weight, rot_weight, rot_weight;
+            }
+            activation.get()->set_weights(temp_weights);
+            debug_rot_weights[i] = rot_weight;
+        }
+
+        // then process the terminal cost
+        auto activation = std::dynamic_pointer_cast<crocoddyl::ActivationModelWeightedQuad>(
+            terminal_cost_model_->get_costs().at("frame_" + frame_name)->cost->get_activation());
+            if (!activation) {
+                std::cout << "Terminal activation is not of type ActivationModelWeightedQuad." << std::endl;
+            }
+        Eigen::VectorXd temp_weights(6);
+        double pos_weight = frame_targets_terminal_[frame_name][0];
+        double rot_weight = 0.;
+
+        // if hand is in contact, foot gets swing weights
+        if (contact_mask[N_horizon_]) {
+            rot_weight = terminal_tracking_swing_rot_weight_;
+        } else {
+            rot_weight = terminal_tracking_contact_rot_weight_;
+        }
+        temp_weights << pos_weight, pos_weight, pos_weight, rot_weight, rot_weight, rot_weight;
+        activation.get()->set_weights(temp_weights);
+        debug_rot_weights[N_horizon_] = rot_weight;
+
+        // save new weights
+        // frame_targets_[frame_name][1] = rot_weight;
+        // frame_targets_terminal_[frame_name][1] = terminal_tracking_contact_rot_weight_;
+    } else {
+        std::cout << "Cost " << frame_name << " not found." << std::endl;
+    }
+}
+
 void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const std::vector<Eigen::Vector3d>& desired_com, std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames, bool contact_trigger) {
 
     static bool first_iteration = true;

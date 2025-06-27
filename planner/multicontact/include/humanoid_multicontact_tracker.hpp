@@ -71,6 +71,15 @@ class HumanoidMulticontactTracker{
         bool isContactActive(const std::string& contact_name) const;
 
         void initializeSolver();
+
+        /**
+         * @brief Changes the rotational weights of the ActivationModelWeightedQuad @p cost_name.
+         * If the mask has a zero, it uses the contact weight, otherwise it uses the terminal contact weight.
+         * @param cost_name Name of the cost to change.
+         * @param contact_mask Contact mask to apply.
+         */
+        void changeWeightedQuadRotWeight(const std::string cost_name, std::vector<bool>& contact_mask);
+
         void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const std::vector<Eigen::Vector3d>& desired_com = {}, std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {}, bool contact_trigger = false);
         std::vector<std::string> getTargetFrameNames() const {return track_frame_names_;}
         
