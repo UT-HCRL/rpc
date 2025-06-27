@@ -23,6 +23,7 @@
 #include "crocoddyl/multibody/residuals/state.hpp"
 #include "crocoddyl/multibody/residuals/frame-placement.hpp"
 #include "crocoddyl/multibody/residuals/contact-friction-cone.hpp"
+#include "crocoddyl/multibody/residuals/contact-wrench-cone.hpp"
 #include "crocoddyl/multibody/residuals/com-position.hpp"
 #include "crocoddyl/core/utils/callbacks.hpp"
 
@@ -402,58 +403,77 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
         pinocchio::SE3 contact_frame_pose = pinocchio::SE3::Identity();
 
         if(frame_name.find("right_rubber") != std::string::npos){
-            // contact_frame_pose.rotation() = Eigen::Matrix3d::Identity();
             contact_frame_pose.rotation() = RH_rotation_;
         }else if(frame_name.find("left_rubber") != std::string::npos){
             contact_frame_pose.rotation() = LH_rotation_;
-            // contact_frame_pose.rotation() = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
-            // contact_frame_pose.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
-            // contact_frame_pose.rotation() = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
-            // contact_frame_pose.rotation() = Eigen::Matrix3d::Identity();
         }
 
+        Vector3d xref = Vector3d::Zero();
         if(phase == mpc_utils::Phase::Running){
-            std::shared_ptr<crocoddyl::ContactModelAbstract> support_contact_model6D =
-            std::make_shared<crocoddyl::ContactModel6D>(state_, model_full_.getFrameId(frame_name), contact_frame_pose, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), contact_weights_[frame_name]);
-            contact_model->addContact(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact", support_contact_model6D);
+            std::shared_ptr<crocoddyl::ContactModelAbstract> support_contact_model;
+            // for hands, use 3D contact model
+            if (frame_name.find("right_rubber") != std::string::npos || frame_name.find("left_rubber") != std::string::npos) {
+                // xref = pinocchio_data_->oMf[model_full_.getFrameId(frame_name)].translation();
+                support_contact_model =
+                    std::make_shared<crocoddyl::ContactModel3D>(state_, model_full_.getFrameId(frame_name), xref, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), contact_weights_[frame_name]);
+            } else {
+                support_contact_model =
+                    std::make_shared<crocoddyl::ContactModel6D>(state_, model_full_.getFrameId(frame_name), contact_frame_pose, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), contact_weights_[frame_name]);
+            }
+            contact_model->addContact(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact", support_contact_model);
         }
         if(phase == mpc_utils::Phase::Terminal){
-            std::shared_ptr<crocoddyl::ContactModelAbstract> support_contact_model6D =
-            std::make_shared<crocoddyl::ContactModel6D>(state_, model_full_.getFrameId(frame_name), contact_frame_pose, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), terminal_contact_weights_[frame_name]);
-            contact_model->addContact(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact_terminal", support_contact_model6D);
+            std::shared_ptr<crocoddyl::ContactModelAbstract> support_contact_model;
+            // for hands, use 3D contact model
+            if (frame_name.find("right_rubber") != std::string::npos || frame_name.find("left_rubber") != std::string::npos) {
+                // xref = pinocchio_data_->oMf[model_full_.getFrameId(frame_name)].translation();
+                support_contact_model =
+                    std::make_shared<crocoddyl::ContactModel3D>(state_, model_full_.getFrameId(frame_name), xref, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), terminal_contact_weights_[frame_name]);
+            } else {
+                support_contact_model =
+                    std::make_shared<crocoddyl::ContactModel6D>(state_, model_full_.getFrameId(frame_name), contact_frame_pose, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), terminal_contact_weights_[frame_name]);
+            }
+            contact_model->addContact(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact_terminal", support_contact_model);
         }
 
         Eigen::Matrix3d rotation;
         if(frame_name.find("right_rubber") != std::string::npos){
-            rotation = Eigen::Matrix3d::Identity(); 
-            // rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
-            // rotation = RH_rotation_;
+            // rotation = Eigen::Matrix3d::Identity();
+            rotation = RH_rotation_;
             std::string contact_suffix;
             contact_suffix = (phase == mpc_utils::Phase::Running) ? "_contact" : "_contact_terminal";
             contact_model->changeContactStatus(model_full_.frames[model_full_.getFrameId(frame_name)].name + contact_suffix, false);
+            crocoddyl::FrictionCone surf_cone(rotation, mu_, 4, true);
+            crocoddyl::ActivationBounds bounds(surf_cone.get_lb(), surf_cone.get_ub());
+            std::shared_ptr<crocoddyl::ActivationModelAbstract> surf_activation_friction = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(bounds);
+            std::shared_ptr<crocoddyl::ResidualModelAbstract> surf_residual = std::make_shared<crocoddyl::ResidualModelContactFrictionCone>(state_, model_full_.getFrameId(frame_name), surf_cone, actuation_->get_nu());
+            std::shared_ptr<crocoddyl::CostModelAbstract> surf_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, surf_activation_friction, surf_residual);
+            cost_model->addCost(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_friction_cone", surf_cost, friction_weight_);
         }
         else if(frame_name.find("left_rubber") != std::string::npos){
-            rotation = Eigen::Matrix3d::Identity();
-            // rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
-            // rotation = Eigen::AngleAxisd( - M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix().transpose();
-            // rotation = Eigen::AngleAxisd( M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
-            // std::cout << "Friction cone Z axis: " << rotation.col(2).transpose() << std::endl;
-            // rotation = LH_rotation_;
+            // rotation = Eigen::Matrix3d::Identity();
+            rotation = LH_rotation_;
             std::string contact_suffix;
             contact_suffix = (phase == mpc_utils::Phase::Running) ? "_contact" : "_contact_terminal";
             contact_model->changeContactStatus(model_full_.frames[model_full_.getFrameId(frame_name)].name + contact_suffix, false);
+            crocoddyl::FrictionCone surf_cone(rotation, mu_, 4, true);
+            crocoddyl::ActivationBounds bounds(surf_cone.get_lb(), surf_cone.get_ub());
+            std::shared_ptr<crocoddyl::ActivationModelAbstract> surf_activation_friction = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(bounds);
+            std::shared_ptr<crocoddyl::ResidualModelAbstract> surf_residual = std::make_shared<crocoddyl::ResidualModelContactFrictionCone>(state_, model_full_.getFrameId(frame_name), surf_cone, actuation_->get_nu());
+            std::shared_ptr<crocoddyl::CostModelAbstract> surf_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, surf_activation_friction, surf_residual);
+            cost_model->addCost(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_friction_cone", surf_cost, friction_weight_);
         }
         else{
             rotation = Eigen::Matrix3d::Identity();
+            Vector2d foot_size(0.12, 0.05); // goes from (-0.05 to 0.12, -0.025 to 0.035)
+            crocoddyl::WrenchCone surf_cone(rotation, mu_, foot_size);
+            crocoddyl::ActivationBounds bounds(surf_cone.get_lb(), surf_cone.get_ub());
+            std::shared_ptr<crocoddyl::ActivationModelAbstract> surf_activation_friction = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(bounds);
+            std::shared_ptr<crocoddyl::ResidualModelAbstract> surf_residual = std::make_shared<crocoddyl::ResidualModelContactWrenchCone>(state_, model_full_.getFrameId(frame_name), surf_cone, actuation_->get_nu());
+            std::shared_ptr<crocoddyl::CostModelAbstract> surf_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, surf_activation_friction, surf_residual);
+            cost_model->addCost(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_friction_cone", surf_cost, friction_weight_);
         }
-        crocoddyl::FrictionCone surf_cone(rotation, mu_, 4, true);
-        crocoddyl::ActivationBounds bounds(surf_cone.get_lb(), surf_cone.get_ub());
-        std::shared_ptr<crocoddyl::ActivationModelAbstract> surf_activation_friction = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(bounds);
-        std::shared_ptr<crocoddyl::ResidualModelAbstract> surf_residual = std::make_shared<crocoddyl::ResidualModelContactFrictionCone>(state_, model_full_.getFrameId(frame_name), surf_cone, actuation_->get_nu());
-        std::shared_ptr<crocoddyl::CostModelAbstract> surf_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, surf_activation_friction, surf_residual);
-        cost_model->addCost(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_friction_cone", surf_cost, friction_weight_);
     }
-
 }
 
 void HumanoidMulticontactTracker::deactivateContacts(const std::vector<std::string>& frame_names){
@@ -975,9 +995,15 @@ void HumanoidMulticontactTracker::printContacts() const {
             const std::string& name = contact_pair.first;
             const auto& contact = contact_pair.second;
             if (contact->active) {
-                std::cout << "Contact: " << name << " at i: <<" <<i <<" is active." << std::endl;
+                std::cout << "Contact: " << name << " at i: " <<i <<" is active." << std::endl;
             } else {
-                std::cout << "Contact: " << name << " at i: <<" <<i << " is inactive." << std::endl;
+                std::cout << "Contact: " << name << " at i: " <<i << " is inactive." << std::endl;
+            }
+            if (name.find("left_rubber_hand") != std::string::npos) {
+                auto cone = std::dynamic_pointer_cast<crocoddyl::ResidualModelContactFrictionCone>(
+                    running_cost_model_[i]->get_costs().at("left_rubber_hand_friction_cone")->cost->get_residual());
+                std::cout << "got cone" << std::endl;
+                std::cout << "cone ref: " << std::endl << cone->get_reference() << std::endl;
             }
         }
     }

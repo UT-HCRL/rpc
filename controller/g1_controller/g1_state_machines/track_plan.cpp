@@ -225,14 +225,14 @@ void TrackPlan::ComputeSync(){
       dm->data_->com_costs_.resize(data_out.com_costs.size());
       dm->data_->com_costs_ = data_out.com_costs;
 
-      dm->data_->torso_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("torso_primitive_shape", controller_time);
-      dm->data_->right_knee_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("right_knee_link", controller_time);
-      dm->data_->left_knee_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("left_knee_link", controller_time);
-      dm->data_->right_ankle_roll_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("right_ankle_roll_link", controller_time);
-      dm->data_->left_ankle_roll_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("left_ankle_roll_link", controller_time);
-      dm->data_->left_rubber_hand_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("left_rubber_hand", controller_time);
-      dm->data_->right_rubber_hand_des_pos_ = bezier_curves_mgr_->getCurrentDesiredPosition("right_rubber_hand", controller_time);
-      dm->data_->com_des_pos_ = pkl_utils::get_com_des_pos(com_des_, controller_time, g1_mpc_->getDt());
+      dm->data_->torso_des_pos_ = desired_frames_vec[0].at("torso_primitive_shape").translation();
+      dm->data_->right_knee_des_pos_ = desired_frames_vec[0].at("right_knee_link").translation();
+      dm->data_->left_knee_des_pos_ = desired_frames_vec[0].at("left_knee_link").translation();
+      dm->data_->right_ankle_roll_des_pos_ = desired_frames_vec[0].at("right_ankle_roll_link").translation();
+      dm->data_->left_ankle_roll_des_pos_ = desired_frames_vec[0].at("left_ankle_roll_link").translation();
+      dm->data_->left_rubber_hand_des_pos_ = desired_frames_vec[0].at("left_rubber_hand").translation();
+      dm->data_->right_rubber_hand_des_pos_ = desired_frames_vec[0].at("right_rubber_hand").translation();
+      dm->data_->com_des_pos_ = desired_com_vec[0];
 
       dm->data_->torso_curr_pos_ = data_out.frame_current_pos["torso_primitive_shape"];
       dm->data_->left_ankle_roll_curr_pos_ = data_out.frame_current_pos["left_ankle_roll_link"];
