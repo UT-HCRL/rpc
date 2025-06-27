@@ -110,6 +110,8 @@ class HumanoidMulticontactTracker{
         ContactSequence contact_seqs_;
         Eigen::VectorXd q0_;
         Eigen::VectorXd x0_;
+        std::vector<VectorXd> x_prev_;
+        std::vector<VectorXd> u_prev_;
         mpc_utils::Weights w_frame_;
 
         double dt_;
