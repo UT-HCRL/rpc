@@ -120,6 +120,8 @@ class HumanoidMulticontactTracker{
         double xbound_weight_;
         double com_tracking_weight_;
         double frame_tracking_weight_;
+        double tracking_contact_rot_weight_;
+        double tracking_swing_rot_weight_;
         double friction_weight_;
 
         Eigen::VectorXd terminal_xreg_weights_;
@@ -128,6 +130,8 @@ class HumanoidMulticontactTracker{
         double terminal_xbound_weight_;
         double terminal_com_tracking_weight_;
         double terminal_frame_tracking_weight_;
+        double terminal_tracking_contact_rot_weight_;
+        double terminal_tracking_swing_rot_weight_;
 
         std::shared_ptr<crocoddyl::CostModelAbstract> xreg_cost_;
         std::shared_ptr<crocoddyl::CostModelAbstract> ureg_cost_;

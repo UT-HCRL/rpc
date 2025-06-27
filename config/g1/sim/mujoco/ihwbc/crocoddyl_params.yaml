@@ -114,6 +114,8 @@ running_costs:
       base_rot: [0.0, 10.0, 0.0]
       joint_pos: 0.0
       joint_vel: 10.0
+      base_lin_vel: [1.0, 100.0, 1.0]
+      base_ang_vel: [5.0, 5.0, 5.0]
   uReg:
     w: 0.02
   xBound:
@@ -122,6 +124,8 @@ running_costs:
     w: 10000.0
   tracking_frames:
     w: 1.0
+    contact_rot: 100.0  # rotation weight assigned for frames in contact
+    swing_rot: 0.01     # rotation weight assigned for frames in swing phase
     torso_primitive_shape: 
       pos: 10000.0
       rot: 0.0
@@ -165,6 +169,8 @@ terminal_costs:
       base_rot: [0.0, 10.0, 0.0]
       joint_pos: 0.0
       joint_vel: 20.0
+      base_lin_vel: [1.0, 500.0, 1.0]
+      base_ang_vel: [5.0, 5.0, 5.0]
   uReg:
     w: 0.01
   xBound:
@@ -173,6 +179,8 @@ terminal_costs:
     w: 3000.0
   tracking_frames:
     w: 1.0
+    contact_rot: 200.0  # weight assigned for frames in contact
+    swing_rot: 0.01  # weight assigned for frames in swing phase
     torso_primitive_shape:
       pos: 1000.0
       rot: 0.0

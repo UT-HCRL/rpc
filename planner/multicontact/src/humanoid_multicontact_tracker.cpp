@@ -164,21 +164,27 @@ void HumanoidMulticontactTracker::loadRegularizationWeights() {
     std::vector<double> base_rot_weights;
     double joint_pos_weights;
     double joint_vel_weights;
+    std::vector<double> base_lin_vel_weights;
+    std::vector<double> base_ang_vel_weights;
 
     int nv = state_->get_nv();
 
     util::ReadParameter(params_["running_costs"]["xReg"], "w", xreg_weight_);
+    mpc_utils::normalize_weights(xreg_weight_, N_horizon_);
     util::ReadParameter(params_["running_costs"]["xReg"]["state_w"], "base_pos", base_pos_weights);
     util::ReadParameter(params_["running_costs"]["xReg"]["state_w"], "base_rot", base_rot_weights);
     util::ReadParameter(params_["running_costs"]["xReg"]["state_w"], "joint_pos", joint_pos_weights);
     util::ReadParameter(params_["running_costs"]["xReg"]["state_w"], "joint_vel", joint_vel_weights);
-    mpc_utils::normalize_weights(xreg_weight_, N_horizon_);
+    util::ReadParameter(params_["running_costs"]["xReg"]["state_w"], "base_lin_vel", base_lin_vel_weights);
+    util::ReadParameter(params_["running_costs"]["xReg"]["state_w"], "base_ang_vel", base_ang_vel_weights);
 
     xreg_weights_ = Eigen::VectorXd::Zero(2 * state_->get_nv());
     for (int i = 0; i < 3; ++i) xreg_weights_(i) = pow(base_pos_weights[i],2);
     for (int i = 0; i < 3; ++i) xreg_weights_(3 + i) = pow(base_rot_weights[i],2);
     for (int i = 6; i < nv; ++i) xreg_weights_(i) = pow(joint_pos_weights,2);
-    for (int i = 0; i < nv; ++i) xreg_weights_(nv + i) = pow(joint_vel_weights,2);      // ignore floating base vel
+    for (int i = 0; i < 3; ++i) xreg_weights_(nv + i) = pow(base_lin_vel_weights[i],2);
+    for (int i = 3; i < 6; ++i) xreg_weights_(nv + i) = pow(base_ang_vel_weights[i],2);
+    for (int i = 6; i < nv; ++i) xreg_weights_(nv + i) = pow(joint_vel_weights,2);
     mpc_utils::normalize_weights(xreg_weights_, N_horizon_);
 
     util::ReadParameter(params_["running_costs"]["uReg"], "w", ureg_weight_);
@@ -189,12 +195,16 @@ void HumanoidMulticontactTracker::loadRegularizationWeights() {
     util::ReadParameter(params_["terminal_costs"]["xReg"]["state_w"], "base_rot", base_rot_weights);
     util::ReadParameter(params_["terminal_costs"]["xReg"]["state_w"], "joint_pos", joint_pos_weights);
     util::ReadParameter(params_["terminal_costs"]["xReg"]["state_w"], "joint_vel", joint_vel_weights);
+    util::ReadParameter(params_["terminal_costs"]["xReg"]["state_w"], "base_lin_vel", base_lin_vel_weights);
+    util::ReadParameter(params_["terminal_costs"]["xReg"]["state_w"], "base_ang_vel", base_ang_vel_weights);
 
     terminal_xreg_weights_ = Eigen::VectorXd::Zero(2 * state_->get_nv());
     for (int i = 0; i < 3; ++i) terminal_xreg_weights_(i) = pow(base_pos_weights[i],2);
     for (int i = 0; i < 3; ++i) terminal_xreg_weights_(3 + i) = pow(base_rot_weights[i],2);
     for (int i = 6; i < nv; ++i) terminal_xreg_weights_(i) = pow(joint_pos_weights,2);
-    for (int i = 0; i < nv; ++i) terminal_xreg_weights_(nv + i) = pow(joint_vel_weights,2);     // ignore floating base vel
+    for (int i = 0; i < 3; ++i) terminal_xreg_weights_(nv + i) = pow(base_lin_vel_weights[i],2);
+    for (int i = 3; i < 6; ++i) terminal_xreg_weights_(nv + i) = pow(base_ang_vel_weights[i],2);
+    for (int i = 6; i < nv; ++i) terminal_xreg_weights_(nv + i) = pow(joint_vel_weights,2);
 
     util::ReadParameter(params_["terminal_costs"]["uReg"], "w", terminal_ureg_weight_);
 
@@ -217,21 +227,37 @@ void HumanoidMulticontactTracker::loadCoMWeights(){
 void HumanoidMulticontactTracker::loadTrackingFramesWeights(){
     util::ReadParameter(params_, "tracking_frames", track_frame_names_);
     util::ReadParameter(params_["running_costs"]["tracking_frames"], "w", frame_tracking_weight_);
+    util::ReadParameter(params_["running_costs"]["tracking_frames"], "contact_rot", tracking_contact_rot_weight_);
+    util::ReadParameter(params_["running_costs"]["tracking_frames"], "swing_rot", tracking_swing_rot_weight_);
     for (const auto& frame_name : track_frame_names_) {
         double w_frame;
         double wo_frame;
         util::ReadParameter(params_["running_costs"]["tracking_frames"][frame_name], "pos", w_frame);
         util::ReadParameter(params_["running_costs"]["tracking_frames"][frame_name], "rot", wo_frame);
         mpc_utils::normalize_weights(w_frame, N_horizon_);
+        // initialize feet with contact weights and hands with swing weights
+        if (frame_name.find("ankle") != std::string::npos) {
+            wo_frame = tracking_contact_rot_weight_;
+        } else {
+            wo_frame = tracking_swing_rot_weight_;
+        }
         frame_targets_[frame_name] = mpc_utils::from2DValues(w_frame, wo_frame);
     }
     util::ReadParameter(params_["terminal_costs"]["tracking_frames"], "w", terminal_frame_tracking_weight_);
+    util::ReadParameter(params_["terminal_costs"]["tracking_frames"], "contact_rot", terminal_tracking_contact_rot_weight_);
+    util::ReadParameter(params_["terminal_costs"]["tracking_frames"], "swing_rot", terminal_tracking_swing_rot_weight_);
     for (const auto& frame_name : track_frame_names_) {
         double w_frame;
         double wo_frame;
         std::string frame_name_terminal = frame_name + "_terminal";
         util::ReadParameter(params_["terminal_costs"]["tracking_frames"][frame_name], "pos", w_frame);
         util::ReadParameter(params_["terminal_costs"]["tracking_frames"][frame_name], "rot", wo_frame);
+        // initialize feet with contact weights and hands with swing weights
+        if (frame_name.find("ankle") != std::string::npos) {
+            wo_frame = terminal_tracking_contact_rot_weight_;
+        } else {
+            wo_frame = terminal_tracking_swing_rot_weight_;
+        }
         frame_targets_terminal_[frame_name] = mpc_utils::from2DValues(w_frame, wo_frame);
     }
 }
