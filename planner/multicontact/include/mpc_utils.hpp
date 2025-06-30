@@ -335,4 +335,11 @@ namespace mpc_utils {
         w = w / pow(N, alpha);
     }
 
+    inline Eigen::Isometry3d SE3_to_Isometry(const pinocchio::SE3 & M) {
+        Eigen::Isometry3d iso(Eigen::Isometry3d::Identity());
+        iso.linear() = M.rotation();
+        iso.translation() = M.translation();
+        return iso;
+    }
+
 } // namespace mpc_utils

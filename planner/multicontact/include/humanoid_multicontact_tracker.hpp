@@ -3,17 +3,17 @@
 #include <Eigen/Dense>
 
 #include <memory>
-#include <memory>
 #include "crocoddyl/core/fwd.hpp"
 #include "crocoddyl/core/solvers/fddp.hpp"
 #include "crocoddyl/multibody/actions/contact-fwddyn.hpp"
 #include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/multibody/model.hpp>
 
-#include "contact_sequence.hpp"
 #include "mpc_utils.hpp"
 #include "util/pkl_utils.hpp"
 #include "util/util.hpp"
+
+#include "contact_switching/core.hpp"
 
 class CostRecorderCallback;
 
@@ -80,7 +80,7 @@ class HumanoidMulticontactTracker{
          */
         void changeWeightedQuadRotWeight(const std::string cost_name, std::vector<bool>& contact_mask);
 
-        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const std::vector<Eigen::Vector3d>& desired_com = {}, std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {}, bool contact_trigger = false);
+        void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const std::vector<Eigen::Vector3d>& desired_com = {}, std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {}, const double time = 0.0);
         std::vector<std::string> getTargetFrameNames() const {return track_frame_names_;}
         
         // Auxiliary functions for DARE computation
@@ -107,7 +107,6 @@ class HumanoidMulticontactTracker{
 
 
         //### PROBLEM FORMULATION ###
-        ContactSequence contact_seqs_;
         Eigen::VectorXd q0_;
         Eigen::VectorXd x0_;
         std::vector<VectorXd> x_prev_;
@@ -177,10 +176,20 @@ class HumanoidMulticontactTracker{
         std::shared_ptr<CostRecorderCallback> cost_callback_;
         //#################
 
+        //### CONTACT SWITCHING ###
+        std::shared_ptr<ContactSwitchingManager> contact_switching_manager_;
+        std::shared_ptr<TransitionDetector> detector_;
+        std::unique_ptr<ContactTransitionCoordinator> coordinator_;
+        ContactSwitchUtils::Context ctx_;
+
+        std::unordered_map<std::string, std::vector<Eigen::Isometry3d>> future_poses_; //FIXME: this is redundant with data_out but need conversion between Isometry and PinocchioSE3
+        std::vector<bool> contact_mask_;
+        bool switch_trigger_ = false;
+        //##########################
+
         //### DARE TEMP VARIABLES ###
         Eigen::MatrixXd K_DARE_;
 
-        bool already_switched_ = false;
 
         //### FUNC UTILS ###
         void printModelContacts() const;

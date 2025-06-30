@@ -191,17 +191,7 @@ void TrackPlan::ComputeSync(){
     xs_out[0] << robot_->GetQ(), robot_->GetQdot();
 
     auto start_time = std::chrono::high_resolution_clock::now();
-    if(controller_time >= 3.0 && !remove_contact){ //FIXME: this should become a switching condition from the forces
-      remove_contact = true;
-      g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, true);
-    }else if(controller_time >= 6.0 && remove_contact){
-      std::cout<<"SHOULD BE NEW STEP NOW \n";
-      exit(23);
-      g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, false);
-    }else{
-      g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, false);
-    }
-   
+    g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, controller_time);
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
@@ -386,16 +376,7 @@ void TrackPlan::Compute() {
       xs_out[0] << robot_->GetQ(), robot_->GetQdot();
 
       auto start_time = std::chrono::high_resolution_clock::now();
-      if (controller_time >= 3.0 && !remove_contact) {
-        remove_contact = true;
-        g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, true);
-      } else if (controller_time >= 6.0 && remove_contact) {
-        std::cout << "SHOULD BE NEW STEP NOW \n";
-        exit(23);
-        g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, false);
-      } else {
-        g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, false);
-      }
+      g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, controller_time);
 
       auto end_time = std::chrono::high_resolution_clock::now();
       auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();

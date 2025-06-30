@@ -17,25 +17,11 @@ target_include_directories(${PROJECT_NAME}
         ${crocoddyl_INCLUDE_DIRS}
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-
 target_link_libraries(${PROJECT_NAME} 
     PUBLIC crocoddyl::crocoddyl
     PUBLIC OpenMP::OpenMP_CXX
     PUBLIC rpc-util
-)
-
-add_executable(${PROJECT_NAME}_test src/model_example.cpp)
-target_link_libraries(${PROJECT_NAME}_test
-    PRIVATE ${PROJECT_NAME}
-)
-target_include_directories(${PROJECT_NAME}_test
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-add_executable(${PROJECT_NAME}_plot_time src/plot_solvetime.cpp)
-target_link_libraries(${PROJECT_NAME}_plot_time
-    PRIVATE ${PROJECT_NAME}
+    PUBLIC contact_switching
 )
 
 install(TARGETS ${PROJECT_NAME}

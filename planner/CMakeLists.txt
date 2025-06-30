@@ -1,2 +1,3 @@
+add_subdirectory(switching_manager)
 add_subdirectory(locomotion)
 add_subdirectory(multicontact)

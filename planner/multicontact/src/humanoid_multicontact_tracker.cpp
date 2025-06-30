@@ -110,6 +110,36 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
     u_prev_= std::vector<Eigen::VectorXd>(N_horizon_, Eigen::VectorXd::Zero(state_->get_nv()-6));
     //#################################
 
+    //### Configure switching problem ###
+    contact_switching_manager_ = std::make_shared<ContactSwitchingManager>(std::unordered_map<std::string, bool>{
+                {"l_foot_contact", true},
+                {"r_foot_contact", true},
+                {"left_rubber_hand", false},
+                {"right_rubber_hand", false}
+            },
+            N_horizon_ +1);
+    
+    detector_ = std::make_shared<TransitionDetector>();
+    coordinator_ = std::make_unique<ContactTransitionCoordinator>(contact_switching_manager_, detector_);
+    auto time_condition = std::make_shared<TimeElapsedCondition>("time_elapsed", 3.0, true);
+    auto plane_condition = std::make_shared<PlanePassCondition>(
+        "plane_pass", 
+        Eigen::Isometry3d(Eigen::Translation3d(0.0, 0.3, 0.0)), 
+        Eigen::Vector3d(0.0, 1.0, 0.0), 
+        "left_rubber_hand"
+    );
+    detector_->addCondition(time_condition);
+    detector_->addCondition(plane_condition);
+    contact_switching_manager_->resetSwitchingMask();
+    ctx_.time = 0.0;
+    ctx_.pose["l_foot_contact"] = mpc_utils::SE3_to_Isometry(pinocchio_data_->oMf[model_full_.getFrameId("l_foot_contact")]);
+    ctx_.pose["r_foot_contact"] = mpc_utils::SE3_to_Isometry(pinocchio_data_->oMf[model_full_.getFrameId("r_foot_contact")]);
+    ctx_.pose["left_rubber_hand"] = mpc_utils::SE3_to_Isometry(pinocchio_data_->oMf[model_full_.getFrameId("left_rubber_hand")]);
+    ctx_.pose["right_rubber_hand"] = mpc_utils::SE3_to_Isometry(pinocchio_data_->oMf[model_full_.getFrameId("right_rubber_hand")]);
+
+    contact_mask_.resize(N_horizon_ + 1);
+    //#####################################
+
     loadInitialConfiguration();
     loadCostMask();
     loadContactFrames();
@@ -520,22 +550,25 @@ void HumanoidMulticontactTracker::activateContacts(const std::vector<std::string
     }
 }
 
-std::vector<bool> HumanoidMulticontactTracker::computeSwitchingMask(int first_contact_index){
-
-    std::vector<bool> contact_mask(N_horizon_ + 1, false);
-    
-    for (int i = first_contact_index; i < N_horizon_ + 1; i++) {
-        contact_mask[i] = true;
-    }
-
-    return contact_mask;
-    
-}
 
 void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask){
 
     if(contact_mask.size() != N_horizon_ +1){
         throw std::invalid_argument("contact_mask size must be equal to N_horizon_ + 1");
+    }
+
+
+    for (const auto& frame_name: inactive_frames) {
+        for(size_t i = 0; i < N_horizon_; i++) {
+            if(contact_mask[i]){
+                running_contact_models_[i]->changeContactStatus(frame_name + "_contact", false);
+                running_cost_model_[i]->changeCostStatus(frame_name + "_friction_cone", false);
+            }
+        }
+        if(contact_mask[N_horizon_]) {
+            terminal_contact_models_->changeContactStatus(frame_name + "_contact_terminal", false);
+            terminal_cost_model_->changeCostStatus(frame_name + "_friction_cone", false);
+        }
     }
 
     for (const auto& frame_name: active_frames) {
@@ -553,56 +586,8 @@ void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>&
         }
     }
 
-    for (const auto& frame_name: inactive_frames) {
-        for(size_t i = 0; i < N_horizon_; i++) {
-            if(contact_mask[i]){
-                running_contact_models_[i]->changeContactStatus(frame_name + "_contact", false);
-                running_cost_model_[i]->changeCostStatus(frame_name + "_friction_cone", false);
-            }
-        }
-        if(contact_mask[N_horizon_]) {
-            terminal_contact_models_->changeContactStatus(frame_name + "_contact_terminal", false);
-            terminal_cost_model_->changeCostStatus(frame_name + "_friction_cone", false);
-        }
-    }
-
     //TODO: add logic to update beziers after re-activating contacts
 
-}
-
-int HumanoidMulticontactTracker::computeContactIndex(const std::vector<std::string>& frame_names, std::vector<Eigen::VectorXd> us, std::vector<Eigen::VectorXd> xs){
-    pinocchio::Data future_data(model_full_);
-    
-    // Plane parameters
-    const double plane_y = 0.317; //0.292125;
-    const double plane_tolerance = 0.005; // Epsilon for absolute plane detection
-    
-    for (std::size_t i = 0; i < xs.size(); ++i) {
-        Eigen::VectorXd q = xs[i].head(state_->get_nq());
-        Eigen::VectorXd v = xs[i].tail(state_->get_nv());
-        
-        pinocchio::forwardKinematics(model_full_, future_data, q, v);
-        pinocchio::updateFramePlacements(model_full_, future_data);
-        
-        for (const auto& frame_name : frame_names) {
-            if (!model_full_.existFrame(frame_name)) {
-                throw std::invalid_argument("Frame " + frame_name + " does not exist in the model.");
-            }
-            
-            pinocchio::SE3 frame_pose = future_data.oMf[model_full_.getFrameId(frame_name)];
-            double current_y = frame_pose.translation().y();
-            
-            // Absolute check: is the frame currently at/through the plane?
-            if (std::abs(current_y - plane_y) <= plane_tolerance) {
-                // std::cout << "PLANE CONTACT DETECTED! Step: " << i << ", Frame: " << frame_name
-                //          << " is at plane y=" << plane_y 
-                //          << " (current_y: " << current_y << ", distance: " << std::abs(current_y - plane_y) << ")" << std::endl;
-                return i;
-            }
-            
-        }
-    }
-    return -1;
 }
 
 std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMulticontactTracker::createMultiFrameActionModel(const std::vector<std::string>& frame_names, const int horizon_index){
@@ -757,7 +742,7 @@ void HumanoidMulticontactTracker::changeWeightedQuadRotWeight(const std::string 
     }
 }
 
-void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const std::vector<Eigen::Vector3d>& desired_com, std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames, bool contact_trigger) {
+void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const std::vector<Eigen::Vector3d>& desired_com, std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames, const double time) {
 
     static bool first_iteration = true;
     const std::size_t N = fddp_->get_problem()->get_T();
@@ -819,44 +804,27 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
 
     }else{
 
-        int contact_mask_index = computeContactIndex({"left_rubber_hand"}, us_out, xs_out);
-        if(contact_mask_index != -1){
-            std::cout << "Detected contact switch in the horizon! \n";
-            std::vector<std::string> to_remove = {"l_foot_contact"};
-            std::vector<std::string> to_add = {"left_rubber_hand"};
-            pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
-            pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
+        std::vector<std::string> to_remove = {"l_foot_contact"};
+        std::vector<std::string> to_add = {"left_rubber_hand"};
+        pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
+        pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
 
-            std::vector<bool> contact_mask = computeSwitchingMask(contact_mask_index);
-            switchContacts(to_add, to_remove, contact_mask);
-            std::cout << "Contact mask: ";
-            for (const auto& mask : contact_mask) {
-                std::cout << mask << " ";
-            }
-            std::cout << std::endl;
-
-            // std::vector<bool> contact_mask(N+1, true);
-            // if (cost_mask_[3]) {
-            //     changeWeightedQuadRotWeight("left_ankle_roll_link",  contact_mask);
-            // }
-
-            // change initial torque guess with quasi-static solution before adding new hand contacts
-            deactivateContacts(to_remove);
-            xs_out[0].tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv());
-            std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
-            us_static = problem_->quasiStatic_xs(xs);
-            u_prev_ = us_static;    // during contact change, use static solution as initial guess
-            activateContacts(to_add);
-
-            // if(!already_switched_){
-            //     std::cout << "Using quasi-static this iteration \n";
-            //     xs_out[0].tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv());
-            //     std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
-            //     std::cout << "Computing quasi-static solution" << std::endl;
-            //     us_out = problem_->quasiStatic_xs(xs);
-            // }
-            // already_switched_ = true;
+        if(switch_trigger_){
+            switch_trigger_ = false;
+            // TODO: add logic after switching trigger up
         }
+
+        xs_out[0].tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv()); // FIXME: should we add it to the switchContact function direcly
+        std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
+        us_static = problem_->quasiStatic_xs(xs);
+        u_prev_ = us_static;    // during contact change, use static solution as initial guess
+
+        switchContacts(to_add, to_remove, contact_mask_); //TODO: to_remove and to_add must come from the switching manager, which must contain the plan beforehand
+
+        // std::vector<bool> contact_mask(N+1, true);
+        // if (cost_mask_[3]) {
+        //     changeWeightedQuadRotWeight("left_ankle_roll_link",  contact_mask);
+        // }
 
         problem_->set_x0(xs_out[0]);
 
@@ -952,7 +920,7 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
     }
 
     // save predicted end effector positions
-    for (int i = 0; i < N; ++i) {
+    for (int i = 0; i < N+1; ++i) {
         for (const auto& frame_name : track_frame_names_) {
             auto q_current = xs_out[i].head(state_->get_nq());
             pinocchio::forwardKinematics(model_full_, *pinocchio_data_, q_current);
@@ -961,8 +929,25 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             pinocchio::SE3 frame_pose = pinocchio_data_->oMf[model_full_.getFrameId(frame_name)];
             std::string frame_id = frame_name + "_" + std::to_string(i);
             data_out.predicted_frame_positions[frame_id] = frame_pose.translation();
+            future_poses_[frame_name].push_back(mpc_utils::SE3_to_Isometry(frame_pose));
         }
     }
+
+    ctx_.time = time;
+    if(coordinator_->processFutureTransitions(ctx_, future_poses_, dt_)){
+        std::static_pointer_cast<TimeElapsedCondition>(detector_->getCondition("time_elapsed"))->update();
+        switch_trigger_ = true;
+        // detector_->getCondition("plane_pass")->update(); //TODO: pass next plane condition
+    }
+    future_poses_.clear();
+    
+    contact_mask_ = contact_switching_manager_->getSwitchingMask();
+    std::cout << "time: " << time << " s \n";
+    std::cout << "[";
+    for (size_t i = 0; i < contact_mask_.size(); ++i) {
+        std::cout << (contact_mask_[i] ? "Active" : "Inactive") << " ";
+    }
+    std::cout << "]\n";
 
     data_out.solve_duration = solve_duration;
 }
