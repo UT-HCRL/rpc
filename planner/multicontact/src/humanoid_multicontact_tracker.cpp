@@ -129,7 +129,7 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
         "left_rubber_hand"
     );
     detector_->addCondition(time_condition);
-    detector_->addCondition(plane_condition);
+    // detector_->addCondition(plane_condition); //FIXME: to add later
     contact_switching_manager_->resetSwitchingMask();
     ctx_.time = 0.0;
     ctx_.pose["l_foot_contact"] = mpc_utils::SE3_to_Isometry(pinocchio_data_->oMf[model_full_.getFrameId("l_foot_contact")]);
@@ -551,7 +551,7 @@ void HumanoidMulticontactTracker::activateContacts(const std::vector<std::string
 }
 
 
-void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask){
+void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask, const std::vector<Eigen::VectorXd>& xs){
 
     if(contact_mask.size() != N_horizon_ +1){
         throw std::invalid_argument("contact_mask size must be equal to N_horizon_ + 1");
@@ -570,6 +570,8 @@ void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>&
             terminal_cost_model_->changeCostStatus(frame_name + "_friction_cone", false);
         }
     }
+
+    u_prev_ = problem_->quasiStatic_xs(xs);    // during contact change, use static solution as initial guess
 
     for (const auto& frame_name: active_frames) {
         for(size_t i = 0; i < N_horizon_; i++) {
@@ -673,6 +675,7 @@ void HumanoidMulticontactTracker::initializeSolver(){
     fddp_ = std::make_shared<crocoddyl::SolverFDDP>(problem_);
     if(enable_callbacks_) fddp_->setCallbacks({std::make_shared<crocoddyl::CallbackVerbose>()});
     
+    problem_->set_nthreads(8);
     std::cout << "\n[Crocoddyl] num of threads used: " << problem_->get_nthreads();
 
     // cost_callback_ = std::make_shared<CostRecorderCallback>();
@@ -811,15 +814,14 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
 
         if(switch_trigger_){
             switch_trigger_ = false;
-            // TODO: add logic after switching trigger up
+
+            xs_out[0].tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv());
+            std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
+            switchContacts(to_add, to_remove, contact_mask_, xs); //TODO: to_remove and to_add must come from the switching manager, which must contain the plan beforehand
         }
 
-        xs_out[0].tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv()); // FIXME: should we add it to the switchContact function direcly
-        std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
-        us_static = problem_->quasiStatic_xs(xs);
-        u_prev_ = us_static;    // during contact change, use static solution as initial guess
 
-        switchContacts(to_add, to_remove, contact_mask_); //TODO: to_remove and to_add must come from the switching manager, which must contain the plan beforehand
+
 
         // std::vector<bool> contact_mask(N+1, true);
         // if (cost_mask_[3]) {
@@ -942,12 +944,12 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
     future_poses_.clear();
     
     contact_mask_ = contact_switching_manager_->getSwitchingMask();
-    std::cout << "time: " << time << " s \n";
-    std::cout << "[";
-    for (size_t i = 0; i < contact_mask_.size(); ++i) {
-        std::cout << (contact_mask_[i] ? "Active" : "Inactive") << " ";
-    }
-    std::cout << "]\n";
+    // std::cout << "time: " << time << " s \n";
+    // std::cout << "[";
+    // for (size_t i = 0; i < contact_mask_.size(); ++i) {
+    //     std::cout << (contact_mask_[i] ? "Active" : "Inactive") << " ";
+    // }
+    // std::cout << "]\n";
 
     data_out.solve_duration = solve_duration;
 }
