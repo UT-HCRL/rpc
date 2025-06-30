@@ -177,14 +177,25 @@ void TrackPlan::ComputeSync(){
       for(const auto& frame_name : g1_mpc_->getTargetFrameNames()) {
         pinocchio::SE3 temp_pose;
         temp_pose.setIdentity();
-        temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
+        // FIXME if statement is temporary to test contact transition
+        if (frame_name.find("left_rubber_hand") != std::string::npos) {
+          temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
+          temp_pose.translation().x() = 0.2;
+        } else if (frame_name.find("torso_primitive_shape") != std::string::npos) {
+          temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, 0.1);
+        } else {
+          temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
+        }
+        // temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
         desired_frames[frame_name] = temp_pose;
       }
       desired_frames_vec[i] = desired_frames;
 
       // std::cout << "Desired CoM at time " << t << ": " <<pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt()) << std::endl;
 
-      desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt());
+      desired_com_vec[i] = Vector3d(0.055, 0., 0.605);  // FIXME testing side wall
+      // desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, 0, g1_mpc_->getDt());
+      // desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt());
 
     }
 
