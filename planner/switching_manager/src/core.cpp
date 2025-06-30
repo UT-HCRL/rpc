@@ -1,0 +1,1 @@
+#include <contact_switching/core.hpp>
