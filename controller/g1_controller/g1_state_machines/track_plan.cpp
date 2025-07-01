@@ -19,8 +19,11 @@ namespace {
 void logToFile(std::ofstream& f_duration, std::ofstream& f_iterations, std::ofstream& f_costs, const std::string &data, int count);
 
 TrackPlan::TrackPlan(const StateId state_id,
-                                           PinocchioRobotSystem *robot,
-                                           G1ControlArchitecture *ctrl_arch)
+                     PinocchioRobotSystem *robot,
+                     std::vector<pkl_utils::CompositeBezierCurve> planned_bezier_curves,
+                     std::vector<Vector3d> planned_com_des,
+                     std::vector<double> planned_time,
+                     G1ControlArchitecture *ctrl_arch)
     : StateMachine(state_id, robot), ctrl_arch_(ctrl_arch), rf_z_max_interp_duration_(0.), b_tracking_plan_(false) {
   util::PrettyConstructor(2, "TrackPlan");
 
@@ -44,38 +47,15 @@ TrackPlan::TrackPlan(const StateId state_id,
   g1_mpc_ = std::make_unique<HumanoidMulticontactTracker>(r_file_path, gains);
   // g1_mpc_->printModel();
 
-  std::string file_path = THIS_COM "data_example/g1_step_over_knee_knocker_latest_fix.pkl";
-  pkl_reader_ = std::make_unique<pkl_utils::PickleReader>(file_path, pkl_utils::PickleType::COMPOSITE);
-
-  if (!pkl_reader_->isReady()) {
-  std::cerr << "Failed to open the file." << std::endl;
-  }
-
-  pkl_reader_->parse();
-
-  std::vector<pkl_utils::CompositeBezierCurve> bezier_curves = pkl_reader_->getCompositeBezierCurves();
   std::vector<std::shared_ptr<pkl_utils::CompositeBezierCurve>> bezier_curves_ptrs;
   // Convert to pointers
-  for (const auto& curve : bezier_curves) {
+  for (const auto& curve : planned_bezier_curves) {
     bezier_curves_ptrs.push_back(std::make_shared<pkl_utils::CompositeBezierCurve>(curve));
   }
 
   std::vector<std::string> target_names = g1_mpc_->getTargetFrameNames();
   bezier_curves_mgr_ = std::make_unique<pkl_utils::BezierCurvesManager>(bezier_curves_ptrs, target_names);
-  com_des_ =  pkl_reader_->getCoM();
-
-  // for(const auto& com : com_des_) {
-  //   std::cout << "CoM : " << com << std::endl;
-  // }
-
-  try {
-    pkl_reader_.reset(); //NOTE: I need this otherwise on ctrl+c I get sigfault due to pybind scope 
-  } catch (const std::exception& e) {
-    std::cerr << "Exception caught while resetting pkl_reader_: " << e.what() << std::endl;
-  } catch (...) {
-    std::cerr << "Unknown exception caught while resetting pkl_reader_" << std::endl;
-  }
-
+  com_des_ =  planned_com_des;
 }
 
 TrackPlan::~TrackPlan() {

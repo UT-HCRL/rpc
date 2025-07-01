@@ -257,11 +257,35 @@ G1ControlArchitecture::G1ControlArchitecture(PinocchioRobotSystem *robot,
   locomotion_state_machine_container_[g1_states::kRFSingleSupportSwing]
       ->SetParameters(cfg);
 
+  // std::string file_path = THIS_COM "experiment_data/g1_29dof_knee_knocker_full_step_over.pkl";
+  std::string file_path = THIS_COM "data_example/g1_step_over_knee_knocker_latest_fix.pkl";
+  PickleReader pkl_reader = PickleReader(file_path, PickleType::COMPOSITE);
+  if (!pkl_reader.isReady()) {
+      std::cerr << "Failed to open the file." << std::endl;
+  return;
+  }
+  pkl_reader.parse();
+  std::vector<Matrix<double, 34, 1>> planned_joint_pos = pkl_reader.getJointPosDes();
+  std::vector<Matrix<double, 33, 1>> planned_joint_vel = pkl_reader.getJointVelDes();
+  std::vector<Matrix<double, 27, 1>> planned_joint_tau = pkl_reader.getJointTauDes();
+  std::vector<double> planned_time = pkl_reader.getTimeVec();
   locomotion_state_machine_container_[g1_states::kReplayRecordedPlan] =
-      new ReplayRecordedPlan(g1_states::kReplayRecordedPlan, robot_, this);
+      new ReplayRecordedPlan(g1_states::kReplayRecordedPlan,
+          robot_,
+          planned_joint_pos,
+          planned_joint_vel,
+          planned_joint_tau,
+          planned_time,
+          this);
 
+  std::vector<CompositeBezierCurve> bezier_curves = pkl_reader.getCompositeBezierCurves();
   locomotion_state_machine_container_[g1_states::kTrackPlan] =
-      new TrackPlan(g1_states::kTrackPlan, robot_, this);
+      new TrackPlan(g1_states::kTrackPlan,
+          robot_,
+          bezier_curves,
+          pkl_reader.getCoM(),
+          planned_time,
+          this);
   locomotion_state_machine_container_[g1_states::kTrackPlan]
       ->SetParameters(cfg);
 

@@ -15,8 +15,13 @@ enum InterpolationMethod {
 
 class ReplayRecordedPlan : public StateMachine {
 public:
-  ReplayRecordedPlan(const StateId state_id, PinocchioRobotSystem *robot,
-                       G1ControlArchitecture *ctrl_arch);
+  ReplayRecordedPlan(const StateId state_id,
+                     PinocchioRobotSystem *robot,
+                     std::vector<Matrix <double, 34, 1>> joint_pos,
+                     std::vector<Matrix <double, 33, 1>> joint_vel,
+                     std::vector<Matrix <double, 27, 1>> joint_tau,
+                     std::vector<double> time_vec,
+                     G1ControlArchitecture *ctrl_arch);
   ~ReplayRecordedPlan();
 
   void FirstVisit() override;
@@ -33,10 +38,9 @@ private:
 
   G1StateProvider *sp_;
 
-  PickleReader* reader_;
-  std::vector<Matrix<double, 44, 1>> pkl_joint_pos_;
-  std::vector<Matrix<double, 43, 1>> pkl_joint_vel_;
-  std::vector<Matrix<double, 37, 1>> pkl_joint_tau_;
+  std::vector<Matrix<double, 34, 1>> pkl_joint_pos_;
+  std::vector<Matrix<double, 33, 1>> pkl_joint_vel_;
+  std::vector<Matrix<double, 27, 1>> pkl_joint_tau_;
   std::vector<double> pkl_time_;
   unsigned int planner_counter_;
   InterpolationMethod k_interp_method_;
