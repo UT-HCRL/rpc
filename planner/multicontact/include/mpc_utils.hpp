@@ -8,6 +8,8 @@
 
 namespace mpc_utils {
 
+    enum class IntegrationMethod { Euler, RK2, RK3, RK4 };
+
     enum class Phase { Running, Terminal };
 
     using Weights = Eigen::Matrix<double, 6, 1>;
@@ -20,6 +22,20 @@ namespace mpc_utils {
 
     inline Weights2D from2DValues(double wp0, double wp1) {
         return Weights2D(wp0, wp1);
+    }
+
+    inline Vector6d fromStdVector(const std::vector<double>& vec) {
+        if (vec.size() != 6) {
+            throw std::invalid_argument("Vector must have exactly 6 elements.");
+        }
+        return Vector6d(vec[0], vec[1], vec[2], vec[3], vec[4], vec[5]);
+    }
+
+    inline Eigen::Vector3d fromStdVector3(const std::vector<double>& vec) {
+        if (vec.size() != 3) {
+            throw std::invalid_argument("Vector must have exactly 3 elements.");
+        }
+        return Eigen::Vector3d(vec[0], vec[1], vec[2]);
     }
 
     inline void printWeights(std::unordered_map<std::string, mpc_utils::Weights> gains){
@@ -319,6 +335,23 @@ namespace mpc_utils {
     }
     
     inline void normalize_weights(Eigen::VectorXd& w, const int N){ //TODO: template fun
+        
+        if ((w.array() < 0.0).all()) {
+            throw std::invalid_argument("Weight must be non-negative");
+        }
+        else if((w.array() == 0.0).all()) {
+            return;
+        }
+        
+        if (N <= 0) {
+            throw std::invalid_argument("Number of weights must be positive");
+        }
+        
+        double alpha = 0.2;
+        w = w / pow(N, alpha);
+    }
+
+    inline void normalize_weights(Eigen::Vector3d& w, const int N){ //TODO: template fun
         
         if ((w.array() < 0.0).all()) {
             throw std::invalid_argument("Weight must be non-negative");

@@ -36,6 +36,7 @@ class HumanoidMulticontactTracker{
         void loadCoMWeights();
         void loadTrackingFramesWeights();
         void loadMPCParams();
+        void loadForceTrackingWeights();
 
         void setInitialJointConfiguration(const Eigen::VectorXd& q0);
         void setFrames(const std::vector<std::string>& frame_names);
@@ -56,10 +57,11 @@ class HumanoidMulticontactTracker{
         void addContactCosts(const std::vector<std::string>& frame_names, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addRegularizationCosts(const Eigen::VectorXd& xreg_weights, const double xreg_weight, const double ureg_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addFrameTrackingCost(const std::string& frame_name, const double frame_tracking_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
+        void addForceTrackingCost(const std::string& frame_name, const pinocchio::Force& force_reference, const Eigen::Vector3d& weights = Eigen::Vector3d::Zero(), const double cost_weight = 0.0, const mpc_utils::Phase phase = mpc_utils::Phase::Running, const int horizon_index = 0, const size_t contact_f_dim = 6, const bool fwwddyn = true);
 
         void deactivateContacts(const std::vector<std::string>& frame_names);
         void activateContacts(const std::vector<std::string>& frame_names);
-        void switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask, const std::vector<Eigen::VectorXd>& xs);
+        void switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask, const std::vector<Eigen::VectorXd>& xs, bool use_quasistatic);
 
         std::vector<std::vector<std::map<std::string, pinocchio::Force>>> const getForceFromSolver();
         std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> const getEigenForceFromSolver();
@@ -91,6 +93,7 @@ class HumanoidMulticontactTracker{
         bool reduced_model_;
         std::vector<std::string> frame_names_;
         std::vector<std::string> track_frame_names_;
+        std::vector<std::string> track_force_names_;
         std::vector<int> locked_joints_list_;
         double mu_;
 
@@ -119,7 +122,10 @@ class HumanoidMulticontactTracker{
         std::unordered_map<std::string, mpc_utils::Weights2D> terminal_contact_weights_;
         std::unordered_map<std::string, mpc_utils::Weights2D> frame_targets_;
         std::unordered_map<std::string, mpc_utils::Weights2D> frame_targets_terminal_; //Used for terminal cost frame tracking
-    
+        std::unordered_map<std::string, Eigen::Vector3d> force_tracking_weights_; //Usedc for running cost of force tracking
+        std::unordered_map<std::string, Eigen::Vector3d> terminal_force_tracking_weights_; //Used for terminal cost of force tracking
+        mpc_utils::IntegrationMethod integration_method_;
+
         std::vector<int> cost_mask_;
 
         Eigen::VectorXd xreg_weights_;
@@ -131,6 +137,7 @@ class HumanoidMulticontactTracker{
         double tracking_contact_rot_weight_;
         double tracking_swing_rot_weight_;
         double friction_weight_;
+        double force_cost_weight_;
 
         Eigen::VectorXd terminal_xreg_weights_;
         double terminal_xreg_weight_;
@@ -140,6 +147,7 @@ class HumanoidMulticontactTracker{
         double terminal_frame_tracking_weight_;
         double terminal_tracking_contact_rot_weight_;
         double terminal_tracking_swing_rot_weight_;
+        double terminal_force_cost_weight_;
 
         std::shared_ptr<crocoddyl::CostModelAbstract> xreg_cost_;
         std::shared_ptr<crocoddyl::CostModelAbstract> ureg_cost_;
@@ -153,6 +161,10 @@ class HumanoidMulticontactTracker{
 
         std::vector<std::shared_ptr<crocoddyl::ResidualModelCoMPosition>> com_residual_;
         std::vector<std::unordered_map<std::string, std::shared_ptr<crocoddyl::ResidualModelFramePlacement>>> frame_residuals_;
+        std::vector<std::unordered_map<std::string, std::shared_ptr<crocoddyl::ResidualModelContactForce>>> force_residuals_;
+
+        std::vector<std::shared_ptr<crocoddyl::ActionModelAbstract>> integrated_action_models_;
+        std::shared_ptr<crocoddyl::ActionModelAbstract> integrated_terminal_action_model_;
         //###########################
 
 
@@ -183,13 +195,11 @@ class HumanoidMulticontactTracker{
         std::unordered_map<std::string, std::vector<Eigen::Isometry3d>> future_poses_; //FIXME: this is redundant with data_out but need conversion between Isometry and PinocchioSE3
         std::vector<bool> contact_mask_;
         bool switch_trigger_ = false;
+        bool first_iteration_ = true; // This is used for first computation of MPC and then is set to false
+        bool first_contact_change_ = true; // This is used to compute the quasi-static solution only once at the first contact change
         //##########################
 
         //### DARE TEMP VARIABLES ###
         Eigen::MatrixXd K_DARE_;
-
-
-        //### FUNC UTILS ###
-        void printModelContacts() const;
 
 };

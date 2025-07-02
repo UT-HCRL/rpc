@@ -2,6 +2,7 @@
 
 #include "crocoddyl/core/optctrl/shooting.hpp"
 #include "crocoddyl/core/integrator/euler.hpp"
+#include "crocoddyl/core/integrator/rk.hpp"
 #include "crocoddyl/core/costs/cost-sum.hpp"
 #include "crocoddyl/core/costs/residual.hpp"
 #include "crocoddyl/core/residuals/control.hpp"
@@ -25,6 +26,7 @@
 #include "crocoddyl/multibody/residuals/contact-friction-cone.hpp"
 #include "crocoddyl/multibody/residuals/contact-wrench-cone.hpp"
 #include "crocoddyl/multibody/residuals/com-position.hpp"
+#include "crocoddyl/multibody/residuals/contact-force.hpp"
 #include "crocoddyl/core/utils/callbacks.hpp"
 
 #include <pinocchio/algorithm/model.hpp>
@@ -66,6 +68,7 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
     loadMPCParams();
 
     frame_residuals_.resize(N_horizon_ + 1);
+    force_residuals_.resize(N_horizon_ + 1);
 
     pinocchio::urdf::buildModel(robot_path, pinocchio::JointModelFreeFlyer(), model_full_);
     pinocchio_data_ = std::make_unique<pinocchio::Data>(model_full_);
@@ -122,14 +125,14 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
     detector_ = std::make_shared<TransitionDetector>();
     coordinator_ = std::make_unique<ContactTransitionCoordinator>(contact_switching_manager_, detector_);
     auto time_condition = std::make_shared<TimeElapsedCondition>("time_elapsed", 3.0, true);
-    auto plane_condition = std::make_shared<PlanePassCondition>(
-        "plane_pass", 
-        Eigen::Isometry3d(Eigen::Translation3d(0.0, 0.3, 0.0)), 
-        Eigen::Vector3d(0.0, 1.0, 0.0), 
-        "left_rubber_hand"
-    );
+    // auto plane_condition = std::make_shared<PlanePassCondition>(
+    //     "plane_pass", 
+    //     Eigen::Isometry3d(Eigen::Translation3d(0.0, 0.3, 0.0)),
+    //     Eigen::Vector3d(0.0, 1.0, 0.0), 
+    //     "left_rubber_hand"
+    // );
     detector_->addCondition(time_condition);
-    // detector_->addCondition(plane_condition); //FIXME: to add later
+    // detector_->addCondition(plane_condition);
     contact_switching_manager_->resetSwitchingMask();
     ctx_.time = 0.0;
     ctx_.pose["l_foot_contact"] = mpc_utils::SE3_to_Isometry(pinocchio_data_->oMf[model_full_.getFrameId("l_foot_contact")]);
@@ -147,6 +150,7 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
     loadBoundWeights();
     loadCoMWeights();
     loadTrackingFramesWeights();
+    loadForceTrackingWeights();
 
     initializeSolver();
 }
@@ -295,10 +299,50 @@ void HumanoidMulticontactTracker::loadTrackingFramesWeights(){
     }
 }
 
+void HumanoidMulticontactTracker::loadForceTrackingWeights(){
+    
+    //NOTE: this assumes that frame_names is already populated by its loading call.
+    util::ReadParameter(params_["running_costs"]["tracking_forces"], "w", force_cost_weight_);
+    util::ReadParameter(params_["terminal_costs"]["tracking_forces"], "w", terminal_force_cost_weight_);
+
+    for(const auto frame : frame_names_){
+        std::vector<double> force_tracking_weight;
+        util::ReadParameter(params_["running_costs"]["tracking_forces"], frame, force_tracking_weight);
+        if(force_tracking_weight.size() != 3) {
+            throw std::runtime_error("Force tracking weight for frame " + frame + " must be a vector of size 3, got: " + std::to_string(force_tracking_weight.size()));
+        }
+        force_tracking_weights_[frame] = mpc_utils::fromStdVector3(force_tracking_weight);
+        mpc_utils::normalize_weights(force_tracking_weights_[frame], N_horizon_);
+
+        if(force_tracking_weight.size() != 3) {
+            throw std::runtime_error("Force tracking weight for frame " + frame + " must be a vector of size 3, got: " + std::to_string(force_tracking_weight.size()));
+        }
+        terminal_force_tracking_weights_[frame] = mpc_utils::fromStdVector3(force_tracking_weight);
+        mpc_utils::normalize_weights(terminal_force_tracking_weights_[frame], N_horizon_);
+    }
+}
+
 void HumanoidMulticontactTracker::loadMPCParams(){
     util::ReadParameter(params_["mpc"], "dt", dt_);
     util::ReadParameter(params_["mpc"], "horizon", N_horizon_);
     util::ReadParameter(params_["mpc"], "max_iter", max_iter_);
+
+    std::string integration_method;
+    util::ReadParameter(params_["mpc"], "integration_method", integration_method);
+
+    std::transform(integration_method.begin(), integration_method.end(), integration_method.begin(), ::toupper);
+
+    if (integration_method == "EULER") {
+        integration_method_ = mpc_utils::IntegrationMethod::Euler;
+    } else if (integration_method == "RK2") {
+        integration_method_ = mpc_utils::IntegrationMethod::RK2;
+    } else if (integration_method == "RK3") {
+        integration_method_ = mpc_utils::IntegrationMethod::RK3;
+    } else if (integration_method == "RK4") {
+        integration_method_ = mpc_utils::IntegrationMethod::RK4;
+    } else {
+        throw std::invalid_argument("Invalid integration method. Supported methods are 'Euler', 'RK2' , 'RK3', 'RK4'.");
+    }
 }
 
 void HumanoidMulticontactTracker::printModel() const {
@@ -376,8 +420,8 @@ void HumanoidMulticontactTracker::addFrameTrackingCost(const std::string& frame_
     Eigen::Vector3d torso_rot = {0, 0, 0};
     pinocchio::SE3 current_pose = pinocchio::SE3(Eigen::AngleAxisd(torso_rot[0], Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(torso_rot[1], Eigen::Vector3d::UnitY()) * Eigen::AngleAxisd(torso_rot[2], Eigen::Vector3d::UnitZ()), torso_pos);
 
-    std::shared_ptr<crocoddyl::ResidualModelFramePlacement> frame_residual_ = std::make_shared<crocoddyl::ResidualModelFramePlacement>(state_, model_full_.getFrameId(frame_name), current_pose, actuation_->get_nu());
-    frame_residuals_[horizon_index][frame_name] = frame_residual_;
+    std::shared_ptr<crocoddyl::ResidualModelFramePlacement> frame_residual = std::make_shared<crocoddyl::ResidualModelFramePlacement>(state_, model_full_.getFrameId(frame_name), current_pose, actuation_->get_nu());
+    frame_residuals_[horizon_index][frame_name] = frame_residual;
 
     Eigen::VectorXd temp_weights(6);
     temp_weights << frame_cost_weight(0), frame_cost_weight(0), frame_cost_weight(0), frame_cost_weight(1), frame_cost_weight(1), frame_cost_weight(1);
@@ -508,6 +552,26 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
     }
 }
 
+void HumanoidMulticontactTracker::addForceTrackingCost(const std::string& frame_name, const pinocchio::Force& force_reference, const Eigen::Vector3d& weights, const double cost_weight, const mpc_utils::Phase phase, const int horizon_index, const size_t contact_f_dim, const bool fwwddyn){
+
+    auto& cost_model = (phase == mpc_utils::Phase::Running) ? running_cost_model_[horizon_index] : terminal_cost_model_;
+    std::cout << "Adding force tracking cost for frame: " << frame_name << std::endl;
+
+    std::shared_ptr<crocoddyl::ResidualModelContactForce> force_residual = std::make_shared<crocoddyl::ResidualModelContactForce>(state_, model_full_.getFrameId(frame_name), force_reference, contact_f_dim, actuation_->get_nu(), fwwddyn);
+    
+    force_residuals_[horizon_index][frame_name] = force_residual;
+    std::cout << "Force residual for frame " << frame_name << " added with reference: " << force_reference << std::endl;
+
+    std::shared_ptr<crocoddyl::ActivationModelAbstract> force_activation = std::make_shared<crocoddyl::ActivationModelWeightedQuad>(weights);
+
+    std::cout << "Force activation for frame " << frame_name << " added with weights: " << weights.transpose() << std::endl;
+
+    std::shared_ptr<crocoddyl::CostModelAbstract> force_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, force_activation, force_residuals_[horizon_index][frame_name]);
+    cost_model->addCost("force_tracking_" + frame_name, force_cost, cost_weight);
+
+    std::cout << "Force tracking cost for frame " << frame_name << " added with weight: " << cost_weight << std::endl;
+}
+
 void HumanoidMulticontactTracker::deactivateContacts(const std::vector<std::string>& frame_names){
 
     for (const auto& frame_name : frame_names) {
@@ -550,8 +614,7 @@ void HumanoidMulticontactTracker::activateContacts(const std::vector<std::string
     }
 }
 
-
-void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask, const std::vector<Eigen::VectorXd>& xs){
+void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask, const std::vector<Eigen::VectorXd>& xs, bool use_quasistatic){
 
     if(contact_mask.size() != N_horizon_ +1){
         throw std::invalid_argument("contact_mask size must be equal to N_horizon_ + 1");
@@ -571,7 +634,22 @@ void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>&
         }
     }
 
-    u_prev_ = problem_->quasiStatic_xs(xs);    // during contact change, use static solution as initial guess
+    if(use_quasistatic){
+        std::cout<<"Computing quasi-static just once \n";
+        // for (size_t i = 0; i < u_prev_.size(); ++i) {
+        //     std::cout << "u_prev_[" << i << "]: " << u_prev_[i].transpose() << std::endl;
+        // }
+
+        std::vector<VectorXd> u_star_;
+
+        u_star_ = problem_->quasiStatic_xs(xs);
+
+        auto first_true = std::distance(contact_mask.begin(), std::find(contact_mask.begin(), contact_mask.end(), true));
+        for(size_t i = first_true; i< N_horizon_; i++) {
+            u_prev_[i] = u_star_[i];
+        }
+        
+        }    // during contact change, use static solution as initial guess only at first step of change
 
     for (const auto& frame_name: active_frames) {
         for(size_t i = 0; i < N_horizon_; i++) {
@@ -611,7 +689,16 @@ std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMu
     if (cost_mask_[4]) {
         addContactCosts(frame_names, mpc_utils::Phase::Running, horizon_index);
     }
-
+    if (cost_mask_[5]) {
+        std::cout << "[Crocoddyl] Adding force tracking costs for running phase." << std::endl;
+        for (const auto& frame_name : frame_names_){
+            if (force_tracking_weights_.find(frame_name) != force_tracking_weights_.end()) { // FIXME: starting reference could be initialised different from zero from known vector
+                addForceTrackingCost(frame_name, pinocchio::Force::Zero(), force_tracking_weights_[frame_name], force_cost_weight_, mpc_utils::Phase::Running, horizon_index, 3, true);
+            }else {
+                std::cout << "[Crocoddyl] Warning: Force tracking weights for frame " << frame_name << " not found. Skipping force tracking cost." << std::endl;
+            }
+        }
+    }
     std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> runningDAM = std::make_shared<crocoddyl::DifferentialActionModelContactFwdDynamics>(state_, actuation_, running_contact_models_[horizon_index], running_cost_model_[horizon_index]);
     return runningDAM;
 }
@@ -635,6 +722,16 @@ std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMu
     if (cost_mask_[4]) {
         addContactCosts(frame_names, mpc_utils::Phase::Terminal);
     }
+    if (cost_mask_[5]) {
+        std::cout << "[Crocoddyl] Adding force tracking costs for terminal phase." << std::endl;
+        for (const auto& frame_name : frame_names_){
+            if (terminal_force_tracking_weights_.find(frame_name) != terminal_force_tracking_weights_.end()) { // FIXME: starting reference could be initialised different from zero from known vector
+                addForceTrackingCost(frame_name, pinocchio::Force::Zero(), terminal_force_tracking_weights_[frame_name], terminal_force_cost_weight_, mpc_utils::Phase::Terminal, N_horizon_, 3, true);
+            }else {
+                std::cout << "[Crocoddyl] Warning: Force tracking weights for frame " << frame_name << " not found. Skipping force tracking cost." << std::endl;
+            }
+        }
+    }
     
     std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> terminalDAM = std::make_shared<crocoddyl::DifferentialActionModelContactFwdDynamics>(state_, actuation_, terminal_contact_models_, terminal_cost_model_);
     return terminalDAM;
@@ -653,36 +750,46 @@ void HumanoidMulticontactTracker::setFrames(const std::vector<std::string>& fram
 
 void HumanoidMulticontactTracker::initializeSolver(){
 
-    std::vector<std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics>> running_DAMS_;
-    for(std::size_t i = 0; i < N_horizon_; ++i) {
-        running_DAMS_.push_back(createMultiFrameActionModel(frame_names_, i));
+    std::vector<std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics>> running_DAMS;
+    running_DAMS.reserve(N_horizon_);
+    for(std::size_t i = 0; i < N_horizon_; ++i) {   
+        running_DAMS.push_back(createMultiFrameActionModel(frame_names_, i));
     }
-
     std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> terminal_DAM = createMultiFrameTerminalActionModel(frame_names_);
 
-    std::vector<std::shared_ptr<crocoddyl::ActionModelAbstract>> runningModelsWithEuler;
-    for(std::size_t i = 0; i < N_horizon_; ++i) {
-        runningModelsWithEuler.push_back(std::make_shared<crocoddyl::IntegratedActionModelEuler>(running_DAMS_[i], dt_));
-    }
-    std::shared_ptr<crocoddyl::ActionModelAbstract> terminalModelWithEuler = std::make_shared<crocoddyl::IntegratedActionModelEuler>(terminal_DAM, 0);
+    auto create_integrated_model = [&](const auto& dam, bool is_terminal = false)
+        -> std::shared_ptr<crocoddyl::IntegratedActionModelAbstract> {
+        
+        if (integration_method_ == mpc_utils::IntegrationMethod::Euler) {
+            return std::static_pointer_cast<crocoddyl::IntegratedActionModelAbstract>(
+                std::make_shared<crocoddyl::IntegratedActionModelEuler>(dam, is_terminal ? 0.0 : dt_));
+        } else if (integration_method_ == mpc_utils::IntegrationMethod::RK2) {
+            return std::static_pointer_cast<crocoddyl::IntegratedActionModelAbstract>(
+                std::make_shared<crocoddyl::IntegratedActionModelRK>(dam, crocoddyl::RKType::two, is_terminal ? 0.0 : dt_));
+        } else if (integration_method_ == mpc_utils::IntegrationMethod::RK3) {
+            return std::static_pointer_cast<crocoddyl::IntegratedActionModelAbstract>(
+                std::make_shared<crocoddyl::IntegratedActionModelRK>(dam, crocoddyl::RKType::three, is_terminal ? 0.0 : dt_));
+        } else if (integration_method_ == mpc_utils::IntegrationMethod::RK4) {
+            return std::static_pointer_cast<crocoddyl::IntegratedActionModelAbstract>(
+                std::make_shared<crocoddyl::IntegratedActionModelRK>(dam, crocoddyl::RKType::four, is_terminal ? 0.0 : dt_));
+        } else {
+            throw std::invalid_argument("Invalid integration method. Supported methods are Euler, RK2, RK3, and RK4.");
+        }
+    };
 
-    std::vector<std::shared_ptr<crocoddyl::ActionModelAbstract>> running_models; // TODO move running_models to class property?
-    for(std::size_t i = 0; i < N_horizon_; ++i) {
-        running_models.push_back(runningModelsWithEuler[i]);
+    integrated_action_models_.reserve(N_horizon_);
+    for (const auto& dam : running_DAMS) {
+        integrated_action_models_.push_back(create_integrated_model(dam));
     }
+    integrated_terminal_action_model_ = create_integrated_model(terminal_DAM, true);
 
-    problem_ = std::make_shared<crocoddyl::ShootingProblem>(x0_, running_models, terminalModelWithEuler);
+    problem_ = std::make_shared<crocoddyl::ShootingProblem>(x0_, integrated_action_models_, integrated_terminal_action_model_);
     fddp_ = std::make_shared<crocoddyl::SolverFDDP>(problem_);
     if(enable_callbacks_) fddp_->setCallbacks({std::make_shared<crocoddyl::CallbackVerbose>()});
-    
+
     problem_->set_nthreads(8);
     std::cout << "\n[Crocoddyl] num of threads used: " << problem_->get_nthreads();
-
-    // cost_callback_ = std::make_shared<CostRecorderCallback>();
-    // std::vector<std::shared_ptr<crocoddyl::CallbackAbstract>> callbacks;
-    // callbacks.push_back(cost_callback_);
-    // fddp_->setCallbacks(callbacks);
-
+    
 }
 
 void HumanoidMulticontactTracker::changeWeightedQuadRotWeight(const std::string frame_name,
@@ -747,20 +854,19 @@ void HumanoidMulticontactTracker::changeWeightedQuadRotWeight(const std::string 
 
 void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const std::vector<Eigen::Vector3d>& desired_com, std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames, const double time) {
 
-    static bool first_iteration = true;
     const std::size_t N = fddp_->get_problem()->get_T();
     // static int iteration = 0;
     // static double avg_solve_time_ = 0.0;
     long solve_duration = 0.;
 
     std::vector<Eigen::VectorXd> us_static;
-    if(first_iteration){
+    if(first_iteration_){
         fddp_->set_th_stop(1e-3);
         std::vector<Eigen::VectorXd> xs(N, x0_);
         us_static = problem_->quasiStatic_xs(xs);
         xs.push_back(x0_);
 
-        first_iteration = false;
+        first_iteration_ = false;
 
         if(cost_mask_[2]) {
             for(size_t i = 0; i < N + 1; i++){
@@ -801,7 +907,12 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
         // fddp_->setCandidate(xs, us, false); It should be already called by ->solve
         auto start_time = std::chrono::high_resolution_clock::now();
-        fddp_->solve(xs, us_static, max_iter_);
+        try {
+            fddp_->solve(xs, us_static, max_iter_);
+        } catch (const std::exception& e) {
+            std::cerr << "Error during FDDP solve: " << e.what() << std::endl;
+            throw;
+        }
         auto end_time = std::chrono::high_resolution_clock::now();
         solve_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
@@ -812,16 +923,20 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
         pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
 
-        if(switch_trigger_){
-            switch_trigger_ = false;
-
+        if (contact_switching_manager_->isMaskNotEmpty()) {
+            // std::cout << "contact_mask contains at least one true value." << std::endl;
             xs_out[0].tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv());
             std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
-            switchContacts(to_add, to_remove, contact_mask_, xs); //TODO: to_remove and to_add must come from the switching manager, which must contain the plan beforehand
+            
+            // std::cout << "Contact mask: ";
+            // for (const auto& mask : contact_mask_) {
+            //     std::cout << mask << " ";
+            // }
+            // std::cout << std::endl;
+
+            switchContacts(to_add, to_remove, contact_mask_, xs, first_contact_change_); //TODO: to_remove and to_add must come from the switching manager, which must contain the plan beforehand
+            first_contact_change_ = false;
         }
-
-
-
 
         // std::vector<bool> contact_mask(N+1, true);
         // if (cost_mask_[3]) {
@@ -868,7 +983,12 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         }
 
         auto start_time = std::chrono::high_resolution_clock::now();
-        fddp_->solve(x_prev_, u_prev_, max_iter_);
+        try {
+            fddp_->solve(x_prev_, u_prev_, max_iter_);
+        } catch (const std::exception& e) {
+            std::cerr << "Error during FDDP solve: " << e.what() << std::endl;
+            throw;
+        }
         getEigenForceFromSolver();
         auto end_time = std::chrono::high_resolution_clock::now();
         solve_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
@@ -938,40 +1058,51 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
     ctx_.time = time;
     if(coordinator_->processFutureTransitions(ctx_, future_poses_, dt_)){
         std::static_pointer_cast<TimeElapsedCondition>(detector_->getCondition("time_elapsed"))->update();
-        switch_trigger_ = true;
         // detector_->getCondition("plane_pass")->update(); //TODO: pass next plane condition
+        // first_contact_change_ = true; // TODO: add this to reset quasi-static computation on next phase
+        switch_trigger_ = true; // TODO: this will be used to start next phase
     }
     future_poses_.clear();
     
     contact_mask_ = contact_switching_manager_->getSwitchingMask();
-    // std::cout << "time: " << time << " s \n";
-    // std::cout << "[";
-    // for (size_t i = 0; i < contact_mask_.size(); ++i) {
-    //     std::cout << (contact_mask_[i] ? "Active" : "Inactive") << " ";
-    // }
-    // std::cout << "]\n";
 
     data_out.solve_duration = solve_duration;
 }
 
 double HumanoidMulticontactTracker::getCostValue(const std::string& cost_name, const int horizon_index) const {
-    auto running_data = fddp_->get_problem()->get_runningDatas()[horizon_index];
-    auto integrated_data = std::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(running_data);
-    if (!integrated_data || !integrated_data->differential) {
-        throw std::runtime_error("Invalid data cast for IntegratedActionDataEuler or differential data is null.");
-    }
 
-    auto contact_data = std::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(integrated_data->differential);
-    if (!contact_data) {
-        throw std::runtime_error("Invalid data cast for DifferentialActionDataContactFwdDynamics.");
-    }
+    if (integration_method_ == mpc_utils::IntegrationMethod::Euler) {
+        auto integrated_data = std::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(fddp_->get_problem()->get_runningDatas()[horizon_index]);
+        if (!integrated_data || !integrated_data->differential) {
+            throw std::runtime_error("Invalid data cast for IntegratedActionDataEuler or differential data is null.");
+        }
+        auto contact_data = std::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(integrated_data->differential);
+        if (!contact_data) {
+            throw std::runtime_error("Invalid data cast for DifferentialActionDataContactFwdDynamics.");
+        }
+        auto it = contact_data->costs->costs.find(cost_name);
+        if (it == contact_data->costs->costs.end()) {
+            throw std::runtime_error("Cost name '" + cost_name + "' not found in the cost model.");
+        }
 
-    auto it = contact_data->costs->costs.find(cost_name);
-    if (it == contact_data->costs->costs.end()) {
-        throw std::runtime_error("Cost name '" + cost_name + "' not found in the cost model.");
-    }
+        return it->second->cost;
 
-    return it->second->cost;
+    } else {
+        auto integrated_data = std::dynamic_pointer_cast<crocoddyl::IntegratedActionDataRK>(fddp_->get_problem()->get_runningDatas()[horizon_index]);
+        if (!integrated_data || !integrated_data->differential.back()) {
+            throw std::runtime_error("Invalid data cast for IntegratedActionDataEuler or differential data is null.");
+        }
+        auto contact_data = std::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(integrated_data->differential.back());
+        if (!contact_data) {
+            throw std::runtime_error("Invalid data cast for DifferentialActionDataContactFwdDynamics.");
+        }
+        auto it = contact_data->costs->costs.find(cost_name);
+        if (it == contact_data->costs->costs.end()) {
+            throw std::runtime_error("Cost name '" + cost_name + "' not found in the cost model.");
+        }
+
+        return it->second->cost;
+    }
 }
 
 void HumanoidMulticontactTracker::computeDARE(const std::vector<Eigen::VectorXd>& xs_out, const std::vector<Eigen::VectorXd>& us_out) {
@@ -1065,34 +1196,61 @@ std::vector<std::vector<std::map<std::string, pinocchio::Force>>> const Humanoid
         std::vector<std::map<std::string, pinocchio::Force>> time_step_forces;
         std::map<std::string, pinocchio::Force> contact_forces;
 
-        auto integrated_data = std::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(data);
+        if (integration_method_ == mpc_utils::IntegrationMethod::Euler) {
+            auto integrated_data = std::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(data);
+            if (!integrated_data || !integrated_data->differential) {
+                forces_trajectory.push_back(time_step_forces);
+                continue;
+            }
+            auto contact_data = std::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(
+            integrated_data->differential);
+            if (!contact_data) {
+                forces_trajectory.push_back(time_step_forces);
+                continue;
+            }
+            const auto& contacts_data = contact_data->multibody.contacts->contacts;
+            for (const auto& contact_pair : contacts_data) {
+                const std::string& name = contact_pair.first;
+                const auto& contact = contact_pair.second;
+                contact_forces[name] = contact->f;
+                // std::cout << "t=" << t << ", " << name
+                //         << ": f_linear=" << contact->f.linear().transpose()
+                //         << ", f_angular=" << contact->f.angular().transpose() << std::endl;
+            }
 
-        if (!integrated_data || !integrated_data->differential) {
+            if (!contact_forces.empty()) {
+                time_step_forces.push_back(contact_forces);
+            }
             forces_trajectory.push_back(time_step_forces);
-            continue;
-        }
 
-        auto contact_data = std::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(
-        integrated_data->differential);
-        if (!contact_data) {
+        } else{
+            auto integrated_data = std::dynamic_pointer_cast<crocoddyl::IntegratedActionDataRK>(data);
+            if (!integrated_data || !integrated_data->differential.back()) {
+                forces_trajectory.push_back(time_step_forces);
+                continue;
+            }
+            auto contact_data = std::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(
+            integrated_data->differential.back());
+            if (!contact_data) {
+                forces_trajectory.push_back(time_step_forces);
+                continue;
+            }
+            const auto& contacts_data = contact_data->multibody.contacts->contacts;
+            for (const auto& contact_pair : contacts_data) {
+                const std::string& name = contact_pair.first;
+                const auto& contact = contact_pair.second;
+                contact_forces[name] = contact->f;
+                // std::cout << "t=" << t << ", " << name
+                //         << ": f_linear=" << contact->f.linear().transpose()
+                //         << ", f_angular=" << contact->f.angular().transpose() << std::endl;
+            }
+
+            if (!contact_forces.empty()) {
+                time_step_forces.push_back(contact_forces);
+            }
             forces_trajectory.push_back(time_step_forces);
-            continue;
         }
 
-        const auto& contacts_data = contact_data->multibody.contacts->contacts;
-        for (const auto& contact_pair : contacts_data) {
-            const std::string& name = contact_pair.first;
-            const auto& contact = contact_pair.second;
-            contact_forces[name] = contact->f;
-            // std::cout << "t=" << t << ", " << name
-            //         << ": f_linear=" << contact->f.linear().transpose()
-            //         << ", f_angular=" << contact->f.angular().transpose() << std::endl;
-        }
-
-        if (!contact_forces.empty()) {
-            time_step_forces.push_back(contact_forces);
-        }
-        forces_trajectory.push_back(time_step_forces);
     }
     
     return forces_trajectory;
@@ -1111,13 +1269,13 @@ std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> const HumanoidMult
         
         std::map<std::string, Eigen::Matrix<double,6,1>> contact_forces;
 
-        auto integrated_data = std::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(data);
-
-        if (!integrated_data || !integrated_data->differential) {
-            forces_trajectory.push_back(contact_forces);
-            continue;
-        }
-
+        if (integration_method_ == mpc_utils::IntegrationMethod::Euler) {
+            auto integrated_data = std::dynamic_pointer_cast<crocoddyl::IntegratedActionDataEuler>(data);
+            if (!integrated_data || !integrated_data->differential) {
+                forces_trajectory.push_back(contact_forces);
+                continue;
+            }
+        
         auto contact_data = std::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(
         integrated_data->differential);
         if (!contact_data) {
@@ -1137,50 +1295,36 @@ std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> const HumanoidMult
         }
 
         forces_trajectory.push_back(contact_forces);
+    
+        } else {
+            auto integrated_data = std::dynamic_pointer_cast<crocoddyl::IntegratedActionDataRK>(data);
+            if (!integrated_data || !integrated_data->differential.back()) {
+                forces_trajectory.push_back(contact_forces);
+                continue;
+            }
+
+            auto contact_data = std::dynamic_pointer_cast<crocoddyl::DifferentialActionDataContactFwdDynamics>(
+            integrated_data->differential.back());
+            if (!contact_data) {
+                forces_trajectory.push_back(contact_forces);
+                continue;
+            }
+
+            const auto& contacts_data = contact_data->multibody.contacts->contacts;
+            for (const auto& contact_pair : contacts_data) {
+                const std::string& name = contact_pair.first;
+                const auto& contact = contact_pair.second;
+                auto joint = state_->get_pinocchio()->frames[contact->frame].parent;
+                // auto oMf = pinocchio_data_->oMi[joint] * contact->jMf;
+                auto fiMo = pinocchio::SE3(contact->pinocchio->oMi[joint].rotation().transpose(), contact->jMf.translation());
+                auto force =  fiMo.actInv(contact->f);
+                contact_forces[name] = mpc_utils::fromPinocchioForce(force);
+            }
+
+            forces_trajectory.push_back(contact_forces);
+        }
     }
     
     return forces_trajectory;
 
-}
-
-void HumanoidMulticontactTracker::printModelContacts() const{
-
-    std::cout << "\n\n\n--------\n\n\n";
-
-    auto running_models = problem_->get_runningModels();
-    for (std::size_t i = 0; i < running_models.size(); ++i) {
-        auto integrated_model = std::dynamic_pointer_cast<crocoddyl::IntegratedActionModelEuler>(running_models[i]);
-        if (!integrated_model || !integrated_model->get_differential()) {
-            continue;
-        }
-
-        auto contact_model = std::dynamic_pointer_cast<crocoddyl::DifferentialActionModelContactFwdDynamics>(integrated_model->get_differential());
-        if (!contact_model) {
-            continue;
-        }
-
-        const auto& contacts = contact_model->get_contacts()->get_contacts();
-        for (const auto& contact_pair : contacts) {
-            const std::string& name = contact_pair.first;
-            const auto& contact = contact_pair.second;
-            std::cout << "Contact: " << name << " at step " << i << " is " 
-                        << (contact->active ? "active" : "inactive") << "." << std::endl;
-        }
-    }
-    auto terminal_models = problem_->get_terminalModel();
-    auto integrated_terminal_model = std::dynamic_pointer_cast<crocoddyl::IntegratedActionModelEuler>(terminal_models);
-    if (integrated_terminal_model && integrated_terminal_model->get_differential()) {
-        auto terminal_contact_model = std::dynamic_pointer_cast<crocoddyl::DifferentialActionModelContactFwdDynamics>(integrated_terminal_model->get_differential());
-        if (terminal_contact_model) {
-            const auto& contacts = terminal_contact_model->get_contacts()->get_contacts();
-            for (const auto& contact_pair : contacts) {
-                const std::string& name = contact_pair.first;
-                const auto& contact = contact_pair.second;
-                std::cout << "Terminal Contact: " << name << " is "
-                            << (contact->active ? "active" : "inactive") << "." << std::endl;
-            }
-        }
-    }
-
-    std::cout << "\n\n\n--------\n\n\n";
 }

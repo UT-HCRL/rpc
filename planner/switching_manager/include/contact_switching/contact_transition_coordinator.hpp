@@ -40,7 +40,7 @@ public:
             return false;
         }
         
-        // Process first event (you could modify this to handle multiple events)
+        // Process first event
         transition_callback_(events[0], *csm_);
         return true;
     }
@@ -77,8 +77,6 @@ private:
         transition_callback_ = [](const TransitionEvent& event, ContactSwitchingManager& csm) {
             // Default behavior: activate switching from the triggered knot
             csm.setSwitchingMask(event.triggered_knot);
-            std::cout << "Transition callback called for event: " << event.condition_name
-                      << " at time: " << event.time << std::endl;
         };
     }
 };
