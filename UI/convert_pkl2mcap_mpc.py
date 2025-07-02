@@ -11,6 +11,11 @@ import pickle
 import pinocchio as pin
 import numpy as np
 from ruamel import yaml
+import time as time_lib
+try:
+    from tqdm import tqdm
+except ImportError:
+        tqdm = None
 
 from scipy.spatial.transform import Rotation as R
 
@@ -26,6 +31,7 @@ from google.protobuf.wrappers_pb2 import FloatValue, BoolValue, Int32Value
 from foxglove_schemas_protobuf.Point3_pb2 import Point3
 from foxglove_schemas_protobuf.FrameTransform_pb2 import FrameTransform
 from foxglove_schemas_protobuf.SceneUpdate_pb2 import SceneUpdate
+
 
 
 def create_sphere_scene(scene_frame_id, rgba, sized=0.03):
@@ -108,7 +114,7 @@ def create_arrow_scene(scene_frame_id, force_x, force_y, force_z, rgba, arrow_se
     return arrow_scene
 
 def main():
-
+    print('[*] Initialising objects')
     robot_name = "g1"
     urdf_path = "robot_model/g1/g1_29dof_lock_waist.urdf"
     package_path = "robot_model/g1"
@@ -269,6 +275,7 @@ def main():
     for oname in joint_info_names:
         joint_info_dict[oname] = []
 
+    print('[*] Reading pkl file')
     # Read and collect all data from pkl file
     with open(cwd + "/experiment_data/debug.pkl", "rb") as f:
         while True:
@@ -331,10 +338,22 @@ def main():
         for i in range(mpc_horizon):
             alpha = np.maximum(1 - 0.2*i, 0.02)
             scenes_dict[f"{frame_name}_{i}"] = create_sphere_scene(f"{frame_name}_{i}", [0, 0, 1, alpha], sized=0.03)
+    
+    print('[*] Writing to mcap')
+    progress_bar = None
+    if tqdm is not None:
+        progress_bar = tqdm(total=len(time), desc="Progress", unit="frame")
 
     # send data to mcap file
     with open(cwd + "/experiment_data/" + robot_name + "_foxglove.mcap", "wb") as f, Writer(f) as mcap_writer:
+              
+        wall_time_reference = time_lib.time()
+        time = [t + wall_time_reference for t in time]  # Adjust timestamps to wall time to fix 1970 epoch vis in foxglove
         for i in range(len(time)):
+            if progress_bar is not None:
+                progress_bar.update(1)
+                progress_bar.set_description(f"Progress: {((i + 1) / len(time)) * 100:.2f}%")
+
             for oname, ovalue in single_value_dict.items():
                 if isinstance(ovalue[i], bool):
                     val = BoolValue(value=ovalue[i])
