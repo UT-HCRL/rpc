@@ -82,7 +82,9 @@ class HumanoidMulticontactTracker{
 
         void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const std::vector<Eigen::Vector3d>& desired_com = {}, std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {}, bool contact_trigger = false);
         std::vector<std::string> getTargetFrameNames() const {return track_frame_names_;}
-        
+
+        void quasiStaticFootHandSolution(const VectorXd& q_current, const Vector3d& desired_com, VectorXd& tau_guess) const;
+
         // Auxiliary functions for DARE computation
         void computeDARE(const std::vector<Eigen::VectorXd>& xs_out, const std::vector<Eigen::VectorXd>& us_out);
 

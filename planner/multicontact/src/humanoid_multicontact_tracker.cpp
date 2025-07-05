@@ -845,7 +845,13 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             xs_out[0].tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv());
             std::vector<Eigen::VectorXd> xs(N, xs_out[0]);
             us_static = problem_->quasiStatic_xs(xs);
-            u_prev_ = us_static;    // during contact change, use static solution as initial guess
+            VectorXd us_guess = VectorXd::Zero(us_static[0].size());
+
+            // try quasi-static solution using hand-feet contacts
+            quasiStaticFootHandSolution(xs_out[0].head(state_->get_nq()), desired_com[0], us_guess);
+            for (size_t i = 0; i < N; i++) {
+                u_prev_[i] = us_guess;
+            }
             activateContacts(to_add);
 
             // if(!already_switched_){
@@ -1016,6 +1022,47 @@ void HumanoidMulticontactTracker::computeDARE(const std::vector<Eigen::VectorXd>
         std::cout<<"Duration : " << duration << "ms\n";
     }
 
+}
+
+void HumanoidMulticontactTracker::quasiStaticFootHandSolution(const VectorXd& q_current,
+                                                              const Vector3d& desired_com,
+                                                              VectorXd& tau_guess) const {
+    VectorXd v = VectorXd::Zero(model_full_.nv);
+    VectorXd a = VectorXd::Zero(model_full_.nv);
+    double percMass = 0.9; //percentage of the total mass on the foot
+
+    // set desired forces to point towards the CoM
+    Eigen::Vector3d left_hand_pos = pinocchio_data_->oMf[model_full_.getFrameId("left_rubber_hand")].translation();
+    Eigen::Vector3d right_foot_pos = pinocchio_data_->oMf[model_full_.getFrameId("right_ankle_roll_link")].translation();
+    double mass = 35.115;
+
+    // use heuristic centroidal dynamics to compute the forces
+    Vector3d com_pos_hand = left_hand_pos - desired_com;    // hand position w.r.t. CoM
+    Vector3d com_pos_foot = right_foot_pos - desired_com;   // foot position w.r.t. CoM
+    Matrix3d skew_foot = util::SkewSymmetric(com_pos_foot);
+    Matrix3d skew_hand = util::SkewSymmetric(com_pos_hand);
+
+    Matrix<double, 7, 6> EE_pos_aug = Matrix<double, 7, 6>::Zero();
+    Matrix<double, 7, 1> forces_aug = Matrix<double, 7, 1>::Zero();
+    EE_pos_aug.block<3, 3>(0, 0) = Matrix3d::Identity();
+    EE_pos_aug.block<3, 3>(0, 3) = Matrix3d::Identity();
+    EE_pos_aug.block<3, 3>(3, 0) = skew_foot;
+    EE_pos_aug.block<3, 3>(3, 3) = skew_hand;
+    EE_pos_aug(6,2) = 1.0;  // assume some percentage of the total mass is on the foot
+    forces_aug(2, 0) = -mass * model_full_.gravity981.z();
+    forces_aug(6, 0) = -percMass * mass * model_full_.gravity981.z();
+
+    auto pInvEE = EE_pos_aug.completeOrthogonalDecomposition().pseudoInverse();
+    Matrix<double, 6, 1> forces_ini_guess = pInvEE * forces_aug;
+
+    PINOCCHIO_ALIGNED_STD_VECTOR(pinocchio::Force) fext(model_full_.joints.size(), pinocchio::Force::Zero());
+    auto rf = model_full_.getJointId("right_ankle_pitch_joint");
+    auto lh = model_full_.getJointId("left_wrist_roll_joint");
+    fext[rf] = pinocchio::Force(forces_ini_guess.head(3), Vector3d::Zero());
+    fext[lh] = pinocchio::Force(forces_ini_guess.tail(3), Vector3d::Zero());
+
+    // solve for torques
+    tau_guess = (rnea(model_full_, *pinocchio_data_, q_current, v, a, fext)).tail(u_prev_[0].size());
 }
 
 void HumanoidMulticontactTracker::printContacts() const {
