@@ -310,6 +310,7 @@ void TrackPlan::ComputeSync(){
 
       dm->data_->b_fddp_feasible_ = data_out.b_fddp_feasible;
       dm->data_->solve_duration_ = data_out.solve_duration;
+      dm->data_->b_trq_limit_ = sp_->b_torque_limit_;
 
     #endif
 

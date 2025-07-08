@@ -76,6 +76,9 @@ G1Controller::G1Controller(G1TCIContainer *tci_container,
         static_cast<IHWBC *>(ihwbc_)->SetTrqLimit(trq_limit);
       }
 
+      sp_->trq_limits_ = robot_->JointTrqLimits();
+      sp_->b_torque_limit_.resize(g1::n_adof, false);
+
       // joint integrator initialize
       Eigen::VectorXd jpos_lb = robot_->JointPosLimits().leftCols(1);
       Eigen::VectorXd jpos_ub = robot_->JointPosLimits().rightCols(1);
@@ -176,14 +179,19 @@ void G1Controller::GetCommand(void *command) {
           joint_trq_cmd_ = tci_container_->robot_commands_->DesiredTrq();
       }
       else if(sp_->state_ == g1_states::kTrackPlan){
-        // std::cout<<"GETTING COMMAND FROM TRACK PLAN"<<std::endl;
-        // std::cout<<"joint_pos_cmd: "<<joint_pos_cmd_.transpose()<<std::endl;
-        // std::cout<<"joint_vel_cmd: "<<joint_vel_cmd_.transpose()<<std::endl;
-        // std::cout<<"joint_trq_cmd: "<<joint_trq_cmd_.transpose()<<std::endl;
 
         joint_pos_cmd_ = tci_container_->robot_commands_->DesiredPos();
         joint_vel_cmd_ = tci_container_->robot_commands_->DesiredVel();
         joint_trq_cmd_ = tci_container_->robot_commands_->DesiredTrq();
+
+        for (int i = 0; i < joint_trq_cmd_.size(); i++) {
+            if (joint_trq_cmd_(i) < sp_->trq_limits_(i, 0) || joint_trq_cmd_(i) > sp_->trq_limits_(i, 1)) {
+                sp_->b_torque_limit_[i] = true;
+            } else {
+                sp_->b_torque_limit_[i] = false;
+            }
+        }
+
       } else {
 
           // whole body controller (feedforward torque computation) with contact

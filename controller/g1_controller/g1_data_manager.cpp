@@ -10,6 +10,7 @@ G1DataManager::G1DataManager()
 {
   // g1 data initialize
   data_ = std::make_unique<G1Data>();
+  data_->b_trq_limit_.resize(g1::n_adof, false);
 
   // zmq stuff initialize
   context_ = std::make_unique<zmq::context_t>(1);
@@ -443,6 +444,9 @@ void G1DataManager::SendData()
   com_curr_pos_msg.set_y(data_->com_curr_pos_(1));
   com_curr_pos_msg.set_z(data_->com_curr_pos_(2));
   msg.mutable_com_curr_pos()->CopyFrom(com_curr_pos_msg);
+
+  for (int i(0); i < data_->b_trq_limit_.size(); i++)
+    msg.add_b_trq_limit(data_->b_trq_limit_[i]);
 
   // serialize msg in string type
   std::string encoded_msg;

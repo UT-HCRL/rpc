@@ -124,4 +124,7 @@ message pnc_msg {
   bool b_lhand = 74;
   bool b_rhand = 75;
 
+  // Torque limit boolean flags
+  repeated bool b_trq_limit = 76;
+
 }

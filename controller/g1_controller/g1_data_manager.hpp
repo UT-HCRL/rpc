@@ -165,6 +165,8 @@ public:
   std::vector<Eigen::Vector3d> predicted_right_knee_pos_ = {Eigen::Vector3d::Zero()};
   std::vector<Eigen::Vector3d> predicted_left_rubber_pos_ = {Eigen::Vector3d::Zero()};
   std::vector<Eigen::Vector3d> predicted_right_rubber_pos_ = {Eigen::Vector3d::Zero()};
+
+  std::vector<bool> b_trq_limit_;
 };
 
 // Singleton class

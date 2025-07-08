@@ -1178,6 +1178,8 @@ def process_data_saver(visualize_type):
         data_saver.add("lh_contact_force" , [msg.lh_contact_force.x, msg.lh_contact_force.y, msg.lh_contact_force.z])
         data_saver.add("rh_contact_force" , [msg.rh_contact_force.x, msg.rh_contact_force.y, msg.rh_contact_force.z])
 
+        data_saver.add("b_trq_limit", list(msg.b_trq_limit))
+
     elif visualize_type == "none":
         data_saver.add("time", msg.time)
         data_saver.add("est_base_joint_pos", list([msg.est_base_joint_pos.x, msg.est_base_joint_pos.y, msg.est_base_joint_pos.z]))
@@ -1253,6 +1255,7 @@ def process_data_saver(visualize_type):
         data_saver.add("lh_contact_force" , [msg.lh_contact_force.x, msg.lh_contact_force.y, msg.lh_contact_force.z])
         data_saver.add("rh_contact_force" , [msg.rh_contact_force.x, msg.rh_contact_force.y, msg.rh_contact_force.z])
 
+        data_saver.add("b_trq_limit", list(msg.b_trq_limit))
 
     data_saver.advance()
 

@@ -59,6 +59,10 @@ public:
   bool b_recv_gripper_cmd_;
   std::unordered_map<std::string, double> gripper_pos_cmd_;
 
+  Eigen::Matrix<double, Eigen::Dynamic, 2> trq_limits_;
+  std::vector<bool> b_torque_limit_;
+
+
 private:
   G1StateProvider();
 };

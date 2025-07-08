@@ -40,6 +40,11 @@ public:
     joint_trq_limits_ = trq_limit;
   }
 
+  // getter
+  Eigen::Matrix<double, Eigen::Dynamic, 2> GetTrqLimits() const {
+    return joint_trq_limits_;
+  }
+
 protected:
   void _SetQPCost(const Eigen::MatrixXd &cost_mat,
                   const Eigen::VectorXd &cost_vec);

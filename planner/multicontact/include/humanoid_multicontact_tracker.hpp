@@ -203,5 +203,6 @@ class HumanoidMulticontactTracker{
 
         //### DARE TEMP VARIABLES ###
         Eigen::MatrixXd K_DARE_;
+        //##########################
 
 };

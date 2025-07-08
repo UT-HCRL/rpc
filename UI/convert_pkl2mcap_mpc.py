@@ -234,6 +234,7 @@ def main():
         "joint_pos_des",
         "joint_vel_des",
         "joint_trq_des",
+        "b_trq_limit"
         ]
 
     vis_3d_dict = {}
