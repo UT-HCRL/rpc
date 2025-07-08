@@ -1156,6 +1156,47 @@ void HumanoidMulticontactTracker::computeDARE(const std::vector<Eigen::VectorXd>
 
 }
 
+void HumanoidMulticontactTracker::quasiStaticFootHandSolution(const VectorXd& q_current,
+                                                              const Vector3d& desired_com,
+                                                              VectorXd& tau_guess) const {
+    VectorXd v = VectorXd::Zero(model_full_.nv);
+    VectorXd a = VectorXd::Zero(model_full_.nv);
+    double percMass = 0.9; //percentage of the total mass on the foot
+
+    // set desired forces to point towards the CoM
+    Eigen::Vector3d left_hand_pos = pinocchio_data_->oMf[model_full_.getFrameId("left_rubber_hand")].translation();
+    Eigen::Vector3d right_foot_pos = pinocchio_data_->oMf[model_full_.getFrameId("right_ankle_roll_link")].translation();
+    double mass = 35.115;
+
+    // use heuristic centroidal dynamics to compute the forces
+    Vector3d com_pos_hand = left_hand_pos - desired_com;    // hand position w.r.t. CoM
+    Vector3d com_pos_foot = right_foot_pos - desired_com;   // foot position w.r.t. CoM
+    Matrix3d skew_foot = util::SkewSymmetric(com_pos_foot);
+    Matrix3d skew_hand = util::SkewSymmetric(com_pos_hand);
+
+    Matrix<double, 7, 6> EE_pos_aug = Matrix<double, 7, 6>::Zero();
+    Matrix<double, 7, 1> forces_aug = Matrix<double, 7, 1>::Zero();
+    EE_pos_aug.block<3, 3>(0, 0) = Matrix3d::Identity();
+    EE_pos_aug.block<3, 3>(0, 3) = Matrix3d::Identity();
+    EE_pos_aug.block<3, 3>(3, 0) = skew_foot;
+    EE_pos_aug.block<3, 3>(3, 3) = skew_hand;
+    EE_pos_aug(6,2) = 1.0;  // assume some percentage of the total mass is on the foot
+    forces_aug(2, 0) = -mass * model_full_.gravity981.z();
+    forces_aug(6, 0) = -percMass * mass * model_full_.gravity981.z();
+
+    auto pInvEE = EE_pos_aug.completeOrthogonalDecomposition().pseudoInverse();
+    Matrix<double, 6, 1> forces_ini_guess = pInvEE * forces_aug;
+
+    PINOCCHIO_ALIGNED_STD_VECTOR(pinocchio::Force) fext(model_full_.joints.size(), pinocchio::Force::Zero());
+    auto rf = model_full_.getJointId("right_ankle_pitch_joint");
+    auto lh = model_full_.getJointId("left_wrist_roll_joint");
+    fext[rf] = pinocchio::Force(forces_ini_guess.head(3), Vector3d::Zero());
+    fext[lh] = pinocchio::Force(forces_ini_guess.tail(3), Vector3d::Zero());
+
+    // solve for torques
+    tau_guess = (rnea(model_full_, *pinocchio_data_, q_current, v, a, fext)).tail(u_prev_[0].size());
+}
+
 void HumanoidMulticontactTracker::printContacts() const {
     std::cout << "Active contacts at this step:" << std::endl;
     for(int i=0; i<N_horizon_; i++){

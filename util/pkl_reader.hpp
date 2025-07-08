@@ -41,11 +41,11 @@ namespace pkl_utils{
          */
         std::vector<CompositeBezierCurve> getCompositeBezierCurves() const;
 
-        std::vector<Matrix<double, 44, 1>> getJointPosDes() const;
+        std::vector<Matrix<double, 34, 1>> getJointPosDes() const;
 
-        std::vector<Matrix<double, 43, 1>> getJointVelDes() const;
+        std::vector<Matrix<double, 33, 1>> getJointVelDes() const;
 
-        std::vector<Matrix<double, 37, 1>> getJointTauDes() const;
+        std::vector<Matrix<double, 27, 1>> getJointTauDes() const;
 
         std::vector<Vector3d> getCoM() const;
 

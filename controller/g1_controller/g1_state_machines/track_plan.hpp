@@ -13,8 +13,12 @@ class G1ControlArchitecture;
 class G1StateProvider;
 class TrackPlan : public StateMachine {
 public:
-  TrackPlan(const StateId state_id, PinocchioRobotSystem *robot,
-                       G1ControlArchitecture *ctrl_arch);
+    TrackPlan(const StateId state_id,
+              PinocchioRobotSystem *robot,
+              std::vector<pkl_utils::CompositeBezierCurve> planned_bezier_curves,
+              std::vector<Vector3d> planned_com_des,
+              std::vector<double> planned_time,
+              G1ControlArchitecture *ctrl_arch);
   ~TrackPlan();
 
   void FirstVisit() override;
@@ -58,8 +62,6 @@ private:
   Eigen::Matrix<double, 6, 1> init_reaction_force_;
   Eigen::Matrix<double, 6, 1> des_reaction_force_;
 
-  std::unique_ptr<pkl_utils::PickleReader> pkl_reader_;
-  // std::vector<pkl_utils::CompositeBezierCurve> bezier_curves_;
   std::unique_ptr<pkl_utils::BezierCurvesManager> bezier_curves_mgr_;
   std::vector<Eigen::Vector3d> com_des_;
 

@@ -154,9 +154,9 @@ public:
 
                             if (py::isinstance<py::float_>(value)) {
                             } else if (py::isinstance<py::list>(value)) {
-                                Vector<double, 44> tmp_pos_vec;
-                                Vector<double, 43> tmp_vel_vec;
-                                Vector<double, 37> tmp_tau_vec;
+                                Vector<double, 34> tmp_pos_vec;
+                                Vector<double, 33> tmp_vel_vec;
+                                Vector<double, 27> tmp_tau_vec;
                                 Vector3d tmp_com_vec;
                                 size_t v_idx = 0;
                                 py::list pylist = value;
@@ -178,6 +178,9 @@ public:
                                     } else {
                                         size_t vec_idx = 0;
                                         if (key == "joint_pos"){
+                                            if (py::len(elem) != 34) {
+                                                std::cerr << "[PKL_READER] - Unexpected size for joint_pos element: " << py::len(elem) << std::endl;
+                                            }
                                             for (auto el : elem) {
                                                 tmp_pos_vec(vec_idx) = el.cast<double>();
                                                 vec_idx++;
@@ -187,6 +190,9 @@ public:
                                             joint_pos_des_.emplace_back(tmp_pos_vec);
                                             tmp_pos_vec.setZero();
                                         } else if (key == "joint_vel") {
+                                            if (py::len(elem) != 33) {
+                                                std::cerr << "[PKL_READER] - Unexpected size for joint_vel element: " << py::len(elem) << std::endl;
+                                            }
                                             for (auto el : elem) {
                                                 tmp_vel_vec(vec_idx) = el.cast<double>();
                                                 vec_idx++;
@@ -196,6 +202,9 @@ public:
                                             joint_vel_des_.emplace_back(tmp_vel_vec);
                                             tmp_vel_vec.setZero();
                                         } else if (key == "joint_torque") {
+                                            if (py::len(elem) != 27) {
+                                                std::cerr << "[PKL_READER] - Unexpected size for joint_torque element: " << py::len(elem) << std::endl;
+                                            }
                                             for (auto el : elem) {
                                                 tmp_tau_vec(vec_idx) = el.cast<double>();
                                                 vec_idx++;
@@ -363,15 +372,15 @@ public:
         return composite_bezier_curves_;
     }
 
-    std::vector<Matrix<double, 44, 1>> getJointPosDes() const {
+    std::vector<Matrix<double, 34, 1>> getJointPosDes() const {
         return joint_pos_des_;
     }
 
-    std::vector<Matrix<double, 43, 1>> getJointVelDes() const {
+    std::vector<Matrix<double, 33, 1>> getJointVelDes() const {
         return joint_vel_des_;
     }
 
-    std::vector<Matrix<double, 37, 1>> getJointTauDes() const {
+    std::vector<Matrix<double, 27, 1>> getJointTauDes() const {
         return joint_tau_des_;
     }
 
@@ -392,9 +401,9 @@ private:
     PickleType pkl_type_;
 
     std::vector<CompositeBezierCurve> composite_bezier_curves_;
-    std::vector<Matrix<double, 44, 1>> joint_pos_des_;
-    std::vector<Matrix<double, 43, 1>> joint_vel_des_;
-    std::vector<Matrix<double, 37, 1>> joint_tau_des_;
+    std::vector<Matrix<double, 34, 1>> joint_pos_des_;
+    std::vector<Matrix<double, 33, 1>> joint_vel_des_;
+    std::vector<Matrix<double, 27, 1>> joint_tau_des_;
     std::vector<Vector3d> com_des_;
     std::vector<double> time_vec_;
     std::function<void(const std::string&)> log_;
@@ -422,15 +431,15 @@ std::vector<CompositeBezierCurve> PickleReader::getCompositeBezierCurves() const
     return impl_->getCompositeBezierCurves();
 }
 
-std::vector<Matrix<double, 44, 1>> PickleReader::getJointPosDes() const {
+std::vector<Matrix<double, 34, 1>> PickleReader::getJointPosDes() const {
     return impl_->getJointPosDes();
 }
 
-std::vector<Matrix<double, 43, 1>> PickleReader::getJointVelDes() const {
+std::vector<Matrix<double, 33, 1>> PickleReader::getJointVelDes() const {
     return impl_->getJointVelDes();
 }
 
-std::vector<Matrix<double, 37, 1>> PickleReader::getJointTauDes() const {
+std::vector<Matrix<double, 27, 1>> PickleReader::getJointTauDes() const {
     return impl_->getJointTauDes();
 }
 
