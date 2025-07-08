@@ -37,6 +37,7 @@ class HumanoidMulticontactTracker{
         void loadTrackingFramesWeights();
         void loadMPCParams();
         void loadForceTrackingWeights();
+        void loadTorqueRateRegWeights();
 
         void setInitialJointConfiguration(const Eigen::VectorXd& q0);
         void setFrames(const std::vector<std::string>& frame_names);
@@ -61,7 +62,7 @@ class HumanoidMulticontactTracker{
 
         void deactivateContacts(const std::vector<std::string>& frame_names);
         void activateContacts(const std::vector<std::string>& frame_names);
-        void switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask, const std::vector<Eigen::VectorXd>& xs, bool use_quasistatic);
+        void switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask, Eigen::VectorXd& xs_prev, bool use_quasistatic);
 
         std::vector<std::vector<std::map<std::string, pinocchio::Force>>> const getForceFromSolver();
         std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> const getEigenForceFromSolver();
@@ -117,13 +118,12 @@ class HumanoidMulticontactTracker{
         double dt_;
         int N_horizon_;
         int max_iter_;
-        std::unordered_map<std::string, mpc_utils::Weights> cost_weights_; //FIXME: maybe unused, remove
         std::unordered_map<std::string, mpc_utils::Weights2D> contact_weights_;
         std::unordered_map<std::string, mpc_utils::Weights2D> terminal_contact_weights_;
         std::unordered_map<std::string, mpc_utils::Weights2D> frame_targets_;
-        std::unordered_map<std::string, mpc_utils::Weights2D> frame_targets_terminal_; //Used for terminal cost frame tracking
-        std::unordered_map<std::string, Eigen::Vector3d> force_tracking_weights_; //Usedc for running cost of force tracking
-        std::unordered_map<std::string, Eigen::Vector3d> terminal_force_tracking_weights_; //Used for terminal cost of force tracking
+        std::unordered_map<std::string, mpc_utils::Weights2D> frame_targets_terminal_;      //Used for terminal cost frame tracking
+        std::unordered_map<std::string, Eigen::Vector3d> force_tracking_weights_;           //Used for running cost of force tracking
+        std::unordered_map<std::string, Eigen::Vector3d> terminal_force_tracking_weights_;  //Used for terminal cost of force tracking
         mpc_utils::IntegrationMethod integration_method_;
 
         std::vector<int> cost_mask_;
@@ -138,6 +138,7 @@ class HumanoidMulticontactTracker{
         double tracking_swing_rot_weight_;
         double friction_weight_;
         double force_cost_weight_;
+        double dtau_reg_weight_;
 
         Eigen::VectorXd terminal_xreg_weights_;
         double terminal_xreg_weight_;
@@ -162,7 +163,8 @@ class HumanoidMulticontactTracker{
         std::vector<std::shared_ptr<crocoddyl::ResidualModelCoMPosition>> com_residual_;
         std::vector<std::unordered_map<std::string, std::shared_ptr<crocoddyl::ResidualModelFramePlacement>>> frame_residuals_;
         std::vector<std::unordered_map<std::string, std::shared_ptr<crocoddyl::ResidualModelContactForce>>> force_residuals_;
-
+        std::vector<std::shared_ptr<crocoddyl::ResidualModelControl>> control_residuals_;
+        void addTorqueRateCost(const double dtau_reg_weight, const mpc_utils::Phase phase,const int horizon_index);
         std::vector<std::shared_ptr<crocoddyl::ActionModelAbstract>> integrated_action_models_;
         std::shared_ptr<crocoddyl::ActionModelAbstract> integrated_terminal_action_model_;
         //###########################
