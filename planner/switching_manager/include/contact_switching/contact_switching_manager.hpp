@@ -69,6 +69,10 @@ public:
         return std::any_of(switching_mask_.begin(), switching_mask_.end(), [](bool v) { return v; });
     }
 
+    bool isMaskAllTrue() const {
+        return std::all_of(switching_mask_.begin(), switching_mask_.end(), [](bool v) { return v; });
+    }
+
 private:
     std::unordered_map<std::string, bool> contact_status_;
     std::vector<bool> switching_mask_;

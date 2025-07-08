@@ -120,7 +120,7 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
                 {"left_rubber_hand", false},
                 {"right_rubber_hand", false}
             },
-            N_horizon_ +1);
+            N_horizon_);
     
     detector_ = std::make_shared<TransitionDetector>();
     coordinator_ = std::make_unique<ContactTransitionCoordinator>(contact_switching_manager_, detector_);
@@ -636,9 +636,9 @@ void HumanoidMulticontactTracker::activateContacts(const std::vector<std::string
     }
 }
 
-void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask, Eigen::VectorXd& xs_prev, bool use_quasistatic){
+void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask, Eigen::VectorXd& xs_prev, const Eigen::Vector3d& desired_com, bool use_quasistatic){
 
-    if(contact_mask.size() != N_horizon_ +1){
+    if(contact_mask.size() != N_horizon_){
         throw std::invalid_argument("contact_mask size must be equal to N_horizon_ + 1");
     }
 
@@ -658,16 +658,18 @@ void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>&
 
     // during contact change, use static solution as initial guess only at first step of change
     if(use_quasistatic){
-        std::cout<<"Computing quasi-static just once \n";
+        std::cout<<"Computing quasi-static \n";
 
         xs_prev.tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv());
         std::vector<Eigen::VectorXd> xs(N_horizon_, xs_prev);
-        std::vector<VectorXd> u_star = problem_->quasiStatic_xs(xs);
+        std::vector<VectorXd> u_star = problem_->quasiStatic_xs(xs);        //FIXME: if this is used only for size, no need to compute quasi static
+        VectorXd us_guess = VectorXd::Zero(u_star[0].size());
+        quasiStaticFootHandSolution(xs_prev.head(state_->get_nq()), desired_com, us_guess);
 
         auto first_true = std::distance(contact_mask.begin(), std::find(contact_mask.begin(), contact_mask.end(), true));
-        for(size_t i = first_true; i< N_horizon_; i++) {
-            u_prev_[i] = u_star[i];
-        }   
+        for(size_t i = first_true ; i< N_horizon_; i++) {
+            u_prev_[i] = us_guess; //FIXME: shouldn't we compute one for each knot of the horizon?
+        }
     }
 
     for (const auto& frame_name: active_frames) {
@@ -681,6 +683,19 @@ void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>&
         if(contact_mask[N_horizon_]) {
             terminal_contact_models_->changeContactStatus(frame_name + "_contact_terminal", true);
             terminal_cost_model_->changeCostStatus(frame_name + "_friction_cone", true);
+            frame_residuals_[N_horizon_][frame_name]->set_reference(pinocchio_data_->oMf[model_full_.getFrameId(frame_name)]);
+        }
+    }
+
+    //FIXME: remove this hardcoded logic, that is used for balancing test
+    std::vector<std::string> temp_frames = {"left_ankle_roll_link", "left_knee_link"};
+    for (const auto& frame_name: temp_frames) {
+        for(size_t i = 0; i < N_horizon_; i++) {
+            if(contact_mask[i]){
+                frame_residuals_[i][frame_name]->set_reference(pinocchio_data_->oMf[model_full_.getFrameId(frame_name)]);
+            }
+        }
+        if(contact_mask[N_horizon_]) {
             frame_residuals_[N_horizon_][frame_name]->set_reference(pinocchio_data_->oMf[model_full_.getFrameId(frame_name)]);
         }
     }
@@ -952,10 +967,17 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
 
         if (contact_switching_manager_->isMaskNotEmpty()) {
-            
-            switchContacts(to_add, to_remove, contact_mask_, xs_out[0], first_contact_change_); //TODO: to_remove and to_add must come from the switching manager, which must contain the plan beforehand
+            for(int i=0; i<N_horizon_; i++){
+                contact_mask_[i] = true;
+            }
+            // NOTE: tried to pass also xs_out[N_horizon_] and desired_com[N_horizon_]
+            switchContacts(to_add, to_remove, contact_mask_, xs_out[0], desired_com[0], first_contact_change_); //TODO: to_remove and to_add must come from the switching manager, which must contain the plan beforehand
             first_contact_change_ = false;
+
         }
+        // if(contact_switching_manager_->isMaskAllTrue()){
+        //     first_contact_change_ = false;
+        // }
 
         problem_->set_x0(xs_out[0]);
 
@@ -980,7 +1002,14 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
                         if (frame_name.first == "left_ankle_roll_link") {
                             // std::cout << "Reference for left ankle: " << temp.translation().transpose() << std::endl;
                         }
+                        if(!first_contact_change_ && frame_name.first == "left_ankle_roll_link"){ //FIXME: remove this hardcoded test
+                            continue;
+                        }
+                        if(!first_contact_change_ && frame_name.first == "left_knee_link"){ //FIXME: remove this hardcoded test
+                            continue;
+                        }
                         frame_residuals_[i][frame_name.first]->set_reference(temp);
+
                     }
                 }
             }
@@ -1062,7 +1091,7 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
     }
 
     // save predicted end effector positions
-    for (int i = 0; i < N+1; ++i) {
+    for (int i = 0; i < N; ++i) {
         for (const auto& frame_name : track_frame_names_) {
             auto q_current = xs_out[i].head(state_->get_nq());
             pinocchio::forwardKinematics(model_full_, *pinocchio_data_, q_current);
@@ -1161,11 +1190,11 @@ void HumanoidMulticontactTracker::quasiStaticFootHandSolution(const VectorXd& q_
                                                               VectorXd& tau_guess) const {
     VectorXd v = VectorXd::Zero(model_full_.nv);
     VectorXd a = VectorXd::Zero(model_full_.nv);
-    double percMass = 0.9; //percentage of the total mass on the foot
+    double percMass = 0.95; //percentage of the total mass on the foot
 
     // set desired forces to point towards the CoM
-    Eigen::Vector3d left_hand_pos = pinocchio_data_->oMf[model_full_.getFrameId("left_rubber_hand")].translation();
-    Eigen::Vector3d right_foot_pos = pinocchio_data_->oMf[model_full_.getFrameId("right_ankle_roll_link")].translation();
+    Eigen::Vector3d left_hand_pos = pinocchio_data_->oMi[model_full_.frames[model_full_.getFrameId("left_rubber_hand")].parent].translation();
+    Eigen::Vector3d right_foot_pos = pinocchio_data_->oMi[model_full_.frames[model_full_.getFrameId("right_ankle_roll_link")].parent].translation();
     double mass = 35.115;
 
     // use heuristic centroidal dynamics to compute the forces

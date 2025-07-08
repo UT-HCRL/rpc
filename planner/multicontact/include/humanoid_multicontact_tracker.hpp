@@ -62,7 +62,7 @@ class HumanoidMulticontactTracker{
 
         void deactivateContacts(const std::vector<std::string>& frame_names);
         void activateContacts(const std::vector<std::string>& frame_names);
-        void switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask, Eigen::VectorXd& xs_prev, bool use_quasistatic);
+        void switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask, Eigen::VectorXd& xs_prev, const Eigen::Vector3d& desired_com, bool use_quasistatic);
 
         std::vector<std::vector<std::map<std::string, pinocchio::Force>>> const getForceFromSolver();
         std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> const getEigenForceFromSolver();
