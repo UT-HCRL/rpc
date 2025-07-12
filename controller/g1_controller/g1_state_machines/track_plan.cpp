@@ -129,9 +129,7 @@ void TrackPlan::OneStep() {
 
 void TrackPlan::ComputeSync(){
 
-  static Eigen::VectorXd x0;
-  x0.resize(g1_mpc_->getX0Size());
-
+  static Eigen::VectorXd x0 = Eigen::VectorXd::Zero(g1_mpc_->getX0Size());
   static std::vector<Eigen::VectorXd> xs_out(g1_mpc_->getNhorizon(), x0);
   static std::vector<Eigen::VectorXd> us_out;
 
