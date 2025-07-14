@@ -26,6 +26,7 @@ class HumanoidMulticontactTracker{
         void printModel() const;
         void printWeights() const;
         void printContacts() const;
+        void printActiveSet(const mpc_utils::Phase phase = mpc_utils::Phase::Running) const;
         void setConfigPath(const std::string& config_path){config_path_ = config_path;}
 
         void loadCostMask();
@@ -144,7 +145,6 @@ class HumanoidMulticontactTracker{
 
         Eigen::VectorXd terminal_xreg_weights_;
         double terminal_xreg_weight_;
-        double terminal_ureg_weight_;
         double terminal_xbound_weight_;
         double terminal_com_tracking_weight_;
         double terminal_frame_tracking_weight_;

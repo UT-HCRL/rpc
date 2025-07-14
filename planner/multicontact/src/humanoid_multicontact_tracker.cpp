@@ -57,12 +57,6 @@ class CostRecorderCallback : public crocoddyl::CallbackAbstract {
 
 HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robot_path, const std::unordered_map<std::string, mpc_utils::Weights>& cost_weights, const std::vector<int>& locked_joints_list, const bool croc_callbacks) : locked_joints_list_(locked_joints_list), enable_callbacks_(croc_callbacks) {
 
-    //### Default problem formulation parameters ### TODO: remove them if we stick with config params
-    dt_ = 0.02;
-    N_horizon_ = 2;
-    max_iter_ = 100;
-    //###############################################
-
     config_path_ = THIS_COM "config/g1/sim/mujoco/ihwbc/crocoddyl_params.yaml";
     params_ = YAML::LoadFile(config_path_);
     loadMPCParams();
@@ -74,32 +68,16 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
     pinocchio::urdf::buildModel(robot_path, pinocchio::JointModelFreeFlyer(), model_full_);
     pinocchio_data_ = std::make_unique<pinocchio::Data>(model_full_);
 
-    // if(locked_joints_list_.empty()) {
     reduced_model_ = false;
     std::shared_ptr<crocoddyl::StateMultibody> state = std::make_shared<crocoddyl::StateMultibody>(std::make_shared<pinocchio::Model>(model_full_));
     state_ = std::make_shared<crocoddyl::StateMultibody>(std::make_shared<pinocchio::Model>(model_full_));
-    // }
-
-    // else {
-    //     reduced_model_ = true;
-    //     locked_joints_.reserve(locked_joints_list_.size());
-    //     for (const auto& joint : locked_joints_list_) {
-    //         locked_joints_.push_back(joint);
-    //     }
-        
-    //     pinocchio::buildReducedModel(model_full_, locked_joints_, Eigen::VectorXd::Zero(model_full_.nq), model_);
-    //     state_ = std::make_shared<crocoddyl::StateMultibody>(std::make_shared<pinocchio::Model>(model_));
-    // }
 
     actuation_ = std::make_shared<crocoddyl::ActuationModelFloatingBase>(state_);
     for(int i = 0; i < N_horizon_; i++){
         running_cost_model_.push_back(std::make_shared<crocoddyl::CostModelSum>(state_, actuation_->get_nu()));
-    }
-    terminal_cost_model_ = std::make_shared<crocoddyl::CostModelSum>(state_, actuation_->get_nu());
-
-    for(int i=0; i < N_horizon_; i++){
         running_contact_models_.push_back(std::make_shared<crocoddyl::ContactModelMultiple>(state_, actuation_->get_nu()));
     }
+    terminal_cost_model_ = std::make_shared<crocoddyl::CostModelSum>(state_, actuation_->get_nu());
     terminal_contact_models_ = std::make_shared<crocoddyl::ContactModelMultiple>(state_, actuation_->get_nu());
 
     //### Default class member init ###
@@ -140,7 +118,7 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
     ctx_.pose["left_rubber_hand"] = mpc_utils::SE3_to_Isometry(pinocchio_data_->oMf[model_full_.getFrameId("left_rubber_hand")]);
     ctx_.pose["right_rubber_hand"] = mpc_utils::SE3_to_Isometry(pinocchio_data_->oMf[model_full_.getFrameId("right_rubber_hand")]);
 
-    contact_mask_.resize(N_horizon_ + 1);
+    contact_mask_.resize(N_horizon_);
     //#####################################
 
     loadInitialConfiguration();
@@ -183,16 +161,14 @@ void HumanoidMulticontactTracker::loadContactFrames(){
     setFrames(contact_frames);
 
     for(const auto& frame_name : contact_frames){
-        double w_tang = 0;
-        double w_norm = 0;
+        double baum_a = 0;
+        double baum_b = 0;
 
-        util::ReadParameter(params_["running_costs"]["contact_frames"][frame_name], "wt", w_tang);
-        util::ReadParameter(params_["running_costs"]["contact_frames"][frame_name], "wn", w_norm);
-        terminal_contact_weights_[frame_name] = mpc_utils::from2DValues(w_tang, w_norm);
+        util::ReadParameter(params_["running_costs"]["baumgarte_gains"][frame_name], "alpha", baum_a);
+        util::ReadParameter(params_["running_costs"]["baumgarte_gains"][frame_name], "beta", baum_b);
+        terminal_contact_weights_[frame_name] = mpc_utils::from2DValues(baum_a, baum_b);
 
-        mpc_utils::normalize_weights(w_tang, N_horizon_);
-        mpc_utils::normalize_weights(w_norm, N_horizon_);
-        contact_weights_[frame_name] = mpc_utils::from2DValues(w_tang, w_norm);
+        contact_weights_[frame_name] = mpc_utils::from2DValues(baum_a, baum_b);
 
     }
 }
@@ -216,7 +192,7 @@ void HumanoidMulticontactTracker::loadRegularizationWeights() {
     util::ReadParameter(params_["running_costs"]["xReg"]["state_w"], "base_lin_vel", base_lin_vel_weights);
     util::ReadParameter(params_["running_costs"]["xReg"]["state_w"], "base_ang_vel", base_ang_vel_weights);
 
-    xreg_weights_ = Eigen::VectorXd::Zero(2 * state_->get_nv());
+    xreg_weights_ = Eigen::VectorXd::Zero(2 * nv);
     for (int i = 0; i < 3; ++i) xreg_weights_(i) = pow(base_pos_weights[i],2);
     for (int i = 0; i < 3; ++i) xreg_weights_(3 + i) = pow(base_rot_weights[i],2);
     for (int i = 6; i < nv; ++i) xreg_weights_(i) = pow(joint_pos_weights,2);
@@ -236,15 +212,13 @@ void HumanoidMulticontactTracker::loadRegularizationWeights() {
     util::ReadParameter(params_["terminal_costs"]["xReg"]["state_w"], "base_lin_vel", base_lin_vel_weights);
     util::ReadParameter(params_["terminal_costs"]["xReg"]["state_w"], "base_ang_vel", base_ang_vel_weights);
 
-    terminal_xreg_weights_ = Eigen::VectorXd::Zero(2 * state_->get_nv());
+    terminal_xreg_weights_ = Eigen::VectorXd::Zero(2 * nv);
     for (int i = 0; i < 3; ++i) terminal_xreg_weights_(i) = pow(base_pos_weights[i],2);
     for (int i = 0; i < 3; ++i) terminal_xreg_weights_(3 + i) = pow(base_rot_weights[i],2);
     for (int i = 6; i < nv; ++i) terminal_xreg_weights_(i) = pow(joint_pos_weights,2);
     for (int i = 0; i < 3; ++i) terminal_xreg_weights_(nv + i) = pow(base_lin_vel_weights[i],2);
     for (int i = 3; i < 6; ++i) terminal_xreg_weights_(nv + i) = pow(base_ang_vel_weights[i],2);
     for (int i = 6; i < nv; ++i) terminal_xreg_weights_(nv + i) = pow(joint_vel_weights,2);
-
-    util::ReadParameter(params_["terminal_costs"]["uReg"], "w", terminal_ureg_weight_);
 
 }
 
@@ -333,6 +307,7 @@ void HumanoidMulticontactTracker::loadMPCParams(){
     util::ReadParameter(params_["mpc"], "dt", dt_);
     util::ReadParameter(params_["mpc"], "horizon", N_horizon_);
     util::ReadParameter(params_["mpc"], "max_iter", max_iter_);
+    util::ReadParameter(params_["mpc"], "verbose", enable_callbacks_);
 
     std::string integration_method;
     util::ReadParameter(params_["mpc"], "integration_method", integration_method);
@@ -383,7 +358,6 @@ void HumanoidMulticontactTracker::printWeights() const{
 
     std::cout << "\n\n### Terminal costs weights ###\n" << std::endl;
     std::cout << "terminal_xreg_weights_: " << terminal_xreg_weights_.transpose() << std::endl;
-    std::cout << "terminal_ureg_weight_: " << terminal_ureg_weight_ << std::endl;
     std::cout << "terminal_xbound_weight_: " << terminal_xbound_weight_ << std::endl;
     std::cout << "terminal_com_tracking_weight_: " << terminal_com_tracking_weight_ << std::endl;
     std::cout << "terminal_frame_tracking_weight_: " << terminal_frame_tracking_weight_ << std::endl;
@@ -486,6 +460,7 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
 
     auto& cost_model = (phase == mpc_utils::Phase::Running) ? running_cost_model_[horizon_index] : terminal_cost_model_;
     auto& contact_model = (phase == mpc_utils::Phase::Running) ? running_contact_models_[horizon_index] : terminal_contact_models_;
+    bool is_active = true;
 
     for(size_t i = 0; i < frame_names.size(); i++){
 
@@ -504,27 +479,30 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
             std::shared_ptr<crocoddyl::ContactModelAbstract> support_contact_model;
             // for hands, use 3D contact model
             if (frame_name.find("right_rubber") != std::string::npos || frame_name.find("left_rubber") != std::string::npos) {
-                // xref = pinocchio_data_->oMf[model_full_.getFrameId(frame_name)].translation();
                 support_contact_model =
                     std::make_shared<crocoddyl::ContactModel3D>(state_, model_full_.getFrameId(frame_name), xref, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), contact_weights_[frame_name]);
+                is_active = false;
             } else {
                 support_contact_model =
                     std::make_shared<crocoddyl::ContactModel6D>(state_, model_full_.getFrameId(frame_name), contact_frame_pose, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), contact_weights_[frame_name]);
             }
             contact_model->addContact(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact", support_contact_model);
+            contact_model->changeContactStatus(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact", is_active);
+
         }
         if(phase == mpc_utils::Phase::Terminal){
             std::shared_ptr<crocoddyl::ContactModelAbstract> support_contact_model;
             // for hands, use 3D contact model
             if (frame_name.find("right_rubber") != std::string::npos || frame_name.find("left_rubber") != std::string::npos) {
-                // xref = pinocchio_data_->oMf[model_full_.getFrameId(frame_name)].translation();
                 support_contact_model =
                     std::make_shared<crocoddyl::ContactModel3D>(state_, model_full_.getFrameId(frame_name), xref, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), terminal_contact_weights_[frame_name]);
+                is_active = false;
             } else {
                 support_contact_model =
                     std::make_shared<crocoddyl::ContactModel6D>(state_, model_full_.getFrameId(frame_name), contact_frame_pose, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), terminal_contact_weights_[frame_name]);
             }
             contact_model->addContact(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact_terminal", support_contact_model);
+            contact_model->changeContactStatus(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact_terminal", is_active);
         }
 
         Eigen::Matrix3d rotation;
@@ -540,6 +518,7 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
             std::shared_ptr<crocoddyl::ResidualModelAbstract> surf_residual = std::make_shared<crocoddyl::ResidualModelContactFrictionCone>(state_, model_full_.getFrameId(frame_name), surf_cone, actuation_->get_nu());
             std::shared_ptr<crocoddyl::CostModelAbstract> surf_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, surf_activation_friction, surf_residual);
             cost_model->addCost(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_friction_cone", surf_cost, friction_weight_);
+            cost_model->changeCostStatus(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_friction_cone", is_active);
         }
         else if(frame_name.find("left_rubber") != std::string::npos){
             // rotation = Eigen::Matrix3d::Identity();
@@ -553,6 +532,7 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
             std::shared_ptr<crocoddyl::ResidualModelAbstract> surf_residual = std::make_shared<crocoddyl::ResidualModelContactFrictionCone>(state_, model_full_.getFrameId(frame_name), surf_cone, actuation_->get_nu());
             std::shared_ptr<crocoddyl::CostModelAbstract> surf_cost = std::make_shared<crocoddyl::CostModelResidual>(state_, surf_activation_friction, surf_residual);
             cost_model->addCost(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_friction_cone", surf_cost, friction_weight_);
+            cost_model->changeCostStatus(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_friction_cone", is_active);
         }
         else{
             rotation = Eigen::Matrix3d::Identity();
@@ -632,7 +612,7 @@ void HumanoidMulticontactTracker::activateContacts(const std::vector<std::string
 void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>& active_frames, const std::vector<std::string>& inactive_frames, std::vector<bool> & contact_mask, Eigen::VectorXd& xs_prev, const Eigen::Vector3d& desired_com, bool use_quasistatic){
 
     if(contact_mask.size() != N_horizon_){
-        throw std::invalid_argument("contact_mask size must be equal to N_horizon_ + 1");
+        throw std::invalid_argument("contact_mask size must be equal to N_horizon_");
     }
 
 
@@ -643,7 +623,7 @@ void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>&
                 running_cost_model_[i]->changeCostStatus(frame_name + "_friction_cone", false);
             }
         }
-        if(contact_mask[N_horizon_]) {
+        if(contact_mask.back()) {
             terminal_contact_models_->changeContactStatus(frame_name + "_contact_terminal", false);
             terminal_cost_model_->changeCostStatus(frame_name + "_friction_cone", false);
         }
@@ -657,7 +637,7 @@ void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>&
                 frame_residuals_[i][frame_name]->set_reference(pinocchio_data_->oMf[model_full_.getFrameId(frame_name)]);
             }
         }
-        if(contact_mask[N_horizon_]) {
+        if(contact_mask.back()) {
             terminal_contact_models_->changeContactStatus(frame_name + "_contact_terminal", true);
             terminal_cost_model_->changeCostStatus(frame_name + "_friction_cone", true);
             frame_residuals_[N_horizon_][frame_name]->set_reference(pinocchio_data_->oMf[model_full_.getFrameId(frame_name)]);
@@ -729,7 +709,7 @@ std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMu
 std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMulticontactTracker::createMultiFrameTerminalActionModel(const std::vector<std::string>& frame_names){
 
     if (cost_mask_[0]) {
-        addRegularizationCosts(terminal_xreg_weights_, terminal_xreg_weight_, terminal_ureg_weight_, mpc_utils::Phase::Terminal);
+        addRegularizationCosts(terminal_xreg_weights_, terminal_xreg_weight_, 0.0, mpc_utils::Phase::Terminal);
     }
     if (cost_mask_[1]) {
         addXBoundCost(terminal_xbound_weight_, mpc_utils::Phase::Terminal);
@@ -808,7 +788,6 @@ void HumanoidMulticontactTracker::initializeSolver(){
 
     problem_ = std::make_shared<crocoddyl::ShootingProblem>(x0_, integrated_action_models_, integrated_terminal_action_model_);
     fddp_ = std::make_shared<crocoddyl::SolverFDDP>(problem_);
-    enable_callbacks_ = true;
     if(enable_callbacks_) fddp_->setCallbacks({std::make_shared<crocoddyl::CallbackVerbose>()});
 
     problem_->set_nthreads(8);
@@ -1186,6 +1165,27 @@ void HumanoidMulticontactTracker::quasiStaticFootHandSolution(const VectorXd& q_
 
     // solve for torques
     tau_guess = (rnea(model_full_, *pinocchio_data_, q_current, v, a, fext)).tail(u_prev_[0].size());
+}
+
+void HumanoidMulticontactTracker::printActiveSet(const mpc_utils::Phase phase) const {
+    if (phase == mpc_utils::Phase::Running) {
+        std::cout << "Active costs in running phase:" << std::endl;
+        for (size_t i = 0; i < N_horizon_; ++i) {
+            std::cout << "Number of active costs in horizon " << i << ": " << running_cost_model_[i]->get_active_set().size() << std::endl;
+            std::cout << "Horizon index: " << i << std::endl;
+            for (const auto& cost_name : running_cost_model_[i]->get_active_set()) {
+                std::cout << " - " << cost_name << std::endl;
+            }
+        }
+    } else if (phase == mpc_utils::Phase::Terminal) {
+        std::cout << "Number of active costs in terminal phase: " << terminal_cost_model_->get_active_set().size() << std::endl;
+        std::cout << "Active costs in terminal phase:" << std::endl;
+        for (const auto& cost_name : terminal_cost_model_->get_active_set()) {
+            std::cout << " - " << cost_name << std::endl;
+        }
+    } else {
+        throw std::invalid_argument("Invalid phase specified. Use mpc_utils::Phase::Running or mpc_utils::Phase::Terminal.");
+    }
 }
 
 void HumanoidMulticontactTracker::printContacts() const {
