@@ -159,13 +159,24 @@ void TrackPlan::ComputeSync(){
         if (frame_name.find("left_rubber_hand") != std::string::npos) {
           temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
           temp_pose.translation().x() = 0.2;
-        } else if (frame_name.find("torso_primitive_shape") != std::string::npos) {
+        } else if (frame_name.find("torso_primitive_shape") != std::string::npos && t>=0.1) {
           temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, 0.1);
-        } else {
+        } else if (t>=3.5) {
+          temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, 3.5);
+        }else {
           temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
         }
         // temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
+        
+        // if(frame_name.find("left_ankle_roll_link") != std::string::npos && t>=3.5) {
+        //     temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, 3.5);
+        // }
+        // else if(frame_name.find("left_knee_link") != std::string::npos && t>=3.5) {
+        //     temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, 3.5);
+        // }
+
         desired_frames[frame_name] = temp_pose;
+
       }
       desired_frames_vec[i] = desired_frames;
 

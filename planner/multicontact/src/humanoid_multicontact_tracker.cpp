@@ -481,14 +481,12 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
             if (frame_name.find("right_rubber") != std::string::npos || frame_name.find("left_rubber") != std::string::npos) {
                 support_contact_model =
                     std::make_shared<crocoddyl::ContactModel3D>(state_, model_full_.getFrameId(frame_name), xref, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), contact_weights_[frame_name]);
-                is_active = false;
+                    is_active = false;
             } else {
                 support_contact_model =
                     std::make_shared<crocoddyl::ContactModel6D>(state_, model_full_.getFrameId(frame_name), contact_frame_pose, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), contact_weights_[frame_name]);
             }
             contact_model->addContact(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact", support_contact_model);
-            contact_model->changeContactStatus(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact", is_active);
-
         }
         if(phase == mpc_utils::Phase::Terminal){
             std::shared_ptr<crocoddyl::ContactModelAbstract> support_contact_model;
@@ -502,7 +500,6 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
                     std::make_shared<crocoddyl::ContactModel6D>(state_, model_full_.getFrameId(frame_name), contact_frame_pose, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, actuation_->get_nu(), terminal_contact_weights_[frame_name]);
             }
             contact_model->addContact(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact_terminal", support_contact_model);
-            contact_model->changeContactStatus(model_full_.frames[model_full_.getFrameId(frame_name)].name + "_contact_terminal", is_active);
         }
 
         Eigen::Matrix3d rotation;
@@ -659,12 +656,12 @@ void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>&
         }
     }
 
-    Eigen::Vector3d left_knee_reference(0.239804, 0.118586, 0.438857);
-    Eigen::Vector3d left_ankle_roll_reference(-0.000541275, 0.118514, 0.141274);
-    for (int i = 0; i < N_horizon_ + 1; i++) {
-        frame_residuals_[i]["left_knee_link"]->set_reference(pinocchio::SE3(Eigen::Matrix3d::Identity(), left_knee_reference));
-        frame_residuals_[i]["left_ankle_roll_link"]->set_reference(pinocchio::SE3(Eigen::Matrix3d::Identity(), left_ankle_roll_reference));
-    }
+    // Eigen::Vector3d left_knee_reference(0.239804, 0.118586, 0.438857);
+    // Eigen::Vector3d left_ankle_roll_reference(-0.000541275, 0.118514, 0.141274);
+    // for (int i = 0; i < N_horizon_ + 1; i++) {
+    //     frame_residuals_[i]["left_knee_link"]->set_reference(pinocchio::SE3(Eigen::Matrix3d::Identity(), left_knee_reference));
+    //     frame_residuals_[i]["left_ankle_roll_link"]->set_reference(pinocchio::SE3(Eigen::Matrix3d::Identity(), left_ankle_roll_reference));
+    // }
 
     //TODO: add logic to update beziers after re-activating contacts
 
@@ -790,6 +787,7 @@ void HumanoidMulticontactTracker::initializeSolver(){
     fddp_ = std::make_shared<crocoddyl::SolverFDDP>(problem_);
     if(enable_callbacks_) fddp_->setCallbacks({std::make_shared<crocoddyl::CallbackVerbose>()});
 
+    // fddp_->set_reg_incfactor(fddp_->get_reg_incfactor()*10);
     problem_->set_nthreads(8);
     std::cout << "\n[Crocoddyl] num of threads used: " << problem_->get_nthreads();
     
@@ -923,13 +921,20 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
 
         if (contact_switching_manager_->isMaskNotEmpty() && first_contact_change_) {
             std::cout << "Switching contacts at time: " << time << std::endl;
+            // for(int i=0; i<N_horizon_; i++){
+            //     std::cout << "Contact mask at horizon " << i << ": " << contact_mask_[i] << std::endl;
+            // }
             for(int i=0; i<N_horizon_; i++){
                 contact_mask_[i] = true;
             }
             switchContacts(to_add, to_remove, contact_mask_, xs_out[0], desired_com[0], first_contact_change_); //TODO: to_remove and to_add must come from the switching manager, which must contain the plan beforehand
             first_contact_change_ = false;
-            std::fill(xs_out.begin(), xs_out.end(), xs_out[0]); // If contact switch happens, then fill xs_out with xs_out[0]
+            // xs_out[0].tail(state_->get_nv()) = Eigen::VectorXd::Zero(state_->get_nv());
+            // std::fill(xs_out.begin(), xs_out.end(), xs_out[0]); // If contact switch happens, then fill xs_out with xs_out[0]
         }
+        // if(contact_switching_manager_->isMaskAllTrue()){
+        //     first_contact_change_ = false;
+        // }
 
         problem_->set_x0(xs_out[0]);
 
@@ -949,38 +954,108 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             for(size_t i = 0; i < N + 1; i++){
                 for (const auto& frame_name : frame_targets_) {
                     const pinocchio::SE3 temp = desired_frames[i][frame_name.first];
-                    if(!isContactActive(frame_name.first) && first_contact_change_){ //FIXME: after contact change I'm not updating references anymore
-                        // std::cout << "Contact for frame " << frame_name.first << " is not active, setting reference to desired pose." << std::endl;
-
+                    if(!isContactActive(frame_name.first)){
                         frame_residuals_[i][frame_name.first]->set_reference(temp);
-                        // std::cout << "Setting reference for frame with name : " << frame_name.first <<"\n";
                     }
                 }
             }
         }
 
         // set the joint reference to the current ones to avoid very fast movements
+        double oblivion_factor = 0.9; //0.8
         auto xReg_res = std::dynamic_pointer_cast<crocoddyl::ResidualModelState>(running_cost_model_[0]->get_costs().at("xReg")->cost->get_residual());
-        xReg_res->set_reference(x0_);
-        x0_ << xs_out[0].head(state_->get_nq()), Eigen::VectorXd::Zero(state_->get_nv());
+        xReg_res->set_reference(xs_out[0]);
+        // x0_ << xs_out[0].head(state_->get_nq()), Eigen::VectorXd::Zero(state_->get_nv());
         for (size_t i = 1; i < N_horizon_; i++) {
             auto xReg_res = std::dynamic_pointer_cast<crocoddyl::ResidualModelState>(running_cost_model_[i]->get_costs().at("xReg")->cost->get_residual());
-            xReg_res->set_reference(x0_);
+            Eigen::VectorXd adjusted_reference = oblivion_factor * xs_out[i] + (1.0 - oblivion_factor) * xs_out[0];
+            xReg_res->set_reference(adjusted_reference);
         }
         auto xReg_res_term = std::dynamic_pointer_cast<crocoddyl::ResidualModelState>(terminal_cost_model_->get_costs().at("xReg")->cost->get_residual());
-        xReg_res_term->set_reference(x0_);
+        Eigen::VectorXd adjusted_reference_term = oblivion_factor * xs_out[N_horizon_] + (1.0 - oblivion_factor) * xs_out[0];
+        xReg_res_term->set_reference(adjusted_reference_term);
 
-        // TODO testing passing uRef from quasi_static or from previous solution
+        // double alpha = 0.05; //0.05
+        // // First node want to use current
+        // auto xReg_res_first = std::dynamic_pointer_cast<crocoddyl::ResidualModelState>(
+        //     running_cost_model_[0]->get_costs().at("xReg")->cost->get_residual());
+        // xReg_res_first->set_reference(xs_out[0]);
+        // // Intermediate nodes blend current with previous solve trajectory using exponential decay
+        // for (size_t i = 1; i < N_horizon_; ++i) {
+        //     double wi = std::exp(-alpha * static_cast<double>(i));
+        //     Eigen::VectorXd adjusted_reference = wi * xs_out[i] + (1.0 - wi) * xs_out[0];
+
+        //     auto xReg_res = std::dynamic_pointer_cast<crocoddyl::ResidualModelState>(
+        //         running_cost_model_[i]->get_costs().at("xReg")->cost->get_residual());
+        //     xReg_res->set_reference(adjusted_reference);
+        // }
+        // // Terminal node
+        // double w_terminal = std::exp(-alpha * static_cast<double>(N_horizon_));
+        // Eigen::VectorXd adjusted_reference_term = w_terminal * xs_out[N_horizon_] + (1.0 - w_terminal) * xs_out[0];
+        // auto xReg_res_term = std::dynamic_pointer_cast<crocoddyl::ResidualModelState>(
+        //     terminal_cost_model_->get_costs().at("xReg")->cost->get_residual());
+        // xReg_res_term->set_reference(adjusted_reference_term);
+
         if (cost_mask_[0]) {
             for (size_t i = 0; i < N_horizon_; i++) {
                 auto uReg_res = std::dynamic_pointer_cast<crocoddyl::ResidualModelControl>(running_cost_model_[i]->get_costs().at("uReg")->cost->get_residual());
-                uReg_res->set_reference(u_prev_[0]);
+                uReg_res->set_reference(u_prev_[0]);         // TODO testing passing uRef from quasi_static or from previous solution
             }
         }
 
         auto start_time = std::chrono::high_resolution_clock::now();
         try {
+            
             fddp_->solve(xs_out, u_prev_, max_iter_);
+            // double base_pos_diff = 0.0;
+            // double base_rot_diff = 0.0;
+            // double joint_pos_diff = 0.0;
+            // double base_lin_vel_diff = 0.0;
+            // double base_ang_vel_diff = 0.0;
+            // double joint_vel_diff = 0.0;
+
+            // for (int i = 0; i < N_horizon_; ++i) {
+            //     base_pos_diff += (x0_.segment(0, 3) - xs_out[i].segment(0, 3)).cwiseAbs().sum();
+            //     base_rot_diff += (x0_.segment(3, 3) - xs_out[i].segment(3, 3)).cwiseAbs().sum();
+            //     joint_pos_diff += (x0_.segment(6, state_->get_nq() - 6) - xs_out[i].segment(6, state_->get_nq() - 6)).cwiseAbs().sum();
+            //     base_lin_vel_diff += (x0_.segment(state_->get_nq(), 3) - xs_out[i].segment(state_->get_nq(), 3)).cwiseAbs().sum();
+            //     base_ang_vel_diff += (x0_.segment(state_->get_nq() + 3, 3) - xs_out[i].segment(state_->get_nq() + 3, 3)).cwiseAbs().sum();
+            //     joint_vel_diff += (x0_.segment(state_->get_nq() + 6, state_->get_nv() - 6) - xs_out[i].segment(state_->get_nq() + 6, state_->get_nv() - 6)).cwiseAbs().sum();
+            // }
+            // std::cout << "\n\n-------------------------------------------\n";
+            // std::cout << "Base Position Difference (Summed): " << base_pos_diff << std::endl;
+            // std::cout << "Base Rotation Difference (Summed): " << base_rot_diff << std::endl;
+            // std::cout << "Joint Position Difference (Summed): " << joint_pos_diff << std::endl;
+            // std::cout << "Base Linear Velocity Difference (Summed): " << base_lin_vel_diff << std::endl;
+            // std::cout << "Base Angular Velocity Difference (Summed): " << base_ang_vel_diff << std::endl;
+            // std::cout << "Joint Velocity Difference (Summed): " << joint_vel_diff << std::endl;
+            // std::cout << "-------------------------------------------\n";
+
+            // double total_cost = fddp_->get_cost();
+            // std::cout << "\n###\n";
+            // std::cout << "Total cost: " << total_cost << std::endl;
+            // std::cout << "\n###\n";
+            // double max_cost = 0.0;
+            // std::string max_cost_name;
+
+            // for (int i = 0; i < N_horizon_; ++i) {
+            //     for (const auto& cost_pair : running_cost_model_[i]->get_costs()) {
+            //         const std::string& cost_name = cost_pair.first;
+            //         double cost_value = getCostValue(cost_name, i);
+            //         if (cost_value > max_cost) {
+            //             max_cost = cost_value;
+            //             max_cost_name = cost_name;
+            //         }
+            //     }
+            //     std::cout << "Cost with the highest value in the horizon: " << max_cost_name << " with value: " << max_cost << std::endl;
+            // }
+
+            // double total_diff_sum = 0.0;
+            // for (std::size_t i = 0; i < fddp_->get_xs().size(); ++i) {
+            //     Eigen::VectorXd diff = (fddp_->get_xs()[i] - x0_).cwiseAbs();
+            //     total_diff_sum += diff.sum();
+            // }
+            // std::cout << "Total sum of differences between x0 and all get_xs(): " << total_diff_sum << std::endl;
         } catch (const std::exception& e) {
             std::cerr << "Error during FDDP solve: " << e.what() << std::endl;
             throw;
@@ -988,6 +1063,7 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         getEigenForceFromSolver();
         auto end_time = std::chrono::high_resolution_clock::now();
         solve_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        // std::cout << "Solve duration: " << solve_duration << " ms" << std::endl;
 
     }
     fddp_->get_is_feasible() ? data_out.b_fddp_feasible = true : data_out.b_fddp_feasible = false;
