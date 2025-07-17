@@ -16,8 +16,6 @@ namespace {
   double kGravity = 9.81;
 }
 
-void logToFile(std::ofstream& f_duration, std::ofstream& f_iterations, std::ofstream& f_costs, const std::string &data, int count);
-
 TrackPlan::TrackPlan(const StateId state_id,
                      PinocchioRobotSystem *robot,
                      std::vector<pkl_utils::CompositeBezierCurve> planned_bezier_curves,
@@ -83,13 +81,10 @@ void TrackPlan::OneStep() {
 
     // std::this_thread::sleep_for(std::chrono::milliseconds(40)); // NOTE: Add sleep to simulate worse performance
 
-    new_q = mpc_q_;
-    new_q_dot = mpc_q_dot_;
-    new_tau = mpc_tau_;
     ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(
-        new_q,
-        new_q_dot,
-        new_tau
+        mpc_q_,
+        mpc_q_dot_,
+        mpc_tau_
     );
   }
   else{
@@ -103,19 +98,13 @@ void TrackPlan::OneStep() {
       {
         std::lock_guard<std::mutex> lock(data_mutex_);
         if (has_new_data_) {
-          // std::cout << "[DEBUG] New data available for OneStep." << std::endl;
-          new_q = mpc_q_;
-          new_q_dot = mpc_q_dot_;
-          new_tau = mpc_tau_;
-          has_new_data_ = false;
 
+          has_new_data_ = false;
           ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(
-            new_q,
-            new_q_dot,
-            new_tau
+            mpc_q_,
+            mpc_q_dot_,
+            mpc_tau_
           );
-        } else {
-          // std::cout << "[DEBUG] No new data available for OneStep." << std::endl;
         }
       }
       last_time = current_time;
@@ -141,7 +130,6 @@ void TrackPlan::ComputeSync(){
   static mpc_utils::MPCData data_out;
 
   double controller_time = sp_->current_time_ - state_machine_start_time_;
-    // std::cout << "controller time: " <<controller_time <<std::endl;
 
     std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames_vec;
     std::vector<Eigen::Vector3d> desired_com_vec;
@@ -156,44 +144,29 @@ void TrackPlan::ComputeSync(){
         pinocchio::SE3 temp_pose;
         temp_pose.setIdentity();
         // FIXME if statement is temporary to test contact transition
-        if (frame_name.find("left_rubber_hand") != std::string::npos) {
-          temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
-          temp_pose.translation().x() = 0.2;
-        } else if (frame_name.find("torso_primitive_shape") != std::string::npos && t>=0.1) {
-          temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, 0.1);
-        } else if (t>=3.5) {
-          temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, 3.5);
-        }else {
+        if(t>=4.5){
+          temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, 4.5);
+        }
+        else {
           temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
         }
-        // temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
-        
-        // if(frame_name.find("left_ankle_roll_link") != std::string::npos && t>=3.5) {
-        //     temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, 3.5);
-        // }
-        // else if(frame_name.find("left_knee_link") != std::string::npos && t>=3.5) {
-        //     temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, 3.5);
-        // }
 
         desired_frames[frame_name] = temp_pose;
 
       }
       desired_frames_vec[i] = desired_frames;
 
-      // std::cout << "Desired CoM at time " << t << ": " <<pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt()) << std::endl;
-
-      desired_com_vec[i] = Vector3d(0.055, 0., 0.605);  // FIXME testing side wall
-      // desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, 0, g1_mpc_->getDt());
-      // desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt());
+      // desired_com_vec[i] = Vector3d(0.055, 0., 0.605);  // FIXME testing side wall
+      if(t>= 4.5){ //FIXME: this is a temporary solution to test contact transition
+        desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, 4.5, g1_mpc_->getDt());
+      }
+      else 
+        desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt());
 
     }
 
     xs_out[0] << robot_->GetQ(), robot_->GetQdot();
-
-    auto start_time = std::chrono::high_resolution_clock::now();
     g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, controller_time);
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
     mpc_q_ = xs_out[0].head(robot_->GetQ().size()).tail(robot_->NumActiveDof()); // q_joints
     mpc_q_dot_ = xs_out[0].tail(robot_->NumActiveDof());  // qdot_joints
@@ -290,12 +263,7 @@ void TrackPlan::ComputeSync(){
         dm->data_->predicted_right_rubber_pos_[i] = data_out.predicted_frame_positions["right_rubber_hand_" + std::to_string(i)];
       }
 
-      // save MPC joint positions, velocities, and torques
-      for (unsigned int i = 0; i < mpc_q_.size(); i++) {
-        dm->data_->joint_pos_des[i] = mpc_q_[i];
-        dm->data_->joint_pos_des[i] = mpc_q_dot_[i];
-        dm->data_->joint_pos_des[i] = mpc_tau_[i];
-      }
+      //NOTE: Joint pos, vel and torque are updated in _SaveData, data is updated using UpdateDesired
 
       dm->data_->b_fddp_feasible_ = data_out.b_fddp_feasible;
       dm->data_->solve_duration_ = data_out.solve_duration;
@@ -343,13 +311,6 @@ void TrackPlan::Compute() {
 
   mpc_utils::MPCData data_out;
 
-  #ifndef B_USE_ZMQ
-    std::ofstream log_file("solve_timing_log.txt", std::ios::app);
-    std::ofstream log_file2("solve_iteration_log.txt", std::ios::app);
-    std::ofstream log_file3("data_out_log.txt", std::ios::app);
-    int count = 0;
-  #endif
-
   while (run_threads_) {
 
       double controller_time = sp_->current_time_ - state_machine_start_time_;
@@ -375,12 +336,7 @@ void TrackPlan::Compute() {
       }
 
       xs_out[0] << robot_->GetQ(), robot_->GetQdot();
-
-      auto start_time = std::chrono::high_resolution_clock::now();
       g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, controller_time);
-
-      auto end_time = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
       
       #if B_USE_ZMQ
       G1DataManager *dm = G1DataManager::GetDataManager();
@@ -501,11 +457,6 @@ void TrackPlan::Compute() {
     data_out.contact_forces.clear();
     data_out.predicted_frame_positions.clear();
 
-      #ifndef B_USE_ZMQ
-        logToFile(log_file, log_file2, log_file3, data_out, std::to_string(duration), count);
-        count++;
-      #endif
-
       {
         std::lock_guard<std::mutex> lock(data_mutex_);
         mpc_q_ = xs_out[0].head(robot_->GetQ().size()).tail(robot_->NumActiveDof());  // q_joints
@@ -537,59 +488,4 @@ StateId TrackPlan::GetNextState() {
 }
 
 void TrackPlan::SetParameters(const YAML::Node &node) {
-}
-
-void logToFile(std::ofstream& f_duration, std::ofstream& f_iterations, std::ofstream& f_costs, const mpc_utils::MPCData &data_out, const std::string& duration, int count) {
-
-    if (f_duration.is_open() && count < 10000) {
-      f_duration << duration << std::endl;
-      f_iterations << data_out.total_iterations << std::endl;
-      count++;
-    } else {
-      f_duration.close();
-      f_iterations.close();
-      std::cerr << "File closed." << std::endl;
-    }
-
-    if(f_costs.is_open() && count< 1000) {
-      for(int i=0; i<data_out.xReg_costs.size(); i++){
-        f_costs << data_out.xReg_costs[i] << " ";
-      }
-
-      f_costs << std::endl;
-
-      for(int i=0; i<data_out.uReg_costs.size(); i++){
-        f_costs << data_out.uReg_costs[i] << " ";
-      }
-
-      f_costs << std::endl;
-
-      for(int i=0; i<data_out.xBound_costs.size(); i++){
-        f_costs << data_out.xBound_costs[i] << " ";
-      }
-
-      f_costs << std::endl;
-
-      for(int i=0; i<data_out.com_costs.size(); i++){
-        f_costs << data_out.com_costs[i] << " ";
-      }
-
-      f_costs << std::endl;
-
-      for (const auto& frame : data_out.frame_costs) {
-        f_costs << frame.first << ": ";
-        for (const auto& cost : frame.second) {
-          f_costs << cost << " ";
-        }
-        f_costs << std::endl;
-      }
-      f_costs << "----------------------------------------" << std::endl;
-      
-      count++;
-    }else{
-      f_costs.close();
-      std::cerr << "File closed." << std::endl;
-      // exit(23);
-    }
-
 }

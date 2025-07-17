@@ -649,19 +649,21 @@ void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>&
         std::vector<Eigen::VectorXd> xs(N_horizon_, xs_prev);
         Eigen::VectorXd us_guess = Eigen::VectorXd::Zero(state_->get_nv()-6);
         quasiStaticFootHandSolution(xs_prev.head(state_->get_nq()), desired_com, us_guess);
+        
+        // for (size_t i = 0; i < N_horizon_; i++) {
+        //     auto& uReg_item = running_cost_model_[i]->get_costs().at("uReg");
+        //     uReg_item->weight = uReg_item->weight * 10;
+        // }
+        // for (size_t i = 0; i < N_horizon_; i++) {
+        //     auto& xReg_item = running_cost_model_[i]->get_costs().at("xReg");
+        //     xReg_item->weight = xReg_item->weight * 10;
+        // }
 
         auto first_true = std::distance(contact_mask.begin(), std::find(contact_mask.begin(), contact_mask.end(), true));
         for(size_t i = first_true ; i< N_horizon_; i++) {
             u_prev_[i] = us_guess;
         }
     }
-
-    // Eigen::Vector3d left_knee_reference(0.239804, 0.118586, 0.438857);
-    // Eigen::Vector3d left_ankle_roll_reference(-0.000541275, 0.118514, 0.141274);
-    // for (int i = 0; i < N_horizon_ + 1; i++) {
-    //     frame_residuals_[i]["left_knee_link"]->set_reference(pinocchio::SE3(Eigen::Matrix3d::Identity(), left_knee_reference));
-    //     frame_residuals_[i]["left_ankle_roll_link"]->set_reference(pinocchio::SE3(Eigen::Matrix3d::Identity(), left_ankle_roll_reference));
-    // }
 
     //TODO: add logic to update beziers after re-activating contacts
 
@@ -1031,24 +1033,24 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             // std::cout << "Joint Velocity Difference (Summed): " << joint_vel_diff << std::endl;
             // std::cout << "-------------------------------------------\n";
 
-            // double total_cost = fddp_->get_cost();
-            // std::cout << "\n###\n";
-            // std::cout << "Total cost: " << total_cost << std::endl;
-            // std::cout << "\n###\n";
-            // double max_cost = 0.0;
-            // std::string max_cost_name;
+            double total_cost = fddp_->get_cost();
+            std::cout << "\n###\n";
+            std::cout << "Total cost: " << total_cost << std::endl;
+            std::cout << "\n###\n";
+            double max_cost = 0.0;
+            std::string max_cost_name;
 
-            // for (int i = 0; i < N_horizon_; ++i) {
-            //     for (const auto& cost_pair : running_cost_model_[i]->get_costs()) {
-            //         const std::string& cost_name = cost_pair.first;
-            //         double cost_value = getCostValue(cost_name, i);
-            //         if (cost_value > max_cost) {
-            //             max_cost = cost_value;
-            //             max_cost_name = cost_name;
-            //         }
-            //     }
-            //     std::cout << "Cost with the highest value in the horizon: " << max_cost_name << " with value: " << max_cost << std::endl;
-            // }
+            for (int i = 0; i < N_horizon_; ++i) {
+                for (const auto& cost_pair : running_cost_model_[i]->get_costs()) {
+                    const std::string& cost_name = cost_pair.first;
+                    double cost_value = getCostValue(cost_name, i);
+                    if (cost_value > max_cost) {
+                        max_cost = cost_value;
+                        max_cost_name = cost_name;
+                    }
+                }
+                std::cout << "Cost with the highest value in the horizon: " << max_cost_name << " with value: " << max_cost << std::endl;
+            }
 
             // double total_diff_sum = 0.0;
             // for (std::size_t i = 0; i < fddp_->get_xs().size(); ++i) {

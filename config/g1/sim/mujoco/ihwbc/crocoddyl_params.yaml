@@ -108,7 +108,7 @@ friction:
 
 running_costs:
   xReg:
-    w: 20.0 #30.0
+    w: 80.0 #30.0
     state_w:
       base_pos: [0.0, 0.0, 0.0]
       base_rot: [1.0, 1.0, 1.0]
@@ -117,7 +117,7 @@ running_costs:
       base_ang_vel: [1.0, 1.0, 1.0]
       joint_vel: 5.0
   uReg:
-    w: 1.0 #4.0
+    w: 4.0 #4.0
   xBound:
     w: 0.001
   CoM:
@@ -127,39 +127,39 @@ running_costs:
     contact_rot: 300.0  # rotation weight assigned for frames in contact
     swing_rot: 0.01     # rotation weight assigned for frames in swing phase
     torso_primitive_shape: 
-      pos: 200.0
+      pos: 500.0
       rot: 0.0
     left_ankle_roll_link: 
-      pos: 400.0
+      pos: 500.0
       rot: 0.0
     right_ankle_roll_link: 
-      pos: 400.0
+      pos: 500.0
       rot: 0.0
     left_knee_link: 
-      pos: 400.0
+      pos: 500.0
       rot: 0.0
     right_knee_link: 
-      pos: 400.0
+      pos: 500.0
       rot: 0.0
     left_rubber_hand: 
-      pos: 400.0
+      pos: 500.0
       rot: 0.0
     right_rubber_hand: 
-      pos: 400.0
+      pos: 500.0
       rot: 0.0
   baumgarte_gains:
     l_foot_contact:
       alpha: 0.0
-      beta: 10.0
+      beta: 30.0
     r_foot_contact:
       alpha: 0.0
-      beta: 10.0
+      beta: 30.0
     left_rubber_hand:
       alpha: 0.0
-      beta: 10.0
+      beta: 30.0
     right_rubber_hand:
       alpha: 0.0
-      beta: 10.0
+      beta: 30.0
   tracking_forces:
     w: 0.0
     l_foot_contact: [0.0, 0.0, 0.0]
@@ -167,22 +167,22 @@ running_costs:
     left_rubber_hand: [0.0, 0.0, 0.0]
     right_rubber_hand: [0.0, 0.0, 0.0]
   tauRateReg:
-    w: 0.01
+    w: 1.6
 
 terminal_costs:
   xReg:
-    w: 0.03
+    w: 10.0
     state_w:
       base_pos: [0.0, 0.0, 0.0]
       base_rot: [5.0, 5.0, 5.0]
-      joint_pos: 0.01
+      joint_pos: 0.001
       base_lin_vel: [1.0, 1.0, 1.0]
       base_ang_vel: [1.0, 1.0, 1.0]
       joint_vel: 10.0
   xBound:
     w: 300.0
   CoM:
-    w: 200.0
+    w: 400.0
   tracking_frames:
     w: 2.0
     contact_rot: 200.0  # weight assigned for frames in contact
@@ -191,16 +191,16 @@ terminal_costs:
       pos: 100.0
       rot: 0.0
     left_ankle_roll_link:
-      pos: 300.0
+      pos: 100.0
       rot: 0.0
     right_ankle_roll_link:
-      pos: 300.0
+      pos: 100.0
       rot: 0.0
     left_knee_link:
-      pos: 300.0
+      pos: 100.0
       rot: 0.0
     right_knee_link:
-      pos: 300.0
+      pos: 100.0
       rot: 0.0
     left_rubber_hand:
       pos: 300.0
