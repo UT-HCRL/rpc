@@ -114,6 +114,7 @@ void G1Interface::GetCommand(void *sensor_data, void *command_data) {
 
   // get control command
   ctrl_arch_->GetCommand(g1_command);
+  sp_->curr_joint_trq_cmd_ = g1_command->joint_trq_cmd_;
   // get gripper command
   if (sp_->b_recv_gripper_cmd_)
     g1_command->gripper_pos_cmd_ = sp_->gripper_pos_cmd_;

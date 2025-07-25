@@ -7,16 +7,16 @@
 class ContactSwitchManagerTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Initialize contact switching manager
-        contact_switching_manager = std::make_shared<ContactSwitchingManager>(
-            std::unordered_map<std::string, bool>{
-                {"left_foot", true},
-                {"right_foot", true},
-                {"left_hand", false},
-                {"right_hand", false}
-            }, 
+        const std::vector<std::string> frame_names = {
+            "left_foot", "right_foot", "left_hand", "right_hand"
+        };
+        // Create contact switching manager
+        auto contact_switching_manager = std::make_shared<ContactSwitchingManager>(
+            frame_names,
             5 // Assuming 5 knots
         );
+
+        contact_switching_manager->addContactPhase({true, true, false, false}); // Initial phase with left and right foot active
 
         // Initialize transition detector
         detector = std::make_shared<TransitionDetector>();

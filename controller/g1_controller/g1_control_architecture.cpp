@@ -257,8 +257,11 @@ G1ControlArchitecture::G1ControlArchitecture(PinocchioRobotSystem *robot,
   locomotion_state_machine_container_[g1_states::kRFSingleSupportSwing]
       ->SetParameters(cfg);
 
-  // std::string file_path = THIS_COM "experiment_data/g1_29dof_knee_knocker_full_step_over.pkl";
-  std::string file_path = THIS_COM "data_example/g1_step_over_knee_knocker_latest_fix.pkl";
+//   std::string file_path = THIS_COM "data_example/g1_step_over_knee_knocker_latest_fix.pkl";
+  std::string file_path = THIS_COM "experiment_data/g1_sca_step_over_knee_knocker_kin_july.pkl";
+//   std::string file_path = THIS_COM "experiment_data/g1_sca_step_on_balanced_knee_knocker.pkl";
+//   std::string file_path = THIS_COM "experiment_data/g1_sca_step_on_knee_knocker.pkl";
+//   std::string file_path = THIS_COM "experiment_data/g1_sca_step_over_knee_knocker.pkl";
   PickleReader pkl_reader = PickleReader(file_path, PickleType::COMPOSITE);
   if (!pkl_reader.isReady()) {
       std::cerr << "Failed to open the file." << std::endl;

@@ -57,4 +57,6 @@ G1StateProvider::G1StateProvider() {
   b_recv_gripper_cmd_ = false;
   gripper_pos_cmd_["left"] = 0.0;
   gripper_pos_cmd_["right"] = 0.0;
+
+  curr_joint_trq_cmd_ = Eigen::VectorXd::Zero(g1::n_adof);
 }

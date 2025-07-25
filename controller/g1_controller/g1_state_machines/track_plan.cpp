@@ -119,180 +119,180 @@ void TrackPlan::OneStep() {
 void TrackPlan::ComputeSync(){
 
   static Eigen::VectorXd x0 = Eigen::VectorXd::Zero(g1_mpc_->getX0Size());
-  static std::vector<Eigen::VectorXd> xs_out(g1_mpc_->getNhorizon(), x0);
-  static std::vector<Eigen::VectorXd> us_out;
-
+  static std::vector<Eigen::VectorXd> xs_out(g1_mpc_->getNhorizon() + 1, x0);
+  static std::vector<Eigen::VectorXd> us_out(g1_mpc_->getNhorizon(), Eigen::VectorXd::Zero(27));
+  
   static Eigen::Vector3d com_ref;
   com_ref = robot_->GetRobotComPos();
 
-  static bool remove_contact = false;
+  static bool first_iteration = true;
 
   static mpc_utils::MPCData data_out;
 
   double controller_time = sp_->current_time_ - state_machine_start_time_;
+  double fake_time = controller_time;
 
-    std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames_vec;
-    std::vector<Eigen::Vector3d> desired_com_vec;
-    desired_frames_vec.resize(g1_mpc_->getNhorizon() +1);
-    desired_com_vec.resize(g1_mpc_->getNhorizon() + 1);
+  std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames_vec;
+  std::vector<Eigen::Vector3d> desired_com_vec;
+  desired_frames_vec.resize(g1_mpc_->getNhorizon() +1);
+  desired_com_vec.resize(g1_mpc_->getNhorizon() + 1);
 
-    for(int i=0; i<g1_mpc_->getNhorizon() + 1; i++){
-      std::unordered_map<std::string, pinocchio::SE3> desired_frames;
-      const double t = controller_time + i * g1_mpc_->getDt();
-      
-      for(const auto& frame_name : g1_mpc_->getTargetFrameNames()) {
-        pinocchio::SE3 temp_pose;
-        temp_pose.setIdentity();
-        // FIXME if statement is temporary to test contact transition
-        if(t>=4.5){
-          temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, 4.5);
-        }
-        else {
-          temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
-        }
-
-        desired_frames[frame_name] = temp_pose;
-
-      }
-      desired_frames_vec[i] = desired_frames;
-
-      // desired_com_vec[i] = Vector3d(0.055, 0., 0.605);  // FIXME testing side wall
-      if(t>= 4.5){ //FIXME: this is a temporary solution to test contact transition
-        desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, 4.5, g1_mpc_->getDt());
-      }
-      else 
-        desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt());
+  for(int i=0; i<g1_mpc_->getNhorizon() + 1; i++){
+    std::unordered_map<std::string, pinocchio::SE3> desired_frames;
+    const double t = controller_time + i * g1_mpc_->getDt();
+    
+    for(const auto& frame_name : g1_mpc_->getTargetFrameNames()) {
+      pinocchio::SE3 temp_pose;
+      temp_pose.setIdentity();
+      temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
+      desired_frames[frame_name] = temp_pose;
 
     }
+    desired_frames_vec[i] = desired_frames;
+    if (!com_des_.empty()) {
+      desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt());
+    }
 
-    xs_out[0] << robot_->GetQ(), robot_->GetQdot();
-    g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, controller_time);
+  }
 
-    mpc_q_ = xs_out[0].head(robot_->GetQ().size()).tail(robot_->NumActiveDof()); // q_joints
-    mpc_q_dot_ = xs_out[0].tail(robot_->NumActiveDof());  // qdot_joints
-    mpc_tau_ = us_out[0];
+  xs_out[0] << robot_->GetQ(), robot_->GetQdot();
+  if(first_iteration){
+    us_out[0] = sp_->curr_joint_trq_cmd_.tail(27);
+    first_iteration = false;
+  }
 
-    #if B_USE_ZMQ
-      G1DataManager *dm = G1DataManager::GetDataManager();
-      dm->data_->total_iterations_ = data_out.total_iterations;
+  g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, controller_time);
+
+  mpc_q_ = xs_out[0].head(robot_->GetQ().size()).tail(robot_->NumActiveDof()); // q_joints
+  mpc_q_dot_ = xs_out[0].tail(robot_->NumActiveDof());  // qdot_joints
+  mpc_tau_ = us_out[0];
+
+  #if B_USE_ZMQ
+    G1DataManager *dm = G1DataManager::GetDataManager();
+    dm->data_->total_iterations_ = data_out.total_iterations;
+    
+    dm->data_->xReg_costs_.resize(data_out.xReg_costs.size());
+    dm->data_->xReg_costs_ = data_out.xReg_costs;
+    
+    dm->data_->uReg_costs_.resize(data_out.uReg_costs.size());
+    dm->data_->uReg_costs_ = data_out.uReg_costs;
+    
+    dm->data_->xBound_costs_.resize(data_out.xBound_costs.size());
+    dm->data_->xBound_costs_ = data_out.xBound_costs;
+
+    dm->data_->com_costs_.resize(data_out.com_costs.size());
+    dm->data_->com_costs_ = data_out.com_costs;
+
+    dm->data_->torso_des_pos_ = desired_frames_vec[0].at("torso_primitive_shape").translation();
+    dm->data_->right_knee_des_pos_ = desired_frames_vec[0].at("right_knee_link").translation();
+    dm->data_->left_knee_des_pos_ = desired_frames_vec[0].at("left_knee_link").translation();
+    dm->data_->right_ankle_roll_des_pos_ = desired_frames_vec[0].at("right_ankle_roll_link").translation();
+    dm->data_->left_ankle_roll_des_pos_ = desired_frames_vec[0].at("left_ankle_roll_link").translation();
+    dm->data_->left_rubber_hand_des_pos_ = desired_frames_vec[0].at("left_rubber_hand").translation();
+    dm->data_->right_rubber_hand_des_pos_ = desired_frames_vec[0].at("right_rubber_hand").translation();
+    dm->data_->com_des_pos_ = desired_com_vec[0];
+
+    dm->data_->torso_curr_pos_ = data_out.frame_current_pos["torso_primitive_shape"];
+    dm->data_->left_ankle_roll_curr_pos_ = data_out.frame_current_pos["left_ankle_roll_link"];
+    dm->data_->right_ankle_roll_curr_pos_ = data_out.frame_current_pos["right_ankle_roll_link"];
+    dm->data_->left_knee_curr_pos_ = data_out.frame_current_pos["left_knee_link"];
+    dm->data_->right_knee_curr_pos_ = data_out.frame_current_pos["right_knee_link"];
+    dm->data_->left_rubber_hand_curr_pos_ = data_out.frame_current_pos["left_rubber_hand"];
+    dm->data_->right_rubber_hand_curr_pos_ = data_out.frame_current_pos["right_rubber_hand"];
+    dm->data_->com_curr_pos_ = data_out.com_curr_pos;
+
+    dm->data_->left_hand_frame_costs_.resize(data_out.left_hand_frame_costs.size());
+    dm->data_->right_hand_frame_costs_.resize(data_out.right_hand_frame_costs.size());
+    dm->data_->left_hand_frame_costs_ = data_out.left_hand_frame_costs;
+    dm->data_->right_hand_frame_costs_ = data_out.right_hand_frame_costs;
+
+    dm->data_->left_ankle_frame_costs_.resize(data_out.left_ankle_frame_costs.size());
+    dm->data_->right_ankle_frame_costs_.resize(data_out.right_ankle_frame_costs.size());
+    dm->data_->left_ankle_frame_costs_ = data_out.left_ankle_frame_costs;
+    dm->data_->right_ankle_frame_costs_ = data_out.right_ankle_frame_costs;
+
+    dm->data_->left_knee_frame_costs_.resize(data_out.left_knee_frame_costs.size());
+    dm->data_->right_knee_frame_costs_.resize(data_out.right_knee_frame_costs.size());
+    dm->data_->left_knee_frame_costs_ = data_out.left_knee_frame_costs;
+    dm->data_->right_knee_frame_costs_ = data_out.right_knee_frame_costs;
+
+    dm->data_->torso_link_frame_costs_.resize(data_out.torso_link_frame_costs.size());
+    dm->data_->torso_link_frame_costs_ = data_out.torso_link_frame_costs;
+
+    dm->data_->left_hand_contact_costs_.resize(data_out.left_hand_contact_costs.size());
+    dm->data_->right_hand_contact_costs_.resize(data_out.right_hand_contact_costs.size());
+    dm->data_->left_hand_contact_costs_ = data_out.left_hand_contact_costs;
+    dm->data_->right_hand_contact_costs_ = data_out.right_hand_contact_costs;
+
+    dm->data_->left_foot_contact_costs_.resize(data_out.left_foot_contact_costs.size());
+    dm->data_->right_foot_contact_costs_.resize(data_out.right_foot_contact_costs.size());
+    dm->data_->left_foot_contact_costs_ = data_out.left_foot_contact_costs;
+    dm->data_->right_foot_contact_costs_ = data_out.right_foot_contact_costs;
+
+    dm->data_->l_foot_rf_.resize(g1_mpc_->getNhorizon());
+    dm->data_->r_foot_rf_.resize(g1_mpc_->getNhorizon());
+    dm->data_->l_hand_rf_.resize(g1_mpc_->getNhorizon());
+    dm->data_->r_hand_rf_.resize(g1_mpc_->getNhorizon());
+
+    dm->data_->predicted_torso_pos_.resize(g1_mpc_->getNhorizon());
+    dm->data_->predicted_left_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
+    dm->data_->predicted_right_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
+    dm->data_->predicted_left_knee_pos_.resize(g1_mpc_->getNhorizon());
+    dm->data_->predicted_right_knee_pos_.resize(g1_mpc_->getNhorizon());
+    dm->data_->predicted_left_rubber_pos_.resize(g1_mpc_->getNhorizon());
+    dm->data_->predicted_right_rubber_pos_.resize(g1_mpc_->getNhorizon());
+
+    dm->data_->joint_vel_des_traj_.resize(g1_mpc_->getNhorizon());
+
+    for (int i = 0; i < g1_mpc_->getNhorizon(); ++i) {
+      dm->data_->l_foot_rf_[i] = data_out.contact_forces["l_foot_contact_contact_" + std::to_string(i)];
+      dm->data_->r_foot_rf_[i] = data_out.contact_forces["r_foot_contact_contact_" + std::to_string(i)];
+      dm->data_->l_hand_rf_[i] = data_out.contact_forces["left_rubber_hand_contact_" + std::to_string(i)];
+      dm->data_->r_hand_rf_[i] = data_out.contact_forces["right_rubber_hand_contact_" + std::to_string(i)];
+
+      // predicted frame positions
+      dm->data_->predicted_torso_pos_[i] = data_out.predicted_frame_positions["torso_primitive_shape_" + std::to_string(i)];
+      dm->data_->predicted_left_ankle_roll_pos_[i] = data_out.predicted_frame_positions["left_ankle_roll_link_" + std::to_string(i)];
+      dm->data_->predicted_right_ankle_roll_pos_[i] = data_out.predicted_frame_positions["right_ankle_roll_link_" + std::to_string(i)];
+      dm->data_->predicted_left_knee_pos_[i] = data_out.predicted_frame_positions["left_knee_link_" + std::to_string(i)];
+      dm->data_->predicted_right_knee_pos_[i] = data_out.predicted_frame_positions["right_knee_link_" + std::to_string(i)];
+      dm->data_->predicted_left_rubber_pos_[i] = data_out.predicted_frame_positions["left_rubber_hand_" + std::to_string(i)];
+      dm->data_->predicted_right_rubber_pos_[i] = data_out.predicted_frame_positions["right_rubber_hand_" + std::to_string(i)];
       
-      dm->data_->xReg_costs_.resize(data_out.xReg_costs.size());
-      dm->data_->xReg_costs_ = data_out.xReg_costs;
-      
-      dm->data_->uReg_costs_.resize(data_out.uReg_costs.size());
-      dm->data_->uReg_costs_ = data_out.uReg_costs;
-      
-      dm->data_->xBound_costs_.resize(data_out.xBound_costs.size());
-      dm->data_->xBound_costs_ = data_out.xBound_costs;
+      // fddp optimal state
+      dm->data_->joint_vel_des_traj_[i] = xs_out[i].tail(robot_->NumActiveDof()); // qdot_joints
+    }
 
-      dm->data_->com_costs_.resize(data_out.com_costs.size());
-      dm->data_->com_costs_ = data_out.com_costs;
+    //NOTE: Joint pos, vel and torque are updated in _SaveData, data is updated using UpdateDesired
 
-      dm->data_->torso_des_pos_ = desired_frames_vec[0].at("torso_primitive_shape").translation();
-      dm->data_->right_knee_des_pos_ = desired_frames_vec[0].at("right_knee_link").translation();
-      dm->data_->left_knee_des_pos_ = desired_frames_vec[0].at("left_knee_link").translation();
-      dm->data_->right_ankle_roll_des_pos_ = desired_frames_vec[0].at("right_ankle_roll_link").translation();
-      dm->data_->left_ankle_roll_des_pos_ = desired_frames_vec[0].at("left_ankle_roll_link").translation();
-      dm->data_->left_rubber_hand_des_pos_ = desired_frames_vec[0].at("left_rubber_hand").translation();
-      dm->data_->right_rubber_hand_des_pos_ = desired_frames_vec[0].at("right_rubber_hand").translation();
-      dm->data_->com_des_pos_ = desired_com_vec[0];
+    dm->data_->b_fddp_feasible_ = data_out.b_fddp_feasible;
+    dm->data_->solve_duration_ = data_out.solve_duration;
+    dm->data_->b_trq_limit_ = sp_->b_torque_limit_;
 
-      dm->data_->torso_curr_pos_ = data_out.frame_current_pos["torso_primitive_shape"];
-      dm->data_->left_ankle_roll_curr_pos_ = data_out.frame_current_pos["left_ankle_roll_link"];
-      dm->data_->right_ankle_roll_curr_pos_ = data_out.frame_current_pos["right_ankle_roll_link"];
-      dm->data_->left_knee_curr_pos_ = data_out.frame_current_pos["left_knee_link"];
-      dm->data_->right_knee_curr_pos_ = data_out.frame_current_pos["right_knee_link"];
-      dm->data_->left_rubber_hand_curr_pos_ = data_out.frame_current_pos["left_rubber_hand"];
-      dm->data_->right_rubber_hand_curr_pos_ = data_out.frame_current_pos["right_rubber_hand"];
-      dm->data_->com_curr_pos_ = data_out.com_curr_pos;
+  #endif
 
-      dm->data_->left_hand_frame_costs_.resize(data_out.left_hand_frame_costs.size());
-      dm->data_->right_hand_frame_costs_.resize(data_out.right_hand_frame_costs.size());
-      dm->data_->left_hand_frame_costs_ = data_out.left_hand_frame_costs;
-      dm->data_->right_hand_frame_costs_ = data_out.right_hand_frame_costs;
-
-      dm->data_->left_ankle_frame_costs_.resize(data_out.left_ankle_frame_costs.size());
-      dm->data_->right_ankle_frame_costs_.resize(data_out.right_ankle_frame_costs.size());
-      dm->data_->left_ankle_frame_costs_ = data_out.left_ankle_frame_costs;
-      dm->data_->right_ankle_frame_costs_ = data_out.right_ankle_frame_costs;
-
-      dm->data_->left_knee_frame_costs_.resize(data_out.left_knee_frame_costs.size());
-      dm->data_->right_knee_frame_costs_.resize(data_out.right_knee_frame_costs.size());
-      dm->data_->left_knee_frame_costs_ = data_out.left_knee_frame_costs;
-      dm->data_->right_knee_frame_costs_ = data_out.right_knee_frame_costs;
-
-      dm->data_->torso_link_frame_costs_.resize(data_out.torso_link_frame_costs.size());
-      dm->data_->torso_link_frame_costs_ = data_out.torso_link_frame_costs;
-
-      dm->data_->left_hand_contact_costs_.resize(data_out.left_hand_contact_costs.size());
-      dm->data_->right_hand_contact_costs_.resize(data_out.right_hand_contact_costs.size());
-      dm->data_->left_hand_contact_costs_ = data_out.left_hand_contact_costs;
-      dm->data_->right_hand_contact_costs_ = data_out.right_hand_contact_costs;
-
-      dm->data_->left_foot_contact_costs_.resize(data_out.left_foot_contact_costs.size());
-      dm->data_->right_foot_contact_costs_.resize(data_out.right_foot_contact_costs.size());
-      dm->data_->left_foot_contact_costs_ = data_out.left_foot_contact_costs;
-      dm->data_->right_foot_contact_costs_ = data_out.right_foot_contact_costs;
-
-      dm->data_->l_foot_rf_.resize(g1_mpc_->getNhorizon());
-      dm->data_->r_foot_rf_.resize(g1_mpc_->getNhorizon());
-      dm->data_->l_hand_rf_.resize(g1_mpc_->getNhorizon());
-      dm->data_->r_hand_rf_.resize(g1_mpc_->getNhorizon());
-
-      dm->data_->predicted_torso_pos_.resize(g1_mpc_->getNhorizon());
-      dm->data_->predicted_left_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
-      dm->data_->predicted_right_ankle_roll_pos_.resize(g1_mpc_->getNhorizon());
-      dm->data_->predicted_left_knee_pos_.resize(g1_mpc_->getNhorizon());
-      dm->data_->predicted_right_knee_pos_.resize(g1_mpc_->getNhorizon());
-      dm->data_->predicted_left_rubber_pos_.resize(g1_mpc_->getNhorizon());
-      dm->data_->predicted_right_rubber_pos_.resize(g1_mpc_->getNhorizon());
-
-      for (int i = 0; i < g1_mpc_->getNhorizon(); ++i) {
-        dm->data_->l_foot_rf_[i] = data_out.contact_forces["l_foot_contact_contact_" + std::to_string(i)];
-        dm->data_->r_foot_rf_[i] = data_out.contact_forces["r_foot_contact_contact_" + std::to_string(i)];
-        dm->data_->l_hand_rf_[i] = data_out.contact_forces["left_rubber_hand_contact_" + std::to_string(i)];
-        dm->data_->r_hand_rf_[i] = data_out.contact_forces["right_rubber_hand_contact_" + std::to_string(i)];
-
-        // predicted frame positions
-        dm->data_->predicted_torso_pos_[i] = data_out.predicted_frame_positions["torso_primitive_shape_" + std::to_string(i)];
-        dm->data_->predicted_left_ankle_roll_pos_[i] = data_out.predicted_frame_positions["left_ankle_roll_link_" + std::to_string(i)];
-        dm->data_->predicted_right_ankle_roll_pos_[i] = data_out.predicted_frame_positions["right_ankle_roll_link_" + std::to_string(i)];
-        dm->data_->predicted_left_knee_pos_[i] = data_out.predicted_frame_positions["left_knee_link_" + std::to_string(i)];
-        dm->data_->predicted_right_knee_pos_[i] = data_out.predicted_frame_positions["right_knee_link_" + std::to_string(i)];
-        dm->data_->predicted_left_rubber_pos_[i] = data_out.predicted_frame_positions["left_rubber_hand_" + std::to_string(i)];
-        dm->data_->predicted_right_rubber_pos_[i] = data_out.predicted_frame_positions["right_rubber_hand_" + std::to_string(i)];
-      }
-
-      //NOTE: Joint pos, vel and torque are updated in _SaveData, data is updated using UpdateDesired
-
-      dm->data_->b_fddp_feasible_ = data_out.b_fddp_feasible;
-      dm->data_->solve_duration_ = data_out.solve_duration;
-      dm->data_->b_trq_limit_ = sp_->b_torque_limit_;
-
-    #endif
-
-    data_out.xReg_costs.clear();
-    data_out.uReg_costs.clear();
-    data_out.xBound_costs.clear();
-    data_out.com_costs.clear();
-    data_out.frame_costs.clear();
-    data_out.frame_des_pos.clear();
-    data_out.frame_des_ori.clear();
-    data_out.frame_ref_pos.clear();
-    data_out.frame_ref_ori.clear();
-    data_out.left_hand_frame_costs.clear();
-    data_out.right_hand_frame_costs.clear();
-    data_out.left_ankle_frame_costs.clear();
-    data_out.right_ankle_frame_costs.clear();
-    data_out.left_knee_frame_costs.clear();
-    data_out.right_knee_frame_costs.clear();
-    data_out.torso_link_frame_costs.clear();
-    data_out.left_hand_contact_costs.clear();
-    data_out.right_hand_contact_costs.clear();
-    data_out.left_foot_contact_costs.clear();
-    data_out.right_foot_contact_costs.clear();
-    data_out.contact_forces.clear();
-    data_out.predicted_frame_positions.clear();
+  data_out.xReg_costs.clear();
+  data_out.uReg_costs.clear();
+  data_out.xBound_costs.clear();
+  data_out.com_costs.clear();
+  data_out.frame_costs.clear();
+  data_out.frame_des_pos.clear();
+  data_out.frame_des_ori.clear();
+  data_out.frame_ref_pos.clear();
+  data_out.frame_ref_ori.clear();
+  data_out.left_hand_frame_costs.clear();
+  data_out.right_hand_frame_costs.clear();
+  data_out.left_ankle_frame_costs.clear();
+  data_out.right_ankle_frame_costs.clear();
+  data_out.left_knee_frame_costs.clear();
+  data_out.right_knee_frame_costs.clear();
+  data_out.torso_link_frame_costs.clear();
+  data_out.left_hand_contact_costs.clear();
+  data_out.right_hand_contact_costs.clear();
+  data_out.left_foot_contact_costs.clear();
+  data_out.right_foot_contact_costs.clear();
+  data_out.contact_forces.clear();
+  data_out.predicted_frame_positions.clear();
 
 }
 
@@ -306,8 +306,6 @@ void TrackPlan::Compute() {
 
   Eigen::Vector3d com_ref;
   com_ref = robot_->GetRobotComPos();
-
-  bool remove_contact = false;
 
   mpc_utils::MPCData data_out;
 
@@ -413,7 +411,10 @@ void TrackPlan::Compute() {
       dm->data_->predicted_left_rubber_pos_.resize(g1_mpc_->getNhorizon());
       dm->data_->predicted_right_rubber_pos_.resize(g1_mpc_->getNhorizon());
 
+      dm->data_->joint_vel_des_traj_.resize(g1_mpc_->getNhorizon());
+
       for (int i = 0; i < g1_mpc_->getNhorizon(); ++i) {
+        // reaction forces
         dm->data_->l_foot_rf_[i] = data_out.contact_forces["l_foot_contact_contact_" + std::to_string(i)];
         dm->data_->r_foot_rf_[i] = data_out.contact_forces["r_foot_contact_contact_" + std::to_string(i)];
         dm->data_->l_hand_rf_[i] = data_out.contact_forces["left_rubber_hand_contact_" + std::to_string(i)];
@@ -427,6 +428,9 @@ void TrackPlan::Compute() {
         dm->data_->predicted_right_knee_pos_[i] = data_out.predicted_frame_positions["right_knee_link_" + std::to_string(i)];
         dm->data_->predicted_left_rubber_pos_[i] = data_out.predicted_frame_positions["left_rubber_hand_" + std::to_string(i)];
         dm->data_->predicted_right_rubber_pos_[i] = data_out.predicted_frame_positions["right_rubber_hand_" + std::to_string(i)];
+
+        // fddp optimal state
+        dm->data_->joint_vel_des_traj_[i] = xs_out[i].tail(robot_->NumActiveDof()); // qdot_joints
       }
 
       dm->data_->b_fddp_feasible_ = data_out.b_fddp_feasible;

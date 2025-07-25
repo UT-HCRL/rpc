@@ -101,6 +101,11 @@ public:
   Eigen::VectorXd joint_vel_des;
   Eigen::VectorXd joint_trq_des;
 
+  // MPC desired joint positions, velocities and torques
+  std::vector<Eigen::VectorXd> joint_pos_des_traj_;
+  std::vector<Eigen::VectorXd> joint_vel_des_traj_;
+  std::vector<Eigen::VectorXd> joint_trq_des_traj_;
+
   // MPC Costs:
   int total_iterations_ = 0;
   std::vector<double> xReg_costs_;

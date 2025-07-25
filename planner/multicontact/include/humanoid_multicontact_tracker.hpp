@@ -26,6 +26,7 @@ class HumanoidMulticontactTracker{
         void printModel() const;
         void printWeights() const;
         void printContacts() const;
+        void printCosts() const;
         void printActiveSet(const mpc_utils::Phase phase = mpc_utils::Phase::Running) const;
         void setConfigPath(const std::string& config_path){config_path_ = config_path;}
 
@@ -81,11 +82,14 @@ class HumanoidMulticontactTracker{
          * @param contact_mask Contact mask to apply.
          */
         void changeWeightedQuadRotWeight(const std::string cost_name, std::vector<bool>& contact_mask);
+        void updateRunningWeights(double xReg_multiplier, double uReg_multiplier, const std::vector<bool>& contact_mask);
+        void updateTerminalWeights(double xReg_multiplier, const std::vector<bool>& contact_mask);
 
         void solveOneStep(std::vector<Eigen::VectorXd>& xs_out, std::vector<Eigen::VectorXd>& us_out, mpc_utils::MPCData& data_out, const std::vector<Eigen::Vector3d>& desired_com = {}, std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames = {}, const double time = 0.0);
         std::vector<std::string> getTargetFrameNames() const {return track_frame_names_;}
 
-        void quasiStaticFootHandSolution(const VectorXd& q_current, const Vector3d& desired_com, VectorXd& tau_guess) const;
+        void quasiStaticFootHandSolution(const VectorXd& q_current, const Vector3d& desired_com, std::vector<VectorXd>& tau_guess) const;
+        void quasiStaticSolution(const VectorXd& x_prev, const std::vector<bool>& contact_config, const Vector3d& desired_com, std::vector<VectorXd>& tau_guess);
 
         // Auxiliary functions for DARE computation
         void computeDARE(const std::vector<Eigen::VectorXd>& xs_out, const std::vector<Eigen::VectorXd>& us_out);
@@ -198,9 +202,11 @@ class HumanoidMulticontactTracker{
 
         std::unordered_map<std::string, std::vector<Eigen::Isometry3d>> future_poses_; //FIXME: this is redundant with data_out but need conversion between Isometry and PinocchioSE3
         std::vector<bool> contact_mask_;
-        bool switch_trigger_ = false;
+        bool quasi_static_trigger_ = true; // This is used to compute quasi-static just once = true;
         bool first_iteration_ = true; // This is used for first computation of MPC and then is set to false
         bool first_contact_change_ = true; // This is used to compute the quasi-static solution only once at the first contact change
+        int knots_lh_;
+        bool transition_trigger_ = false;
         //##########################
 
         //### DARE TEMP VARIABLES ###

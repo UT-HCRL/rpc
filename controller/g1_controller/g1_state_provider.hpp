@@ -62,6 +62,7 @@ public:
   Eigen::Matrix<double, Eigen::Dynamic, 2> trq_limits_;
   std::vector<bool> b_torque_limit_;
 
+  Eigen::VectorXd curr_joint_trq_cmd_;
 
 private:
   G1StateProvider();

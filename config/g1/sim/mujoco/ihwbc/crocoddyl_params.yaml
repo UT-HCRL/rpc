@@ -91,7 +91,7 @@ initial_config:
   right_two_joint: 0.
 
 #          [   Reg,   xBound,   CoM,    Frames,    Contacts,      Forces,     TorqueRate      ]
-cost_mask: [    1,      1,       1,        1,          1,           0,            1           ]
+cost_mask: [    1,      1,       0,        1,          1,           0,            0           ]
 
 tracking_frames:
   - torso_primitive_shape
@@ -104,34 +104,34 @@ tracking_frames:
 
 friction:
   w: 100.0
-  mu: 0.7
+  mu: 2.0
 
 running_costs:
   xReg:
-    w: 80.0 #30.0
+    w: 1.0 #30.0
     state_w:
       base_pos: [0.0, 0.0, 0.0]
-      base_rot: [1.0, 1.0, 1.0]
-      joint_pos: 5.0
-      base_lin_vel: [1.0, 1.0, 1.0]
-      base_ang_vel: [1.0, 1.0, 1.0]
-      joint_vel: 5.0
+      base_rot: [0.01, 0.01, 0.01]
+      joint_pos: 0.1
+      base_lin_vel: [0.01, 0.01, 0.01]
+      base_ang_vel: [0.01, 0.01, 0.01]
+      joint_vel: 3.0
   uReg:
-    w: 4.0 #4.0
+    w: 0.1 #4.0
   xBound:
     w: 0.001
   CoM:
     w: 50.0
   tracking_frames:
     w: 2.0
-    contact_rot: 300.0  # rotation weight assigned for frames in contact
+    contact_rot: 1.0  # rotation weight assigned for frames in contact
     swing_rot: 0.01     # rotation weight assigned for frames in swing phase
     torso_primitive_shape: 
-      pos: 500.0
+      pos: 100.0
       rot: 0.0
     left_ankle_roll_link: 
       pos: 500.0
-      rot: 0.0
+      rot: 100.0
     right_ankle_roll_link: 
       pos: 500.0
       rot: 0.0
@@ -174,11 +174,11 @@ terminal_costs:
     w: 10.0
     state_w:
       base_pos: [0.0, 0.0, 0.0]
-      base_rot: [5.0, 5.0, 5.0]
-      joint_pos: 0.001
-      base_lin_vel: [1.0, 1.0, 1.0]
-      base_ang_vel: [1.0, 1.0, 1.0]
-      joint_vel: 10.0
+      base_rot: [0.01, 0.01, 0.01]
+      joint_pos: 0.1
+      base_lin_vel: [0.01, 0.01, 0.01]
+      base_ang_vel: [0.01, 0.01, 0.01]
+      joint_vel: 0.1
   xBound:
     w: 300.0
   CoM:
@@ -188,7 +188,7 @@ terminal_costs:
     contact_rot: 200.0  # weight assigned for frames in contact
     swing_rot: 0.01  # weight assigned for frames in swing phase
     torso_primitive_shape:
-      pos: 100.0
+      pos: 1000.0
       rot: 0.0
     left_ankle_roll_link:
       pos: 100.0
@@ -197,10 +197,10 @@ terminal_costs:
       pos: 100.0
       rot: 0.0
     left_knee_link:
-      pos: 100.0
+      pos: 300.0
       rot: 0.0
     right_knee_link:
-      pos: 100.0
+      pos: 300.0
       rot: 0.0
     left_rubber_hand:
       pos: 300.0
@@ -222,3 +222,4 @@ mpc:
   max_iter: 30
   integration_method: Euler # [Euler; RK2, RK3, RK4]
   verbose: false
+  contact_lookahead: 0 #ms
