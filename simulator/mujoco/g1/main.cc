@@ -614,18 +614,30 @@ bool CopySensorData() {
 
 
 void CopyCommand() {
-  // joint impednace control law
   for (const auto &[mj_act_name, mj_act_idx] : mj_act_map_) {
     int pin_act_idx = pin_act_map_.at(mj_act_name);
     int mj_qpos_idx = mj_qpos_map_.at(mj_act_name);
     int mj_qvel_idx = mj_qvel_map_.at(mj_act_name);
 
-    d->ctrl[mj_act_idx] =
-        g1_command->joint_trq_cmd_[pin_act_idx] +
+    double dq = d->qpos[mj_qpos_idx] - g1_command->joint_pos_cmd_[pin_act_idx];
+    double dv = d->qvel[mj_qvel_idx] - g1_command->joint_vel_cmd_[pin_act_idx];
+
+    if(g1_command->K_.rows() != 0){ // MPC Feedback using Riccati Gain Matrix from DDP. u = u(0) + u_fb, where u_fb = -K * (x_real - x_nominal)
+      int q_idx = 6 + pin_act_idx;        // joint pos starts at x[6] -> remove floating base
+      int v_idx = 39 + pin_act_idx;       // joint vel starts at x[39] -> remove floating base
+
+      double u_fb = - g1_command->K_(pin_act_idx, q_idx) * dq
+                    - g1_command->K_(pin_act_idx, v_idx) * dv;
+      
+      d->ctrl[mj_act_idx] = g1_command->joint_trq_cmd_[pin_act_idx] + u_fb;
+    }
+    else{ // joint impednace control law
+      d->ctrl[mj_act_idx] = g1_command->joint_trq_cmd_[pin_act_idx] +
         kp_[mj_act_idx] * (g1_command->joint_pos_cmd_[pin_act_idx] -
                            d->qpos[mj_qpos_idx]) +
         kd_[mj_act_idx] *
             (g1_command->joint_vel_cmd_[pin_act_idx] - d->qvel[mj_qvel_idx]);
+    }
   }
 }
 

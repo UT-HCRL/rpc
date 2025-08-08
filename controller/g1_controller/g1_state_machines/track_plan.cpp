@@ -84,7 +84,8 @@ void TrackPlan::OneStep() {
     ctrl_arch_->tci_container_->robot_commands_->UpdateDesired(
         mpc_q_,
         mpc_q_dot_,
-        mpc_tau_
+        mpc_tau_,
+        K_
     );
   }
   else{
@@ -122,15 +123,13 @@ void TrackPlan::ComputeSync(){
   static std::vector<Eigen::VectorXd> xs_out(g1_mpc_->getNhorizon() + 1, x0);
   static std::vector<Eigen::VectorXd> us_out(g1_mpc_->getNhorizon(), Eigen::VectorXd::Zero(27));
   
-  static Eigen::Vector3d com_ref;
-  com_ref = robot_->GetRobotComPos();
+  static Eigen::Vector3d com_ref = robot_->GetRobotComPos();
 
   static bool first_iteration = true;
 
   static mpc_utils::MPCData data_out;
 
   double controller_time = sp_->current_time_ - state_machine_start_time_;
-  double fake_time = controller_time;
 
   std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames_vec;
   std::vector<Eigen::Vector3d> desired_com_vec;
@@ -154,18 +153,17 @@ void TrackPlan::ComputeSync(){
     }
 
   }
-
-  xs_out[0] << robot_->GetQ(), robot_->GetQdot();
+  xs_out[0] << robot_->GetQ(), robot_->GetQdot(); // Update xs_out[0] with new values from the robot
   if(first_iteration){
     us_out[0] = sp_->curr_joint_trq_cmd_.tail(27);
     first_iteration = false;
   }
-
   g1_mpc_->solveOneStep(xs_out, us_out, data_out, desired_com_vec, desired_frames_vec, controller_time);
 
   mpc_q_ = xs_out[0].head(robot_->GetQ().size()).tail(robot_->NumActiveDof()); // q_joints
   mpc_q_dot_ = xs_out[0].tail(robot_->NumActiveDof());  // qdot_joints
   mpc_tau_ = us_out[0];
+  K_ = data_out.K;
 
   #if B_USE_ZMQ
     G1DataManager *dm = G1DataManager::GetDataManager();

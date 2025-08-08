@@ -49,6 +49,7 @@ private:
   Eigen::Matrix<double, 27, 1> mpc_q_;
   Eigen::Matrix<double, 27, 1> mpc_q_dot_;
   Eigen::Matrix<double, 27, 1> mpc_tau_;
+  Eigen::MatrixXd K_;
   bool has_new_data_;
 
   G1ControlArchitecture *ctrl_arch_;

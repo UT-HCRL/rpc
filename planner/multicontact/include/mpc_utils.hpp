@@ -108,6 +108,8 @@ namespace mpc_utils {
         std::unordered_map<std::string, Eigen::Vector3d> contact_forces;
         std::unordered_map<std::string, Eigen::Vector3d> predicted_frame_positions;
 
+        Eigen::MatrixXd K; // FDDP gain matrix for knot 0
+
     };
 
     inline std::pair<bool, Eigen::MatrixXd> calcDARE_old(const Eigen::Ref<const Eigen::MatrixXd>& A,const Eigen::Ref<const Eigen::MatrixXd>& B,const Eigen::Ref<const Eigen::MatrixXd>& Q,const Eigen::Ref<const Eigen::MatrixXd>& R){
@@ -373,6 +375,69 @@ namespace mpc_utils {
         iso.linear() = M.rotation();
         iso.translation() = M.translation();
         return iso;
+    }
+
+    inline double cross(const Eigen::Vector2d& A, const Eigen::Vector2d& B, const Eigen::Vector2d& C) {
+        return (B.x() - A.x()) * (C.y() - A.y()) - (B.y() - A.y()) * (C.x() - A.x());
+    }
+
+    inline std::vector<Eigen::Vector2d> computeConvexHull(const std::vector<Eigen::Vector2d>& points){
+        //Using Graham sweep 
+        std::vector<Eigen::Vector2d> hull;
+        std::vector<Eigen::Vector2d> pts = points;
+        for (auto& point : pts) {
+            point.x() = std::round(point.x() * 1e3) / 1e3;
+            point.y() = std::round(point.y() * 1e3) / 1e3;
+        }
+        std::sort(pts.begin(), pts.end(), [=](const Eigen::Vector2d& a, const Eigen::Vector2d& b) {
+            if (std::abs(a.x() - b.x()) > 1e-9) return a.x() < b.x();
+            return a.y() < b.y();
+        });
+
+        for (const auto& p : pts) {
+            while (hull.size() >= 2 && cross(hull[hull.size() - 2], hull[hull.size() - 1], p) <= 0) {
+                hull.pop_back();
+            }
+            hull.push_back(p);
+        }
+        size_t lower_size = hull.size();
+        for (int i = pts.size() - 2; i >= 0; --i) {
+            const auto& p = pts[i];
+            while (hull.size() > lower_size &&
+                cross(hull[hull.size() - 2], hull[hull.size() - 1], p) <= 0) {
+                hull.pop_back();
+            }
+            hull.push_back(p);
+        }
+
+        hull.pop_back();
+
+        // std::cout << "Convex Hull Points:" << std::endl;
+        // for (const auto& point : hull) {
+        //     std::cout << "[" << point.x() << ", " << point.y() << "]" << std::endl;
+        // }
+
+        return hull;
+    }
+
+    inline void computeHalfSpaceRep(const std::vector<Eigen::Vector2d>& convex_hull, Eigen::MatrixXd& A, Eigen::VectorXd& b){
+        
+        const std::size_t n = convex_hull.size();
+        A.resize(n, 2);
+        b.resize(n);
+
+        for (std::size_t i = 0; i < n; ++i) {
+            const Eigen::Vector2d& p1 = convex_hull[i];
+            const Eigen::Vector2d& p2 = convex_hull[(i + 1) % n];
+
+            Eigen::Vector2d edge = p2 - p1;
+
+            Eigen::Vector2d normal(-edge.y(), edge.x());
+            normal.normalize();
+
+            A.row(i) = normal.transpose();
+            b(i) = normal.dot(p1);
+        }
     }
 
 } // namespace mpc_utils

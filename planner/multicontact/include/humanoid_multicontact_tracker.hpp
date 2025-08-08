@@ -14,6 +14,7 @@
 #include "util/util.hpp"
 
 #include "contact_switching/core.hpp"
+#include "residuals/com-static-polytope.hpp"
 
 class CostRecorderCallback;
 
@@ -40,6 +41,7 @@ class HumanoidMulticontactTracker{
         void loadMPCParams();
         void loadForceTrackingWeights();
         void loadTorqueRateRegWeights();
+        void loadCoMPolytopeWeights();
 
         void setInitialJointConfiguration(const Eigen::VectorXd& q0);
         void setFrames(const std::vector<std::string>& frame_names);
@@ -56,11 +58,16 @@ class HumanoidMulticontactTracker{
 
         // BASE MPC OCP DEFS
         void addCoMCost(const double com_tracking_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
+        void addCoMPolytopeCost(const double com_poly_weight = 1.0, const mpc_utils::Phase phase = mpc_utils::Phase::Running, const int horizon_index = 0);
+        void addCoMPolytopeVariantsCost(const double com_poly_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addXBoundCost(const double x_bound_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addContactCosts(const std::vector<std::string>& frame_names, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addRegularizationCosts(const Eigen::VectorXd& xreg_weights, const double xreg_weight, const double ureg_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addFrameTrackingCost(const std::string& frame_name, const double frame_tracking_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
-        void addForceTrackingCost(const std::string& frame_name, const pinocchio::Force& force_reference, const Eigen::Vector3d& weights = Eigen::Vector3d::Zero(), const double cost_weight = 0.0, const mpc_utils::Phase phase = mpc_utils::Phase::Running, const int horizon_index = 0, const size_t contact_f_dim = 6, const bool fwwddyn = true);
+        void addForceTrackingCost(const std::string& frame_name, const pinocchio::Force& force_reference, const Eigen::VectorXd weights = Eigen::VectorXd::Ones(6), const double cost_weight = 0.0, const mpc_utils::Phase phase = mpc_utils::Phase::Running, const int horizon_index = 0, const size_t contact_f_dim = 6, const bool fwwddyn = true);
+        void addTorqueRateCost(const double dtau_reg_weight, const mpc_utils::Phase phase,const int horizon_index);
+
+        Eigen::Vector3d computeCoMReference(std::vector<std::string> active_contacts, std::string torso_frame);
 
         void deactivateContacts(const std::vector<std::string>& frame_names);
         void activateContacts(const std::vector<std::string>& frame_names);
@@ -68,7 +75,7 @@ class HumanoidMulticontactTracker{
 
         std::vector<std::vector<std::map<std::string, pinocchio::Force>>> const getForceFromSolver();
         std::vector<std::map<std::string, Eigen::Matrix<double,6,1>>> const getEigenForceFromSolver();
-    
+        
         double getCostValue(const std::string& cost_name, const int horizon_index) const;
 
         bool isContactActive(const std::string& contact_name) const;
@@ -90,10 +97,13 @@ class HumanoidMulticontactTracker{
 
         void quasiStaticFootHandSolution(const VectorXd& q_current, const Vector3d& desired_com, std::vector<VectorXd>& tau_guess) const;
         void quasiStaticSolution(const VectorXd& x_prev, const std::vector<bool>& contact_config, const Vector3d& desired_com, std::vector<VectorXd>& tau_guess);
-
-        // Auxiliary functions for DARE computation
+        void quasiStaticMultiContactSolution(const VectorXd& q_current, const Vector3d& desired_com, const std::vector<std::string>& active_contacts, const std::vector<double>& alpha, std::vector<VectorXd>& tau_guess) const;
+        
+        // Auxiliary functions
         void computeDARE(const std::vector<Eigen::VectorXd>& xs_out, const std::vector<Eigen::VectorXd>& us_out);
-
+        void shiftSolution(std::vector<Eigen::VectorXd>& x, const int shift);
+        std::vector<Eigen::Vector2d> getContactPoints(const int horizon_index, const double length = 0.12, const double width = 0.05);
+        void updatePolytope();
 
     private:
 
@@ -120,7 +130,11 @@ class HumanoidMulticontactTracker{
         Eigen::VectorXd x0_;
         std::vector<VectorXd> x_prev_;
         std::vector<VectorXd> u_prev_;
+        std::vector<Eigen::MatrixXd> K_old_;
         mpc_utils::Weights w_frame_;
+
+        Eigen::MatrixXd A_; // Used for static polytope residuals
+        Eigen::VectorXd b_; // Used for static polytope residuals
 
         double dt_;
         int N_horizon_;
@@ -129,8 +143,8 @@ class HumanoidMulticontactTracker{
         std::unordered_map<std::string, mpc_utils::Weights2D> terminal_contact_weights_;
         std::unordered_map<std::string, mpc_utils::Weights2D> frame_targets_;
         std::unordered_map<std::string, mpc_utils::Weights2D> frame_targets_terminal_;      //Used for terminal cost frame tracking
-        std::unordered_map<std::string, Eigen::Vector3d> force_tracking_weights_;           //Used for running cost of force tracking
-        std::unordered_map<std::string, Eigen::Vector3d> terminal_force_tracking_weights_;  //Used for terminal cost of force tracking
+        std::unordered_map<std::string, Eigen::VectorXd> force_tracking_weights_;           //Used for running cost of force tracking
+        std::unordered_map<std::string, Eigen::VectorXd> terminal_force_tracking_weights_;  //Used for terminal cost of force tracking
         mpc_utils::IntegrationMethod integration_method_;
 
         std::vector<int> cost_mask_;
@@ -146,6 +160,7 @@ class HumanoidMulticontactTracker{
         double friction_weight_;
         double force_cost_weight_;
         double dtau_reg_weight_;
+        double com_polytope_weight_;
 
         Eigen::VectorXd terminal_xreg_weights_;
         double terminal_xreg_weight_;
@@ -155,6 +170,7 @@ class HumanoidMulticontactTracker{
         double terminal_tracking_contact_rot_weight_;
         double terminal_tracking_swing_rot_weight_;
         double terminal_force_cost_weight_;
+        double terminal_com_polytope_weight_;
 
         std::shared_ptr<crocoddyl::CostModelAbstract> xreg_cost_;
         std::shared_ptr<crocoddyl::CostModelAbstract> ureg_cost_;
@@ -170,7 +186,9 @@ class HumanoidMulticontactTracker{
         std::vector<std::unordered_map<std::string, std::shared_ptr<crocoddyl::ResidualModelFramePlacement>>> frame_residuals_;
         std::vector<std::unordered_map<std::string, std::shared_ptr<crocoddyl::ResidualModelContactForce>>> force_residuals_;
         std::vector<std::shared_ptr<crocoddyl::ResidualModelControl>> control_residuals_;
-        void addTorqueRateCost(const double dtau_reg_weight, const mpc_utils::Phase phase,const int horizon_index);
+        std::vector<std::shared_ptr<crocoddyl::ResidualModelStaticPolytope>> com_polytope_residuals_;
+        std::vector<std::shared_ptr<crocoddyl::ResidualModelStaticPolytope>> residuals_poly4_;
+        std::vector<std::shared_ptr<crocoddyl::ResidualModelStaticPolytope>> residuals_poly5_;
         std::vector<std::shared_ptr<crocoddyl::ActionModelAbstract>> integrated_action_models_;
         std::shared_ptr<crocoddyl::ActionModelAbstract> integrated_terminal_action_model_;
         //###########################

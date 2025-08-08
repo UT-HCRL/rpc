@@ -14,6 +14,7 @@ public:
     des_pos_ = Eigen::VectorXd::Zero(dim_pos);
     des_vel_ = Eigen::VectorXd::Zero(dim_vel);
     des_trq_ = Eigen::VectorXd::Zero(dim_vel);
+    K_ = Eigen::MatrixXd::Zero(dim_pos, dim_pos);
 
   }
   ~RobotCommand() = default;
@@ -28,10 +29,21 @@ public:
     des_trq_ = des_trq;
   }
 
+  void UpdateDesired(const Eigen::VectorXd &des_pos,
+                     const Eigen::VectorXd &des_vel,
+                     const Eigen::VectorXd &des_trq,
+                     const Eigen::MatrixXd &K) {
+    des_pos_ = des_pos;
+    des_vel_ = des_vel;
+    des_trq_ = des_trq;
+    K_ = K;
+  }
+
   // getter function
   Eigen::VectorXd DesiredPos() const { return des_pos_; }
   Eigen::VectorXd DesiredVel() const { return des_vel_; }
   Eigen::VectorXd DesiredTrq() const { return des_trq_; }
+  Eigen::MatrixXd DesiredGains() const { return K_; }
 
   // Debug
   void Debug() {
@@ -39,6 +51,8 @@ public:
     std::cout << "des_pos: " << des_pos_.transpose() << std::endl;
     std::cout << "des_vel: " << des_vel_.transpose() << std::endl;
     std::cout << "des_trq: " << des_trq_.transpose() << std::endl;
+    std::cout << "K: " << std::endl << K_ << std::endl;
+    std::cout << "=================================" << std::endl;
   }
 
 protected:
@@ -48,4 +62,5 @@ protected:
   Eigen::VectorXd des_pos_;
   Eigen::VectorXd des_vel_;
   Eigen::VectorXd des_trq_;
+  Eigen::MatrixXd K_;
 };

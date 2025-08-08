@@ -39,6 +39,7 @@ private:
   Eigen::VectorXd joint_pos_cmd_;
   Eigen::VectorXd joint_vel_cmd_;
   Eigen::VectorXd joint_trq_cmd_;
+  Eigen::MatrixXd K_;
   Eigen::VectorXd joint_trq_cmd_prev_;
   Eigen::VectorXd wbc_qddot_cmd_;
 

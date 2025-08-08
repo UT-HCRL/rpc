@@ -55,12 +55,14 @@ public:
   G1Command()
       : joint_pos_cmd_(Eigen::VectorXd::Zero(g1::n_adof)),
         joint_vel_cmd_(Eigen::VectorXd::Zero(g1::n_adof)),
-        joint_trq_cmd_(Eigen::VectorXd::Zero(g1::n_adof)){};
+        joint_trq_cmd_(Eigen::VectorXd::Zero(g1::n_adof)),
+        K_(Eigen::MatrixXd::Zero(g1::n_adof,g1::n_adof)){};
   virtual ~G1Command() = default;
 
   Eigen::VectorXd joint_pos_cmd_;
   Eigen::VectorXd joint_vel_cmd_;
   Eigen::VectorXd joint_trq_cmd_;
+  Eigen::MatrixXd K_;
   std::unordered_map<std::string, double> gripper_pos_cmd_;
 };
 

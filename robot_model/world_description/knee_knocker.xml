@@ -26,8 +26,9 @@
     <body name="navy_door_765x1450" pos="0.34 0.05 0">
       <geom mesh="navy_door_765x1450_0" material="0.615686_0.811765_0.929412_0.000000_0.000000" class="visual" euler="0 0 1.57"/>
       <geom mesh="navy_door_765x1450_1" material="0.498039_0.498039_0.498039_0.000000_0.000000" class="visual" euler="0 0 1.57"/>
-      <geom pos="0.0 0.39 0.5" quat="0 0.70710678 0.70710678 0" type="box" size="0.01 0.07 0.8" mass="1000" rgba="0.7 0.7 0.7 0.3"/>
-      <geom pos="0.0 -0.39 0.5" quat="0 0.70710678 0.70710678 0" type="box" size="0.07 0.1 0.8" mass="1000" rgba="0.7 0.7 0.7 0.3"/>
+      <!-- <geom pos="0.0 0.39 0.5" quat="0 0.70710678 0.70710678 0" type="box" size="0.01 0.2 0.8" mass="1000" rgba="0.7 0.7 0.7 0.3"/> -->
+      <geom pos="0.0 0.39 0.5" quat="0 0.70710678 0.70710678 0" type="box" size="0.01 0.07 0.8" friction="1 1 1"  mass="1000" rgba="0.7 0.7 0.7 0.3"/> 
+      <geom pos="0.0 -0.39 0.5" quat="0 0.70710678 0.70710678 0" type="box" size="0.07 0.1 0.8" friction="1 1 1" mass="1000" rgba="0.7 0.7 0.7 0.3"/>
       <!-- <geom name="step_collision" type="box" pos="0.34 0.05 -0.05" size="0.34 1.0 0.1" mass="1000" rgba="0.7 0.7 0.7 0.3"/> -->
 <!--      <geom mesh="navy_door_765x1450_collision_0" rgba="0.7527953103855858 0.18414577896470308 0.13306204457553372 1" class="collision" euler="0 0 1.57"/>-->
 <!--      <geom mesh="navy_door_765x1450_collision_1" rgba="0.7556638553148609 0.7461487398220683 0.5315544128767224 1" class="collision" euler="0 0 1.57"/>-->

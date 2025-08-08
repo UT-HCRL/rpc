@@ -183,6 +183,7 @@ void G1Controller::GetCommand(void *command) {
         joint_pos_cmd_ = tci_container_->robot_commands_->DesiredPos();
         joint_vel_cmd_ = tci_container_->robot_commands_->DesiredVel();
         joint_trq_cmd_ = tci_container_->robot_commands_->DesiredTrq();
+        K_ = tci_container_->robot_commands_->DesiredGains();
 
         for (int i = 0; i < joint_trq_cmd_.size(); i++) {
             if (joint_trq_cmd_(i) < sp_->trq_limits_(i, 0) || joint_trq_cmd_(i) > sp_->trq_limits_(i, 1)) {
@@ -316,6 +317,7 @@ void G1Controller::GetCommand(void *command) {
   static_cast<G1Command *>(command)->joint_pos_cmd_ = joint_pos_cmd_;
   static_cast<G1Command *>(command)->joint_vel_cmd_ = joint_vel_cmd_;
   static_cast<G1Command *>(command)->joint_trq_cmd_ = joint_trq_cmd_;
+  static_cast<G1Command *>(command)->K_ = K_;
 
   joint_trq_cmd_prev_ = joint_trq_cmd_;
 
