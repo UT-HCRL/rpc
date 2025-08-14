@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include "interpolation.hpp"
 using namespace Eigen;
 
 namespace pkl_utils {
@@ -186,6 +187,29 @@ namespace pkl_utils {
         }
 
         return com_des.at(index);
+    }
+
+    static const Vector3d get_frame_des_pos(const std::unordered_map<std::string, std::vector<Vector3d>>& frames_des, const std::string& frame_name, const std::vector<double>& time_vec, const double t, const double dt, const int planner_counter = -1, const double epsilon = 1e-6){
+        
+        if(frames_des.find(frame_name) == frames_des.end()){
+            throw std::invalid_argument("Frame name not found in frames_des map");
+        }
+
+        if(t < 0){
+            throw std::out_of_range("t can't be negative");
+        }
+
+        if(planner_counter < 0){ // Use ZOH
+            int index = static_cast<int>(t / dt + epsilon);
+            if (index < 0 || index >= static_cast<int>(frames_des.at(frame_name).size())) {
+                throw std::out_of_range("Time t out of bounds for CoM trajectory");
+            }
+            return frames_des.at(frame_name).at(index);
+        }else{ // Use linear interpolation
+            double alpha = (t - time_vec[planner_counter]) / (time_vec[planner_counter + 1] - time_vec[planner_counter]);
+            return Lerp<Vector3d, double>(frames_des.at(frame_name)[planner_counter], frames_des.at(frame_name)[planner_counter + 1], alpha);
+        }
+
     }
 
 } // namespace pkl_utils

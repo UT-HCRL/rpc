@@ -12,8 +12,8 @@ namespace pkl_utils {
 
 class PickleReader::Impl {
 public:
-    explicit Impl(const std::string& filePath = "", const PickleType& pkl_type = PickleType::BEZIER)
-        : guard_(), filename_(filePath), is_ready_(false), pkl_type_(pkl_type) 
+    explicit Impl(const std::string& filePath = "", const PickleType& pkl_type = PickleType::BEZIER, const std::vector<std::string>& frame_names = {})
+        : guard_(), filename_(filePath), is_ready_(false), pkl_type_(pkl_type), frame_names_(frame_names) 
     {
         try {
             py::module_ sys = py::module_::import("sys");
@@ -26,7 +26,6 @@ public:
             py::object open_func = py::module_::import("builtins").attr("open");
             py::object file = open_func(filePath, "rb");
 
-            // std::cout << "[PKL_READER] - Pickle type is: " << (pkl_type == PickleType::DICT ? "DICT" : (pkl_type == PickleType::LIST ? "LIST" : "BEZIER")) << std::endl;
             if (pkl_type == PickleType::COMPOSITE){
                 bool once = true;
                 py::list loaded_data;
@@ -78,7 +77,6 @@ public:
                 data_ = pickle.attr("load")(file);
                 if (py::isinstance<py::dict>(data_)) {
                     bez_data_ = data_["bez_path"];
-                    // std::cout << "[PKL_READER] - Imported bezier path\n";
                 } else {
                     std::cerr << "Unpickled object is not a Bezier Curve\n";
                 }
@@ -87,9 +85,7 @@ public:
             }
 
             file.attr("close")();
-            
             is_ready_ = true;
-            // std::cout << "[PKL_READER] - File opened successfully: " << filePath << std::endl;
 
         } catch (const std::exception& e) {
             std::cerr << "[PKL_READER] - Error loading pickle file: " << e.what() << std::endl;
@@ -112,13 +108,10 @@ public:
                 parseList();
             }
             else if (py::isinstance<py::list>(data_) && pkl_type_ == PickleType::LIST) {
-                // std::cout << "[PKL_READER] - Parsing list..." << std::endl;
                 parseList();
             } else if (py::isinstance<py::dict>(data_) && pkl_type_ == PickleType::DICT) {
-                // std::cout << "[PKL_READER] - Parsing dictionary..." << std::endl;
                 parseDict();
             } else if (py::isinstance<py::list>(bez_data_) && pkl_type_ == PickleType::BEZIER) {
-                // std::cout << "[PKL_READER] - Parsing Bezier curve..." << std::endl;
                 parseBezier();
             } 
             else {
@@ -140,7 +133,6 @@ public:
         try {
             if (py::isinstance<py::list>(data_)) {
                 py::list obj_list = data_;
-                // std::cout << "[PKL_READER] - Loaded " << py::len(obj_list) << " object(s) from pickle file.\n";
                 
                 for(size_t i=0; i<py::len(obj_list); i++){
                     py::object obj = obj_list[i];
@@ -150,7 +142,6 @@ public:
                         for (auto item : robot_data) {
                             std::string key = py::str(item.first);
                             py::object value = py::reinterpret_steal<py::object>(item.second);
-                            // std::cout <<"[PKL_READER] - " <<key << ": ";
 
                             if (py::isinstance<py::float_>(value)) {
                             } else if (py::isinstance<py::list>(value)) {
@@ -160,7 +151,7 @@ public:
                                 Vector3d tmp_com_vec;
                                 size_t v_idx = 0;
                                 py::list pylist = value;
-                                // std::cout << "[ ";
+
                                 for (auto elem : pylist) {
                                     if (py::isinstance<py::float_>(elem)) {
                                         if ( key == "center_of_mass"){
@@ -173,7 +164,6 @@ public:
                                         }
                                         else if (key == "time") {
                                             time_vec_.emplace_back(elem.cast<double>());
-                                            // std::cout << " LOGGED " << std::endl;
                                         }
                                     } else {
                                         size_t vec_idx = 0;
@@ -184,7 +174,6 @@ public:
                                             for (auto el : elem) {
                                                 tmp_pos_vec(vec_idx) = el.cast<double>();
                                                 vec_idx++;
-                                                // std::cout << " LOGGED " << std::endl;
                                             }
                                             // store current vector and clear for next iteration
                                             joint_pos_des_.emplace_back(tmp_pos_vec);
@@ -196,7 +185,6 @@ public:
                                             for (auto el : elem) {
                                                 tmp_vel_vec(vec_idx) = el.cast<double>();
                                                 vec_idx++;
-                                                // std::cout << " LOGGED " << std::endl;
                                             }
                                             // store current vector and clear for next iteration
                                             joint_vel_des_.emplace_back(tmp_vel_vec);
@@ -208,26 +196,28 @@ public:
                                             for (auto el : elem) {
                                                 tmp_tau_vec(vec_idx) = el.cast<double>();
                                                 vec_idx++;
-                                                // std::cout << " LOGGED " << std::endl;
                                             }
                                             // store current vector and clear for next iteration
                                             joint_tau_des_.emplace_back(tmp_tau_vec);
                                             tmp_tau_vec.setZero();
-                                        }else if (key == "grf_lfoot") {
+                                        } else if (key == "grf_lfoot") {
                                         } else if (key == "grf_rfoot") {
                                         } else if (key == "grf_lhand") {
                                         } else if (key == "grf_rhand") {
-                                        } else if (key == "rh_act") {
-                                        } else if (key == "lh_act") {
-                                        } else if (key == "rkn_act") {
-                                        } else if (key == "lkn_act"){
-                                        } else if (key == "rf_act") {
-                                        } else if (key == "lf_act"){
-                                        } else if (key == "torso_act"){
+                                        } else if (std::find(frame_names_.begin(), frame_names_.end(), key) != frame_names_.end()){
+                                            Vector3d frame_vec;
+                                            size_t vec_idx = 0;
+                                            py::list coord_list = elem.cast<py::list>();
+                                            if (py::len(coord_list) != 3) {
+                                                std::cerr << "[PKL_READER] - Unexpected size for " << key << ": " << py::len(coord_list) << std::endl;
+                                            }
+                                            for (auto coord : coord_list) {
+                                                frame_vec(vec_idx++) = coord.cast<double>();
+                                            }
+                                            frames_des_[key].emplace_back(frame_vec);
                                         } else if (key == "bez_path"){
                                             //pass;
-                                        }else if (key == "center_of_mass"){
-
+                                        } else if (key == "center_of_mass"){
                                             for (auto el : elem) {
                                                 tmp_com_vec(vec_idx) = el.cast<double>();
                                                 vec_idx++;
@@ -240,7 +230,6 @@ public:
                                         }
                                     }
                                 }
-                                // std::cout << "]\n";
                             } else if (py::isinstance<py::int_>(value)){
                                 // std::cout << value.cast<int>() << std::endl;
                             } else {
@@ -256,9 +245,6 @@ public:
         } catch (const std::exception& e) {
             std::cerr << "[PKL_READER] -Error: " << e.what() << std::endl;
         }
-
-        
-
     }
 
     void parseDict(){
@@ -392,6 +378,10 @@ public:
         return time_vec_;
     }
 
+    std::unordered_map<std::string, std::vector<Vector3d>> getFramesDes() const {
+        return frames_des_;
+    }
+
 private:
     py::scoped_interpreter guard_;  
     std::string filename_;
@@ -399,6 +389,9 @@ private:
     py::object data_;
     py::object bez_data_;
     PickleType pkl_type_;
+
+    std::vector<std::string> frame_names_;
+    std::unordered_map<std::string, std::vector<Vector3d>> frames_des_;
 
     std::vector<CompositeBezierCurve> composite_bezier_curves_;
     std::vector<Matrix<double, 34, 1>> joint_pos_des_;
@@ -410,8 +403,8 @@ private:
 
 };
 
-PickleReader::PickleReader(const std::string& filePath, const PickleType& pkl_type)
-    : impl_(std::make_unique<Impl>(filePath, pkl_type)) {}
+PickleReader::PickleReader(const std::string& filePath, const PickleType& pkl_type, const std::vector<std::string>& frame_names)
+    : impl_(std::make_unique<Impl>(filePath, pkl_type, frame_names)) {}
 
 PickleReader::~PickleReader() = default;
 
@@ -449,6 +442,10 @@ std::vector<double> PickleReader::getTimeVec() const {
 
 std::vector<Vector3d> PickleReader::getCoM() const {
     return impl_->getCoM();
+}
+
+std::unordered_map<std::string, std::vector<Eigen::Vector3d>> PickleReader::getFramesDes() const {
+    return impl_->getFramesDes();
 }
 
 } // namespace pkl_utils

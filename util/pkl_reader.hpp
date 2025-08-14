@@ -14,7 +14,7 @@ namespace pkl_utils{
     class __attribute__((visibility("hidden"))) PickleReader {
     public:
 
-        explicit PickleReader(const std::string& filename = "", const PickleType& pkl_type = PickleType::DICT);
+        explicit PickleReader(const std::string& filename = "", const PickleType& pkl_type = PickleType::COMPOSITE, const std::vector<std::string>& frame_names = {});
         ~PickleReader();
 
         /**
@@ -46,6 +46,8 @@ namespace pkl_utils{
         std::vector<Matrix<double, 33, 1>> getJointVelDes() const;
 
         std::vector<Matrix<double, 27, 1>> getJointTauDes() const;
+
+        std::unordered_map<std::string, std::vector<Eigen::Vector3d>> getFramesDes() const;
 
         std::vector<Vector3d> getCoM() const;
 

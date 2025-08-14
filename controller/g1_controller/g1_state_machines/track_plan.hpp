@@ -16,6 +16,7 @@ public:
     TrackPlan(const StateId state_id,
               PinocchioRobotSystem *robot,
               std::vector<pkl_utils::CompositeBezierCurve> planned_bezier_curves,
+              std::unordered_map<std::string, std::vector<Vector3d>> planned_frames_dyn,  
               std::vector<Vector3d> planned_com_des,
               std::vector<double> planned_time,
               G1ControlArchitecture *ctrl_arch);
@@ -58,12 +59,14 @@ private:
   bool b_use_base_height_;
   bool b_tracking_plan_;
 
-  double rf_z_max_interp_duration_;
-  Eigen::Matrix<double, 6, 1> init_reaction_force_;
-  Eigen::Matrix<double, 6, 1> des_reaction_force_;
-
   std::unique_ptr<pkl_utils::BezierCurvesManager> bezier_curves_mgr_;
   std::vector<Eigen::Vector3d> com_des_;
+
+  std::unordered_map<std::string, std::vector<Eigen::Vector3d>> planned_frames_dyn_;
+  std::vector<std::string> target_names_;
+  bool b_kin_plan_;
+  int planner_counter_;
+  std::vector<double> pkl_time_;
 
   void Compute();
 };

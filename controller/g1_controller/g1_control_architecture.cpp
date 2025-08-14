@@ -262,7 +262,8 @@ G1ControlArchitecture::G1ControlArchitecture(PinocchioRobotSystem *robot,
   std::string file_path = THIS_COM "experiment_data/g1_sca_step_on_balanced_knee_knocker.pkl";
 //   std::string file_path = THIS_COM "experiment_data/g1_sca_step_on_knee_knocker.pkl";
 //   std::string file_path = THIS_COM "experiment_data/g1_sca_step_over_knee_knocker.pkl";
-  PickleReader pkl_reader = PickleReader(file_path, PickleType::COMPOSITE);
+  std::vector<std::string> pkl_frame_names = {"rh_act", "lh_act", "rkn_act", "lkn_act", "rf_act", "lf_act", "torso_act"};
+  PickleReader pkl_reader = PickleReader(file_path, PickleType::COMPOSITE, pkl_frame_names);
   if (!pkl_reader.isReady()) {
       std::cerr << "Failed to open the file." << std::endl;
   return;
@@ -271,6 +272,8 @@ G1ControlArchitecture::G1ControlArchitecture(PinocchioRobotSystem *robot,
   std::vector<Matrix<double, 34, 1>> planned_joint_pos = pkl_reader.getJointPosDes();
   std::vector<Matrix<double, 33, 1>> planned_joint_vel = pkl_reader.getJointVelDes();
   std::vector<Matrix<double, 27, 1>> planned_joint_tau = pkl_reader.getJointTauDes();
+  std::unordered_map<std::string, std::vector<Vector3d>> dyn_plan_des_frames = pkl_reader.getFramesDes();
+
   std::vector<double> planned_time = pkl_reader.getTimeVec();
   locomotion_state_machine_container_[g1_states::kReplayRecordedPlan] =
       new ReplayRecordedPlan(g1_states::kReplayRecordedPlan,
@@ -286,6 +289,7 @@ G1ControlArchitecture::G1ControlArchitecture(PinocchioRobotSystem *robot,
       new TrackPlan(g1_states::kTrackPlan,
           robot_,
           bezier_curves,
+          dyn_plan_des_frames,
           pkl_reader.getCoM(),
           planned_time,
           this);

@@ -19,19 +19,15 @@ namespace {
 TrackPlan::TrackPlan(const StateId state_id,
                      PinocchioRobotSystem *robot,
                      std::vector<pkl_utils::CompositeBezierCurve> planned_bezier_curves,
+                     std::unordered_map<std::string, std::vector<Vector3d>> planned_frames_dyn,
                      std::vector<Vector3d> planned_com_des,
                      std::vector<double> planned_time,
                      G1ControlArchitecture *ctrl_arch)
-    : StateMachine(state_id, robot), ctrl_arch_(ctrl_arch), rf_z_max_interp_duration_(0.), b_tracking_plan_(false) {
+    : StateMachine(state_id, robot), ctrl_arch_(ctrl_arch), b_tracking_plan_(false), b_kin_plan_(false), planner_counter_(0) {
   util::PrettyConstructor(2, "TrackPlan");
 
   has_new_data_ = false;
   sp_ = G1StateProvider::GetStateProvider();
-  init_reaction_force_.setZero();
-  des_reaction_force_.setZero();
-  double half_mass = robot_->GetTotalMass() / 2.;
-  init_reaction_force_(5) = half_mass * kGravity;
-  des_reaction_force_(5) = half_mass * kGravity;
   
   std::string r_file_path = THIS_COM "/robot_model/g1/g1_29dof_lock_waist.urdf";
   const std::unordered_map<std::string, mpc_utils::Weights> gains = {
@@ -46,14 +42,15 @@ TrackPlan::TrackPlan(const StateId state_id,
   // g1_mpc_->printModel();
 
   std::vector<std::shared_ptr<pkl_utils::CompositeBezierCurve>> bezier_curves_ptrs;
-  // Convert to pointers
   for (const auto& curve : planned_bezier_curves) {
     bezier_curves_ptrs.push_back(std::make_shared<pkl_utils::CompositeBezierCurve>(curve));
   }
 
-  std::vector<std::string> target_names = g1_mpc_->getTargetFrameNames();
-  bezier_curves_mgr_ = std::make_unique<pkl_utils::BezierCurvesManager>(bezier_curves_ptrs, target_names);
+  target_names_ = g1_mpc_->getTargetFrameNames();
+  bezier_curves_mgr_ = std::make_unique<pkl_utils::BezierCurvesManager>(bezier_curves_ptrs, target_names_);
   com_des_ =  planned_com_des;
+  planned_frames_dyn_ = planned_frames_dyn;
+  pkl_time_ = planned_time;
 }
 
 TrackPlan::~TrackPlan() {
@@ -122,37 +119,70 @@ void TrackPlan::ComputeSync(){
   static Eigen::VectorXd x0 = Eigen::VectorXd::Zero(g1_mpc_->getX0Size());
   static std::vector<Eigen::VectorXd> xs_out(g1_mpc_->getNhorizon() + 1, x0);
   static std::vector<Eigen::VectorXd> us_out(g1_mpc_->getNhorizon(), Eigen::VectorXd::Zero(27));
+  static const std::unordered_map<std::string, std::string> frame_pkl2model = {
+    { "torso_primitive_shape", "torso_act" },
+    { "left_ankle_roll_link",  "lf_act" },
+    { "right_ankle_roll_link", "rf_act" },
+    { "left_knee_link",        "lkn_act" },
+    { "right_knee_link",       "rkn_act" },
+    { "left_rubber_hand",      "lh_act" },
+    { "right_rubber_hand",     "rh_act" }
+  };   // FIXME: pkl file has desired frames with different names that require a mapping
   
   static Eigen::Vector3d com_ref = robot_->GetRobotComPos();
-
   static bool first_iteration = true;
-
   static mpc_utils::MPCData data_out;
 
   double controller_time = sp_->current_time_ - state_machine_start_time_;
+  if (controller_time >= pkl_time_[planner_counter_ + 1]) planner_counter_++;
 
   std::vector<std::unordered_map<std::string, pinocchio::SE3>> desired_frames_vec;
   std::vector<Eigen::Vector3d> desired_com_vec;
   desired_frames_vec.resize(g1_mpc_->getNhorizon() +1);
   desired_com_vec.resize(g1_mpc_->getNhorizon() + 1);
 
-  for(int i=0; i<g1_mpc_->getNhorizon() + 1; i++){
-    std::unordered_map<std::string, pinocchio::SE3> desired_frames;
-    const double t = controller_time + i * g1_mpc_->getDt();
-    
-    for(const auto& frame_name : g1_mpc_->getTargetFrameNames()) {
-      pinocchio::SE3 temp_pose;
-      temp_pose.setIdentity();
-      temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
-      desired_frames[frame_name] = temp_pose;
+  if(b_kin_plan_){
+    for(int i=0; i<g1_mpc_->getNhorizon() + 1; i++){
+      std::unordered_map<std::string, pinocchio::SE3> desired_frames;
+      const double t = controller_time + i * g1_mpc_->getDt();
+      
+      for(const auto& frame_name : target_names_) {
+        pinocchio::SE3 temp_pose;
+        temp_pose.setIdentity();
+        temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
+        desired_frames[frame_name] = temp_pose;
+      }
 
+      desired_frames_vec[i] = desired_frames;
+      if (!com_des_.empty()) {
+        desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt());
+      }
     }
-    desired_frames_vec[i] = desired_frames;
-    if (!com_des_.empty()) {
-      desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt());
-    }
-
   }
+  else{
+    for(int i=0; i<g1_mpc_->getNhorizon() + 1; i++){
+      std::unordered_map<std::string, pinocchio::SE3> desired_frames;
+      const double t = controller_time + i * g1_mpc_->getDt();
+
+      for(const auto& frame_name : target_names_) {
+        
+        auto it_map = frame_pkl2model.find(frame_name);
+        std::string lookup_name = (it_map != frame_pkl2model.end()) ? it_map->second : frame_name;
+
+        pinocchio::SE3 temp_pose;
+        temp_pose.setIdentity();
+        temp_pose.translation() = pkl_utils::get_frame_des_pos(planned_frames_dyn_, lookup_name, pkl_time_, t, g1_mpc_->getDt(), planner_counter_);
+        desired_frames[frame_name] = temp_pose;
+      }
+
+      desired_frames_vec[i] = desired_frames;
+      if (!com_des_.empty()) {
+        desired_com_vec[i] = pkl_utils::get_com_des_pos(com_des_, t, g1_mpc_->getDt());
+      }
+    }
+  }
+
+  
   xs_out[0] << robot_->GetQ(), robot_->GetQdot(); // Update xs_out[0] with new values from the robot
   if(first_iteration){
     us_out[0] = sp_->curr_joint_trq_cmd_.tail(27);
@@ -320,7 +350,7 @@ void TrackPlan::Compute() {
         std::unordered_map<std::string, pinocchio::SE3> desired_frames;
         const double t = controller_time + i * g1_mpc_->getDt();
 
-        for (const auto& frame_name : g1_mpc_->getTargetFrameNames()) {
+        for (const auto& frame_name : target_names_) {
           pinocchio::SE3 temp_pose;
           temp_pose.setIdentity();
           temp_pose.translation() = bezier_curves_mgr_->getCurrentDesiredPosition(frame_name, t);
