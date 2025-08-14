@@ -189,6 +189,7 @@ class HumanoidMulticontactTracker{
         std::vector<std::shared_ptr<crocoddyl::ResidualModelStaticPolytope>> com_polytope_residuals_;
         std::vector<std::shared_ptr<crocoddyl::ResidualModelStaticPolytope>> residuals_poly4_;
         std::vector<std::shared_ptr<crocoddyl::ResidualModelStaticPolytope>> residuals_poly5_;
+        std::vector<std::shared_ptr<crocoddyl::ResidualModelStaticPolytope>> residuals_poly6_;
         std::vector<std::shared_ptr<crocoddyl::ActionModelAbstract>> integrated_action_models_;
         std::shared_ptr<crocoddyl::ActionModelAbstract> integrated_terminal_action_model_;
         //###########################
