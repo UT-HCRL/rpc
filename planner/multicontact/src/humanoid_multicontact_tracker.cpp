@@ -82,7 +82,8 @@ HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robo
 
     //### Default class member init ###
     util::ReadParameter(params_["friction"], "w", friction_weight_);
-    util::ReadParameter(params_["friction"], "mu", mu_);
+    util::ReadParameter(params_["friction"], "mu_lb", mu_lb_);
+    util::ReadParameter(params_["friction"], "mu_ub", mu_ub_);
 
     RH_rotation_ = Eigen::AngleAxisd(-M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
     LH_rotation_ = Eigen::AngleAxisd(M_PI / 2, Eigen::Vector3d::UnitX()).toRotationMatrix();
@@ -439,6 +440,78 @@ void HumanoidMulticontactTracker::addCoMPolytopeCost(const double com_poly_weigh
     cost_model->addCost("com_polytope", cost, com_poly_weight);
 }
 
+void HumanoidMulticontactTracker::add3DComPolytopeVariantCost(const double com_poly_weight, const mpc_utils::Phase phase, const int horizon_index){
+
+    auto& cost_model = (phase == mpc_utils::Phase::Running) ? running_cost_model_[horizon_index] : terminal_cost_model_;
+    std::vector<Eigen::Vector3d> dummy_poly8 = {
+        {0.12, 0.14, 0.01},
+        {0.12, 0.09, 0.01},
+        {0, 0.09, 0.01},
+        {0, 0.14, 0.01},
+        {0.12, -0.09, 0.01},
+        {0.12, -0.14, 0.01},
+        {0, -0.14, 0.01},
+        {0, -0.09, 0.01}
+    };
+    Eigen::MatrixXd A8;
+    Eigen::VectorXd b8;
+    mpc_utils::compute3DHalfSpaceRep(dummy_poly8, A8, b8);
+    Eigen::VectorXd lb8 = Eigen::VectorXd::Constant(A8.rows(), -1e10);
+    Eigen::VectorXd ub8 = Eigen::VectorXd::Zero(A8.rows());
+    auto activation8 = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(crocoddyl::ActivationBounds(lb8, ub8));
+    auto residual8 = std::make_shared<crocoddyl::ResidualModelStaticPolytope>(state_, A8, b8, actuation_->get_nu());
+    residuals_poly8_.push_back(residual8);
+    cost_model->addCost("com_polytope_8", std::make_shared<crocoddyl::CostModelResidual>(state_, activation8, residual8), com_poly_weight);
+    cost_model->changeCostStatus("com_polytope_8", false);
+
+    std::cout << "Size of A for polytope8: " << A8.rows() << " x " << A8.cols() << std::endl;
+    std::cout << "Size of b for polytope8: " << b8.size() << std::endl;
+
+    std::vector<Eigen::Vector3d> dummy_poly5 = {
+        {0.0, 0.0, 0.0},   
+        {1.0, 0.0, 0.0}, 
+        {0.0, 1.0, 0.0}, 
+        {0.0, 0.0, 1.0},
+        {1.0, 1.0, 0.5},
+    };
+    Eigen::MatrixXd A5;
+    Eigen::VectorXd b5;
+    mpc_utils::compute3DHalfSpaceRep(dummy_poly5, A5, b5);
+    Eigen::VectorXd lb5 = Eigen::VectorXd::Constant(A5.rows(), -1e10);
+    Eigen::VectorXd ub5 = Eigen::VectorXd::Zero(A5.rows());
+    auto activation5 = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(crocoddyl::ActivationBounds(lb5, ub5));
+    auto residual5 = std::make_shared<crocoddyl::ResidualModelStaticPolytope>(state_, A5, b5, actuation_->get_nu());
+    residuals_poly5_.push_back(residual5);
+    cost_model->addCost("com_polytope_5", std::make_shared<crocoddyl::CostModelResidual>(state_, activation5, residual5), com_poly_weight);
+    cost_model->changeCostStatus("com_polytope_5", false);
+
+    std::cout << "Size of A for polytope5: " << A5.rows() << " x " << A5.cols() << std::endl;
+    std::cout << "Size of b for polytope5: " << b5.size() << std::endl;
+
+    std::vector<Eigen::Vector3d> dummy_poly6 = {
+        {0.11, 0.14, 0}, 
+        {0.11, 0.09, 0},
+        {-0.01, 0.09, 0},
+        {-0.01, 0.14, 0},
+        {0.27, 0.37, 0.98}, 
+        {0.34, -0.3, 0.93}
+    };
+    Eigen::MatrixXd A6;
+    Eigen::VectorXd b6;
+    mpc_utils::compute3DHalfSpaceRep(dummy_poly6, A6, b6);
+    Eigen::VectorXd lb6 = Eigen::VectorXd::Constant(A6.rows(), -1e10);
+    Eigen::VectorXd ub6 = Eigen::VectorXd::Zero(A6.rows());
+    auto activation6 = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(crocoddyl::ActivationBounds(lb6, ub6));
+    auto residual6 = std::make_shared<crocoddyl::ResidualModelStaticPolytope>(state_, A6, b6, actuation_->get_nu());
+    residuals_poly6_.push_back(residual6);
+    cost_model->addCost("com_polytope_6", std::make_shared<crocoddyl::CostModelResidual>(state_, activation6, residual6), com_poly_weight);
+    cost_model->changeCostStatus("com_polytope_6", false);
+
+    std::cout << "Size of A for polytope6: " << A6.rows() << " x " << A6.cols() << std::endl;
+    std::cout << "Size of b for polytope6: " << b6.size() << std::endl;
+
+}
+
 void HumanoidMulticontactTracker::addCoMPolytopeVariantsCost(const double com_poly_weight, const mpc_utils::Phase phase, const int horizon_index){
 
     auto& cost_model = (phase == mpc_utils::Phase::Running) ? running_cost_model_[horizon_index] : terminal_cost_model_;
@@ -526,17 +599,51 @@ std::vector<Eigen::Vector2d> HumanoidMulticontactTracker::getContactPoints(const
                 active_contact_positions.push_back(pose.translation().head<2>());
                 std::cout << "[" << pose.translation().x() << ", " << pose.translation().y() << "] ";
             }
-        }else{
-            // std::cout << "Contact not active for frame: " << frame_name << " at horizon index " << horizon_index << std::endl;
         }
     }
 
     return active_contact_positions;
 
-    // std::cout << "Active contact points at horizon index " << horizon_index << ":" << std::endl;
-    // for (const auto& contact_position : active_contact_positions) {
-    //     std::cout << "Contact point: [" << contact_position.x() << ", " << contact_position.y() << "]" << std::endl;
-    // }
+}
+
+std::vector<Eigen::Vector3d> HumanoidMulticontactTracker::get3DContactPoints(const int horizon_index, const double length, const double width){
+
+    std::vector<Eigen::Vector3d> active_contact_positions;
+
+    std::vector<Eigen::Vector3d> local_corners = {
+                    { length/2,  width/2, 0.0},
+                    { length/2, -width/2, 0.0},
+                    {-length/2, -width/2, 0.0},
+                    {-length/2,  width/2, 0.0}
+                };
+
+    for (const auto& frame_name : frame_names_) {
+        if (running_contact_models_[horizon_index]->get_contacts().at(frame_name + "_contact")->active) {
+            pinocchio::FrameIndex fid = model_full_.getFrameId(frame_name);
+            std::cout << "Contact active for frame: " << frame_name << " at horizon index " << horizon_index << std::endl;
+            const pinocchio::SE3& pose = pinocchio_data_->oMf[fid];
+            std::cout << "contacts for " <<frame_name<<"\n";
+            if (frame_name.find("foot") != std::string::npos) {
+                for (const auto& corner_local : local_corners) {
+                    Eigen::Vector3d corner_world = pose.act(corner_local);
+                    active_contact_positions.push_back(corner_world);
+                    std::cout << "[" << corner_world.x() << ", " << corner_world.y() << ", " << corner_world.z() << "] ";
+                }
+                std::cout << std::endl;
+            } else {
+                active_contact_positions.push_back(pose.translation());
+                std::cout << "[" << pose.translation().x() << ", " << pose.translation().y() << ", " << pose.translation().z() << "] ";
+            }
+        }
+    }
+
+    // Round each coordinate of the active contact positions to 2 decimals
+    for (auto& p : active_contact_positions) {
+        p = (p * 100.0).array().round() / 100.0;
+    }
+
+    return active_contact_positions;
+
 }
 
 void HumanoidMulticontactTracker::addFrameTrackingCost(const std::string& frame_name, const double frame_tracking_weight=1.0, const mpc_utils::Phase phase = mpc_utils::Phase::Running, const int horizon_index){
@@ -661,7 +768,7 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
             std::string contact_suffix;
             contact_suffix = (phase == mpc_utils::Phase::Running) ? "_contact" : "_contact_terminal";
             contact_model->changeContactStatus(model_full_.frames[model_full_.getFrameId(frame_name)].name + contact_suffix, false);
-            crocoddyl::FrictionCone surf_cone(rotation, mu_, 4, true);
+            crocoddyl::FrictionCone surf_cone(rotation, mu_ub_, 4, true);
             crocoddyl::ActivationBounds bounds(surf_cone.get_lb(), surf_cone.get_ub());
             std::shared_ptr<crocoddyl::ActivationModelAbstract> surf_activation_friction = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(bounds);
             std::shared_ptr<crocoddyl::ResidualModelAbstract> surf_residual = std::make_shared<crocoddyl::ResidualModelContactFrictionCone>(state_, model_full_.getFrameId(frame_name), surf_cone, actuation_->get_nu());
@@ -675,7 +782,7 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
             std::string contact_suffix;
             contact_suffix = (phase == mpc_utils::Phase::Running) ? "_contact" : "_contact_terminal";
             contact_model->changeContactStatus(model_full_.frames[model_full_.getFrameId(frame_name)].name + contact_suffix, false);
-            crocoddyl::FrictionCone surf_cone(rotation, mu_, 4, true);
+            crocoddyl::FrictionCone surf_cone(rotation, mu_ub_, 4, true);
             crocoddyl::ActivationBounds bounds(surf_cone.get_lb(), surf_cone.get_ub());
             std::shared_ptr<crocoddyl::ActivationModelAbstract> surf_activation_friction = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(bounds);
             std::shared_ptr<crocoddyl::ResidualModelAbstract> surf_residual = std::make_shared<crocoddyl::ResidualModelContactFrictionCone>(state_, model_full_.getFrameId(frame_name), surf_cone, actuation_->get_nu());
@@ -686,7 +793,7 @@ void HumanoidMulticontactTracker::addContactCosts(const std::vector<std::string>
         else{
             rotation = Eigen::Matrix3d::Identity();
             Vector2d foot_size(0.12, 0.05); // goes from (-0.05 to 0.12, -0.025 to 0.035)
-            crocoddyl::WrenchCone surf_cone(rotation, mu_, foot_size);
+            crocoddyl::WrenchCone surf_cone(rotation, mu_lb_, foot_size);
             crocoddyl::ActivationBounds bounds(surf_cone.get_lb(), surf_cone.get_ub());
             std::shared_ptr<crocoddyl::ActivationModelAbstract> surf_activation_friction = std::make_shared<crocoddyl::ActivationModelQuadraticBarrier>(bounds);
             std::shared_ptr<crocoddyl::ResidualModelAbstract> surf_residual = std::make_shared<crocoddyl::ResidualModelContactWrenchCone>(state_, model_full_.getFrameId(frame_name), surf_cone, actuation_->get_nu());
@@ -814,7 +921,7 @@ void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>&
                     double rot_w = tracking_swing_rot_weight_; // swing rotational weight
                     weights << pos_w, pos_w, pos_w, rot_w, rot_w, rot_w;
                     activation->set_weights(weights);
-                    std::cout << "Changing weight for: " << "frame_" + tracking_frame_name << " to: " << weights.transpose() << std::endl;
+                    // std::cout << "Changing weight for: " << "frame_" + tracking_frame_name << " to: " << weights.transpose() << std::endl;
 
                 }
             }
@@ -853,7 +960,7 @@ void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>&
                     double rot_w = tracking_contact_rot_weight_; // swing rotational weight
                     weights << pos_w, pos_w, pos_w, rot_w, rot_w, rot_w;
                     activation->set_weights(weights);
-                    std::cout << "Changing weight for: " << "frame_" + tracking_frame_name << " to: " << weights.transpose() << std::endl;
+                    // std::cout << "Changing weight for: " << "frame_" + tracking_frame_name << " to: " << weights.transpose() << std::endl;
                 }
                 
             }
@@ -933,7 +1040,8 @@ std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMu
     }
     if (cost_mask_[7]) {
         // addCoMPolytopeCost(com_polytope_weight_, mpc_utils::Phase::Running, horizon_index); 
-        addCoMPolytopeVariantsCost(com_polytope_weight_, mpc_utils::Phase::Running, horizon_index);
+        // addCoMPolytopeVariantsCost(com_polytope_weight_, mpc_utils::Phase::Running, horizon_index);
+        add3DComPolytopeVariantCost(com_polytope_weight_, mpc_utils::Phase::Running, horizon_index);
     }
     std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> runningDAM = std::make_shared<crocoddyl::DifferentialActionModelContactFwdDynamics>(state_, actuation_, running_contact_models_[horizon_index], running_cost_model_[horizon_index]);
     return runningDAM;
@@ -971,7 +1079,8 @@ std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> HumanoidMu
     }
     if (cost_mask_[7]) {
         // addCoMPolytopeCost(terminal_com_polytope_weight_, mpc_utils::Phase::Terminal); 
-        addCoMPolytopeVariantsCost(terminal_com_polytope_weight_, mpc_utils::Phase::Terminal);
+        // addCoMPolytopeVariantsCost(terminal_com_polytope_weight_, mpc_utils::Phase::Terminal);
+        add3DComPolytopeVariantCost(terminal_com_polytope_weight_, mpc_utils::Phase::Terminal);
     }
     std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> terminalDAM = std::make_shared<crocoddyl::DifferentialActionModelContactFwdDynamics>(state_, actuation_, terminal_contact_models_, terminal_cost_model_);
     return terminalDAM;
@@ -988,7 +1097,7 @@ void HumanoidMulticontactTracker::setFrames(const std::vector<std::string>& fram
     }
 }
 
-void HumanoidMulticontactTracker::updatePolytope(){
+void HumanoidMulticontactTracker::update2DPolytope(){
     auto cp = getContactPoints(0); //FIXME: we can do it for all the knots, but rn we dont have mixed contacts in the horizon
     std::cout << "Contact Points: ";
     for (const auto& point : cp) {
@@ -1044,6 +1153,57 @@ void HumanoidMulticontactTracker::updatePolytope(){
 
 }
 
+void HumanoidMulticontactTracker::update3DPolytope(){
+    auto cp = get3DContactPoints(0); //FIXME: we can do it for all the knots, but rn we dont have mixed contacts in the horizon
+    std::cout << "Contact Points: ";
+    for (const auto& point : cp) {
+        std::cout << "[" << point.x() << ", " << point.y() << ", " << point.z() << "] ";
+    }
+    std::cout << std::endl;
+    
+    for (size_t i = 0; i < N_horizon_; ++i) {        
+        if (cp.size() == 4 || cp.size() == 8) {
+            mpc_utils::compute3DHalfSpaceRep(cp, A_, b_);
+            residuals_poly8_[i]->setPolytope(A_, b_);
+            running_cost_model_[i]->changeCostStatus("com_polytope_8", true);
+            running_cost_model_[i]->changeCostStatus("com_polytope_5", false);
+            running_cost_model_[i]->changeCostStatus("com_polytope_6", false);
+            if(i == N_horizon_ -1){
+                terminal_cost_model_->changeCostStatus("com_polytope_8", true);
+                terminal_cost_model_->changeCostStatus("com_polytope_5", false);
+                terminal_cost_model_->changeCostStatus("com_polytope_6", false);
+            }
+        } else if (cp.size() == 5) {
+            mpc_utils::compute3DHalfSpaceRep(cp, A_, b_);
+            residuals_poly5_[i]->setPolytope(A_, b_);
+            running_cost_model_[i]->changeCostStatus("com_polytope_8", false);
+            running_cost_model_[i]->changeCostStatus("com_polytope_5", true);
+            running_cost_model_[i]->changeCostStatus("com_polytope_6", false);
+            if(i == N_horizon_ -1){
+                terminal_cost_model_->changeCostStatus("com_polytope_8", false);
+                terminal_cost_model_->changeCostStatus("com_polytope_5", true);
+                terminal_cost_model_->changeCostStatus("com_polytope_6", false);
+            }
+        } else if (cp.size() == 6) {
+            mpc_utils::compute3DHalfSpaceRep(cp, A_, b_);
+            residuals_poly6_[i]->setPolytope(A_, b_);
+            running_cost_model_[i]->changeCostStatus("com_polytope_8", false);
+            running_cost_model_[i]->changeCostStatus("com_polytope_5", false);
+            running_cost_model_[i]->changeCostStatus("com_polytope_6", true);
+            if(i == N_horizon_ -1){
+                terminal_cost_model_->changeCostStatus("com_polytope_8", false);
+                terminal_cost_model_->changeCostStatus("com_polytope_5", false);
+                terminal_cost_model_->changeCostStatus("com_polytope_6", true);
+            }
+        } else {
+            std::cout << "[Crocoddyl] Warning: Unsupported number of contact points for polytope cost. Expected 4-5-6, got " << cp.size() << ". Skipping polytope cost." << std::endl;
+        }
+
+        std::cout << "New A size is: " << A_.rows() << "x" << A_.cols() << std::endl;
+        std::cout << "New b size is: " << b_.size() << std::endl;
+    }
+}
+
 void HumanoidMulticontactTracker::initializeSolver(){
 
     std::vector<std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics>> running_DAMS;
@@ -1054,7 +1214,8 @@ void HumanoidMulticontactTracker::initializeSolver(){
     std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> terminal_DAM = createMultiFrameTerminalActionModel(frame_names_);
 
     if (cost_mask_[7]) {
-        updatePolytope();
+        std::cout << "Updating 3D polytope for the fist time \n\n\n";
+        update3DPolytope();
     }
     
     auto create_integrated_model = [&](const auto& dam, bool is_terminal = false)
@@ -1231,8 +1392,8 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
 
     }else{
 
-        shiftSolution(u_prev_, 1);
-        shiftSolution(x_prev_, 1);
+        // shiftSolution(u_prev_, 1);
+        // shiftSolution(x_prev_, 1);
                 
         pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
         pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
@@ -1251,7 +1412,10 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             Eigen::Vector3d current_com = pinocchio::centerOfMass(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
             switchContacts(to_add, to_remove, contact_mask_, xs_out[0], current_com, quasi_static_trigger_);
             quasi_static_trigger_ = false; // reset the first contact change flag
-            if(cost_mask_[7]) updatePolytope();
+            if(cost_mask_[7]){
+                std::cout<<"Updating polytope on contact change \n";
+                update3DPolytope();
+            }
         }
         if(transition_trigger_){
             transition_trigger_ = false;
@@ -1292,16 +1456,6 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             }
         }
 
-        if(cost_mask_[7]) {
-
-            
-            // mpc_utils::computeHalfSpaceRep(mpc_utils::computeConvexHull(getContactPoints(0)), A_, b_); //FIXME: we can compute the polytope for each knot, bur rn, we don't have a mixed contact horizon
-            // std::cout << "A_ :\n" << A_ << std::endl;
-            // std::cout << "b_ :\n" << b_.transpose() << std::endl;
-            // for(size_t i = 0; i < N_horizon_ + 1; i++){
-            //     com_polytope_residuals_[i]->setPolytope(A_, b_);
-            // }
-        }
         // shiftSolution(u_prev_, 5); // I'm using 5 under the assumption that MPC dt=0.025, MuJoCo dt=0.0125, MPC call is each ten steps of MuJoCo
         // shiftSolution(x_prev_, 5);
 
@@ -1634,73 +1788,6 @@ void HumanoidMulticontactTracker::quasiStaticMultiContactSolution(
     Eigen::VectorXd tau = rnea(model_full_, *pinocchio_data_, q_current, v, a, fext);
     tau_guess[0] = tau.tail(u_prev_[0].size());
 }
-
-
-// void HumanoidMulticontactTracker::quasiStaticMultiContactSolution(const VectorXd& q_current, const Vector3d& desired_com, const std::vector<std::string>& active_contacts, const std::vector<double>& alpha, std::vector<VectorXd>& tau_guess)const {
-    
-//     VectorXd v = VectorXd::Zero(model_full_.nv);
-//     VectorXd a = VectorXd::Zero(model_full_.nv);
-//     double mass = 35.115;
-//     Vector3d gravity = model_full_.gravity981;
-
-//     int n_contacts = active_contacts.size();
-//     int base_rows = 6;
-//     int cols = 3 * n_contacts;  // 3D force per contact
-//     int rows = base_rows + n_contacts;   // add bias rows
-
-//     MatrixXd EE_aug = MatrixXd::Zero(rows, cols);
-//     VectorXd forces_aug = VectorXd::Zero(rows);
-
-//     // Check that alpha size is equal to number of contacts, as we are creating bias rows dynamically
-//     if (alpha.size() != n_contacts) {
-//         throw std::invalid_argument("Alpha size must match the number of active contacts.");
-//     }
-//     double alpha_sum = std::accumulate(alpha.begin(), alpha.end(), 0.0);
-//     if (std::abs(alpha_sum - 1.0) > 1e-6) {
-//         throw std::invalid_argument("Sum of alpha values must be equal to 1. Current sum: " + std::to_string(alpha_sum));
-//     }
-
-//     // Force equilibrium
-//     for (int i = 0; i < n_contacts; ++i) {
-//         EE_aug.block<3,3>(0, 3*i) = Matrix3d::Identity();
-//     }
-//     forces_aug.segment<3>(0) = -mass * gravity;
-
-//     // Moment equilibrium
-//     for (int i = 0; i < n_contacts; ++i) {
-//         const std::string& contact_name = active_contacts[i];
-//         pinocchio::FrameIndex fid = model_full_.getFrameId(contact_name);
-//         Vector3d pos = pinocchio_data_->oMi[model_full_.frames[fid].parent].translation();
-//         Vector3d rel_pos = pos - desired_com;
-//         EE_aug.block<3,3>(3, 3*i) = util::SkewSymmetric(rel_pos);
-//     }
-//     forces_aug.segment<3>(3) = Vector3d::Zero();
-
-//     // Add bias constraint
-//     for (int i = 0; i < n_contacts; ++i) {
-//         EE_aug(base_rows + i, 3*i + 2) = 1.0;
-//         forces_aug(base_rows + i) = -alpha[i] * mass * gravity.z();
-//     }
-
-//     // Solve using pseudo-inverse
-//     auto pInv = EE_aug.completeOrthogonalDecomposition().pseudoInverse();
-//     Eigen::VectorXd f_guess = pInv * forces_aug;
-
-//     // Build fext for Pinocchio
-//     PINOCCHIO_ALIGNED_STD_VECTOR(pinocchio::Force) fext(model_full_.joints.size(), pinocchio::Force::Zero());
-//     for (int i = 0; i < n_contacts; ++i) {
-//         const std::string& contact_name = active_contacts[i];
-//         auto fid = model_full_.getFrameId(active_contacts[i]);
-//         auto jid = model_full_.frames[fid].parent;
-//         Vector3d force = f_guess.segment<3>(3*i);
-//         fext[jid] = pinocchio::Force(force, Vector3d::Zero()); // Only forces
-//     }
-
-//     // Compute torques via RNEA
-//     Eigen::VectorXd tau = rnea(model_full_, *pinocchio_data_, q_current, v, a, fext);
-//     tau_guess[0] = tau.tail(u_prev_[0].size());
-//     std::cout << "tau_guess" <<tau_guess[0].transpose() <<"\n";
-// }
 
 void HumanoidMulticontactTracker::quasiStaticFootHandSolution(const VectorXd& q_current,
                                                               const Vector3d& desired_com,

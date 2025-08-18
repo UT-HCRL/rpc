@@ -6,6 +6,11 @@
 #include <unordered_map>
 #include <Eigen/Dense>
 
+#include "libqhullcpp/Qhull.h"
+#include "libqhullcpp/QhullFacetList.h"
+#include "libqhullcpp/QhullFacet.h"
+#include "libqhullcpp/QhullVertexSet.h"
+
 namespace mpc_utils {
 
     enum class IntegrationMethod { Euler, RK2, RK3, RK4 };
@@ -439,5 +444,95 @@ namespace mpc_utils {
             b(i) = normal.dot(p1);
         }
     }
+
+    inline bool isNearlyCoplanar(const std::vector<Eigen::Vector3d>& pts, double tol=1e-8) {
+        if (pts.size() < 4) return true;
+        Eigen::Vector3d n = (pts[1] - pts[0]).cross(pts[2] - pts[0]);
+        double max_dist = 0.0;
+        for (size_t i = 3; i < pts.size(); ++i) {
+            double dist = std::abs(n.normalized().dot(pts[i] - pts[0]));
+            max_dist = std::max(max_dist, dist);
+        }
+        return max_dist < tol;
+    }
+
+    inline void compute3DHalfSpaceRep(const std::vector<Eigen::Vector3d>& points, Eigen::MatrixXd& A, Eigen::VectorXd& b) {
+        orgQhull::Qhull qh;
+
+        if (isNearlyCoplanar(points)) { // NOTE: I'm assuming that points will be coplanar only if feet are on the ground, thus the trick is to add points at the robot height with same x,y.
+            std::cout << "coplanar 2d case \n";
+            // Augment points by duplicating them at a fixed height to build a prism
+            const double z_top = 1.35;
+            std::vector<Eigen::Vector3d> augmented_pts;
+            augmented_pts.reserve(points.size() * 2);
+            for (const auto& p : points) {
+                augmented_pts.emplace_back(p);                               // original (base) point
+                augmented_pts.emplace_back(p.x(), p.y(), z_top);             // lifted point
+            }
+
+            std::vector<coordT> coords;
+            coords.reserve(augmented_pts.size() * 3);
+            for (const auto& p : augmented_pts) {
+                coords.push_back(p.x());
+                coords.push_back(p.y());
+                coords.push_back(p.z());
+            }
+
+            qh.runQhull("", 3, static_cast<int>(augmented_pts.size()), coords.data(), "Qt");
+
+            auto facets = qh.facetList();
+            A.resize(facets.size(), 3);
+            b.resize(facets.size());
+
+            int row = 0;
+            for (auto f = facets.begin(); f != facets.end(); ++f) {
+                if (!f->isGood()) continue;
+
+                auto normal = f->hyperplane().coordinates();
+                double offset = f->hyperplane().offset();
+
+                Eigen::Vector3d n(normal[0], normal[1], normal[2]);
+                A.row(row) = n.transpose();
+                b(row) = -offset;
+                row++;
+            }
+
+            A.conservativeResize(row, 3);
+            b.conservativeResize(row);
+        } 
+        else {
+
+            std::vector<coordT> coords;
+            coords.reserve(points.size() * 3);
+            for (auto& p : points) {
+                coords.push_back(p.x());
+                coords.push_back(p.y());
+                coords.push_back(p.z());
+            }
+
+            qh.runQhull("", 3, static_cast<int>(points.size()), coords.data(), "Qt");
+
+            auto facets = qh.facetList();
+            A.resize(facets.size(), 3);
+            b.resize(facets.size());
+
+            int row = 0;
+            for (auto f = facets.begin(); f != facets.end(); ++f) {
+                if (!f->isGood()) continue;
+
+                auto normal = f->hyperplane().coordinates();
+                double offset = f->hyperplane().offset();
+
+                Eigen::Vector3d n(normal[0], normal[1], normal[2]);
+                A.row(row) = n.transpose();
+                b(row) = -offset;
+                row++;
+            }
+
+            A.conservativeResize(row, 3);
+            b.conservativeResize(row);
+        }
+    }
+
 
 } // namespace mpc_utils

@@ -60,6 +60,7 @@ class HumanoidMulticontactTracker{
         void addCoMCost(const double com_tracking_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addCoMPolytopeCost(const double com_poly_weight = 1.0, const mpc_utils::Phase phase = mpc_utils::Phase::Running, const int horizon_index = 0);
         void addCoMPolytopeVariantsCost(const double com_poly_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
+        void add3DComPolytopeVariantCost(const double com_poly_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addXBoundCost(const double x_bound_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addContactCosts(const std::vector<std::string>& frame_names, const mpc_utils::Phase phase, const int horizon_index = 0);
         void addRegularizationCosts(const Eigen::VectorXd& xreg_weights, const double xreg_weight, const double ureg_weight, const mpc_utils::Phase phase, const int horizon_index = 0);
@@ -103,7 +104,9 @@ class HumanoidMulticontactTracker{
         void computeDARE(const std::vector<Eigen::VectorXd>& xs_out, const std::vector<Eigen::VectorXd>& us_out);
         void shiftSolution(std::vector<Eigen::VectorXd>& x, const int shift);
         std::vector<Eigen::Vector2d> getContactPoints(const int horizon_index, const double length = 0.12, const double width = 0.05);
-        void updatePolytope();
+        std::vector<Eigen::Vector3d> get3DContactPoints(const int horizon_index, const double length = 0.12, const double width = 0.05);
+        void update2DPolytope();
+        void update3DPolytope();
 
     private:
 
@@ -113,7 +116,8 @@ class HumanoidMulticontactTracker{
         std::vector<std::string> track_frame_names_;
         std::vector<std::string> track_force_names_;
         std::vector<int> locked_joints_list_;
-        double mu_;
+        double mu_lb_;
+        double mu_ub_;
 
         Eigen::Matrix3d RH_rotation_;
         Eigen::Matrix3d LH_rotation_;
@@ -190,6 +194,7 @@ class HumanoidMulticontactTracker{
         std::vector<std::shared_ptr<crocoddyl::ResidualModelStaticPolytope>> residuals_poly4_;
         std::vector<std::shared_ptr<crocoddyl::ResidualModelStaticPolytope>> residuals_poly5_;
         std::vector<std::shared_ptr<crocoddyl::ResidualModelStaticPolytope>> residuals_poly6_;
+        std::vector<std::shared_ptr<crocoddyl::ResidualModelStaticPolytope>> residuals_poly8_;
         std::vector<std::shared_ptr<crocoddyl::ActionModelAbstract>> integrated_action_models_;
         std::shared_ptr<crocoddyl::ActionModelAbstract> integrated_terminal_action_model_;
         //###########################

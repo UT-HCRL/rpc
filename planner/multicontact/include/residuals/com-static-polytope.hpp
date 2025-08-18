@@ -63,8 +63,8 @@ public:
                                  const VectorXs& b,
                                  std::size_t nu = 0)
       : Base(state, A.rows(), nu, true, false, false), A_(A), b_(b) {
-    if (A.cols() != 2 || A.rows() != b.rows()) {
-      throw std::invalid_argument("A must be Nx2 and b must match A.rows()");
+    if (A.cols() < 2 || A.cols() > 3 || A.rows() != b.rows()) {
+      throw std::invalid_argument("A must be Nx2 or Nx3 and b must match A.rows()");
     }
   }
 
@@ -76,7 +76,13 @@ public:
     
     Data* d = static_cast<Data*>(data.get());
 
-    data->r.noalias() = A_ * d->pinocchio->com[0].template head<2>() - b_;
+    if (A_.cols() == 2) {
+      data->r.noalias() = A_ * d->pinocchio->com[0].template head<2>() - b_;
+    } else if (A_.cols() == 3) {
+      data->r.noalias() = A_ * d->pinocchio->com[0] - b_;
+    } else {
+      throw std::runtime_error("A_ must have 2 or 3 columns.");
+    }
   }
 
   virtual void calcDiff(const std::shared_ptr<ResidualDataAbstract>& data,
@@ -84,7 +90,14 @@ public:
                 const Eigen::Ref<const VectorXs>& /*u*/) override {
     Data* d = static_cast<Data*>(data.get());
 
-    const auto& Jcom = d->pinocchio->Jcom.topRows(2);
+    Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> Jcom;
+    if (A_.cols() == 2) {
+      Jcom = d->pinocchio->Jcom.topRows(2);
+    } else if (A_.cols() == 3) {
+      Jcom = d->pinocchio->Jcom;
+    } else {
+      throw std::runtime_error("A_ must have 2 or 3 columns.");
+    }
 
     data->Rx.setZero(this->nr_, this->state_->get_ndx());
     data->Rx.leftCols(this->state_->get_nv()).noalias() = A_ * Jcom;
@@ -113,9 +126,9 @@ public:
   }
 
   void setPolytope(const MatrixXs& A, const VectorXs& b) {
-      if (A.cols() != 2) {
-          std::cout << "setPolytope: A must have 2 columns (xy projection)";
-          throw std::invalid_argument("setPolytope: A must have 2 columns (xy projection)");
+      if (A.cols() < 2 || A.cols() > 3) {
+          std::cout << "setPolytope: A must have 2 columns (xy projection) or 3 columns (xyz)";
+          throw std::invalid_argument("setPolytope: A must have 2 columns (xy projection)  or 3 columns (xyz)");
       }
       if (A.rows() != b.size()) {
           std::cout << "setPolytope: A.rows must match b.size()";

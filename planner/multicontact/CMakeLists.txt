@@ -22,6 +22,8 @@ target_link_libraries(${PROJECT_NAME}
     PUBLIC OpenMP::OpenMP_CXX
     PUBLIC rpc-util
     PUBLIC contact_switching
+    PUBLIC qhullcpp
+    PUBLIC qhull_r
 )
 
 install(TARGETS ${PROJECT_NAME}
