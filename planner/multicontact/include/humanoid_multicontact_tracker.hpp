@@ -102,7 +102,8 @@ class HumanoidMulticontactTracker{
         
         // Auxiliary functions
         void computeDARE(const std::vector<Eigen::VectorXd>& xs_out, const std::vector<Eigen::VectorXd>& us_out);
-        void shiftSolution(std::vector<Eigen::VectorXd>& x, const int shift);
+        void shiftSolutionX(std::vector<Eigen::VectorXd>& x, const int shift);
+        void shiftSolutionU(std::vector<Eigen::VectorXd>& u, const int shift);
         std::vector<Eigen::Vector2d> getContactPoints(const int horizon_index, const double length = 0.12, const double width = 0.05);
         std::vector<Eigen::Vector3d> get3DContactPoints(const int horizon_index, const double length = 0.12, const double width = 0.05);
         void update2DPolytope();

@@ -91,7 +91,7 @@ initial_config:
   right_two_joint: 0.
 
 #          [   Reg,   xBound,   CoM,    Frames,    Contacts,      Forces,     TorqueRate      CoM Polytope    ]
-cost_mask: [    1,      1,       0,        1,          1,           0,            0,                1         ]
+cost_mask: [    1,      1,       0,        1,          1,           0,            0,                0         ]
 
 tracking_frames:
   - torso_primitive_shape
@@ -103,12 +103,13 @@ tracking_frames:
   - right_rubber_hand
 
 friction:
-  w: 100.0
-  mu: 0.7
+  w: 1.0
+  mu_lb: 0.7
+  mu_ub: 0.7
 
 running_costs:
   xReg:
-    w: 0.1 #30.0
+    w: 0.1
     state_w:
       base_pos: [0.0, 0.0, 0.0]
       base_rot: [0.01, 0.01, 0.01]
@@ -117,49 +118,49 @@ running_costs:
       base_ang_vel: [0.01, 0.01, 0.01]
       joint_vel: 3.0
   uReg:
-    w: 0.1 #4.0
+    w: 0.01
   xBound:
     w: 0.001
   CoM:
-    w: 500.0
+    w: 50.0
   tracking_frames:
     w: 2.0
     contact_rot: 5.0  # rotation weight assigned for frames in contact
-    swing_rot: 20.0     # rotation weight assigned for frames in swing phase
+    swing_rot: 0.2     # rotation weight assigned for frames in swing phase
     torso_primitive_shape: 
-      pos: 2000.0
+      pos: 80.0
       rot: 0.0
     left_ankle_roll_link: 
-      pos: 1000.0
+      pos: 60.0
       rot: 0.0
     right_ankle_roll_link: 
-      pos: 1000.0
+      pos: 60.0
       rot: 0.0
     left_knee_link: 
-      pos: 1000.0
+      pos: 60.0
       rot: 0.0
     right_knee_link: 
-      pos: 1000.0
+      pos: 60.0
       rot: 0.0
     left_rubber_hand: 
-      pos: 100.0
+      pos: 40.0
       rot: 0.0
     right_rubber_hand: 
-      pos: 100.0
+      pos: 40.0
       rot: 0.0
   baumgarte_gains:
     l_foot_contact:
-      alpha: 0.0
-      beta: 60.0
+      alpha: 0.04
+      beta: 0.04
     r_foot_contact:
-      alpha: 0.0
-      beta: 60.0
+      alpha: 0.04
+      beta: 0.04
     left_rubber_hand:
-      alpha: 0.0
-      beta: 60.0
+      alpha: 0.04
+      beta: 0.04
     right_rubber_hand:
-      alpha: 0.0
-      beta: 60.0
+      alpha: 0.04
+      beta: 0.04
   tracking_forces:
     w: 0.0
     l_foot_contact: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -173,7 +174,7 @@ running_costs:
 
 terminal_costs:
   xReg:
-    w: 1.0 #5.0
+    w: 0.1 #5.0
     state_w:
       base_pos: [0.0, 0.0, 0.0]
       base_rot: [0.01, 0.01, 0.01]
@@ -184,31 +185,31 @@ terminal_costs:
   xBound:
     w: 300.0
   CoM:
-    w: 4000.0
+    w: 40.0
   tracking_frames:
     w: 2.0
-    contact_rot: 0.1  # weight assigned for frames in contact
+    contact_rot: 0.01  # weight assigned for frames in contact
     swing_rot: 1.0  # weight assigned for frames in swing phase
     torso_primitive_shape:
-      pos: 1000.0
+      pos: 10.0
       rot: 0.0
     left_ankle_roll_link:
-      pos: 10.0
+      pos: 1.0
       rot: 0.0
     right_ankle_roll_link:
-      pos: 10.0
+      pos: 1.0
       rot: 0.0
     left_knee_link:
-      pos: 10.0
+      pos: 1.0
       rot: 0.0
     right_knee_link:
-      pos: 10.0
+      pos: 1.0
       rot: 0.0
     left_rubber_hand:
-      pos: 10.0
+      pos: 1.0
       rot: 0.0
     right_rubber_hand:
-      pos: 10.0
+      pos: 1.0
       rot: 0.0
   tracking_forces:
     w: 0.0
@@ -225,5 +226,5 @@ mpc:
   horizon: 30
   max_iter: 30
   integration_method: Euler # [Euler; RK2, RK3, RK4]
-  verbose: false
+  verbose: true
   contact_lookahead: 0 #ms

@@ -261,7 +261,8 @@ G1ControlArchitecture::G1ControlArchitecture(PinocchioRobotSystem *robot,
 //   std::string file_path = THIS_COM "experiment_data/g1_sca_step_over_knee_knocker_kin_july.pkl";
   std::string file_path = THIS_COM "experiment_data/g1_sca_step_on_balanced_knee_knocker.pkl";
 //   std::string file_path = THIS_COM "experiment_data/g1_sca_step_on_knee_knocker.pkl";
-//   std::string file_path = THIS_COM "experiment_data/g1_sca_step_over_knee_knocker.pkl";
+  // std::string file_path = THIS_COM "experiment_data/g1_sca_step_over_knee_knocker.pkl";
+//   std::string file_path = THIS_COM "data_example/g1_step_on_balanced_door_aug.pkl";
   std::vector<std::string> pkl_frame_names = {"rh_act", "lh_act", "rkn_act", "lkn_act", "rf_act", "lf_act", "torso_act"};
   PickleReader pkl_reader = PickleReader(file_path, PickleType::COMPOSITE, pkl_frame_names);
   if (!pkl_reader.isReady()) {
@@ -303,6 +304,8 @@ G1ControlArchitecture::G1ControlArchitecture(PinocchioRobotSystem *robot,
   manipulation_state_machine_container_[g1_states::kTeleopManipulation]
       ->SetParameters(cfg);
 #endif
+
+  std::cout << "Finished parsing \n";
 }
 
 G1ControlArchitecture::~G1ControlArchitecture() {

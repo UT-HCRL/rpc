@@ -29,7 +29,7 @@
       <!-- <geom pos="0.0 0.39 0.5" quat="0 0.70710678 0.70710678 0" type="box" size="0.01 0.2 0.8" mass="1000" rgba="0.7 0.7 0.7 0.3"/> -->
       <geom pos="0.0 0.39 0.5" quat="0 0.70710678 0.70710678 0" type="box" size="0.04 0.2 0.8" friction="1 1 1"  mass="1000" rgba="0.7 0.7 0.7 0.3"/> 
       <geom pos="0.03 -0.39 0.5" quat="0 0.70710678 0.70710678 0" type="box" size="0.01 0.2 0.8" friction="1 1 1" mass="1000" rgba="0.7 0.7 0.7 0.3"/>
-      <geom pos="0.09 -0.24 0.38" quat="0.70710678 0.0 0.69 0" type="box" size="0.015 0.25 0.13" friction="1 1 1" mass="1000" rgba="0.0 0.0 1.0 0.3"/>
+      <geom pos="0.11 -0.24 0.38" quat="0.70710678 0.0 0.70710678 0" type="box" size="0.015 0.15 0.13" friction="1 1 1" mass="1000" rgba="0.0 0.0 1.0 0.3"/>
       <!-- <geom pos="0.12 0.25 0.38" quat="0.70710678 0.0 0.69 0" type="box" size="0.015 0.25 0.13" friction="1 1 1" mass="1000" rgba="1.0 0.0 0.0 0.3"/> -->
       <!-- <geom name="step_collision" type="box" pos="0.34 0.05 -0.05" size="0.34 1.0 0.1" mass="1000" rgba="0.7 0.7 0.7 0.3"/> -->
 <!--      <geom mesh="navy_door_765x1450_collision_0" rgba="0.7527953103855858 0.18414577896470308 0.13306204457553372 1" class="collision" euler="0 0 1.57"/>-->

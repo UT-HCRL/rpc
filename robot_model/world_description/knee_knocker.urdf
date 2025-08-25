@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<robot name="knee_knocker">
+
+  <!-- Materials -->
+  <material name="gray">
+    <color rgba="0.498 0.498 0.498 1"/>
+  </material>
+  <material name="lightblue">
+    <color rgba="0.6157 0.8118 0.9294 1"/>
+  </material>
+  <material name="transparent_gray">
+    <color rgba="0.7 0.7 0.7 0.3"/>
+  </material>
+  <material name="transparent_blue">
+    <color rgba="0.0 0.0 1.0 0.3"/>
+  </material>
+
+  <!-- Root link -->
+  <link name="world"/>
+
+  <!-- Door body -->
+  <link name="navy_door_765x1450">
+
+    <!-- Visual meshes -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 1.57"/>
+      <geometry>
+        <mesh filename="meshes/navy_door_765x1450_0.obj"/>
+      </geometry>
+      <material name="lightblue"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 1.57"/>
+      <geometry>
+        <mesh filename="meshes/navy_door_765x1450_1.obj"/>
+      </geometry>
+      <material name="transparent_gray"/>
+    </visual>
+
+  </link>
+
+  <!-- Fixed joint to world -->
+  <joint name="door_fixed" type="fixed">
+    <parent link="world"/>
+    <child link="navy_door_765x1450"/>
+    <origin xyz="0.34 0.05 0" rpy="0 0 0"/>
+  </joint>
+
+</robot>

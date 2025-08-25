@@ -13,7 +13,7 @@
           <geom condim="1" contype="0" conaffinity="0" group="0"/>
       </default>
       <default class="world_collision">
-          <geom contype="3" conaffinity="2" condim="6" group="2" friction="0.5 0.005 0.0001"/>
+          <geom contype="3" conaffinity="2" condim="6" group="2" friction="0.7 0.005 0.0001"/>
       </default>
   </default>
 

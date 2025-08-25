@@ -36,3 +36,25 @@ install(TARGETS ${PROJECT_NAME}
 install(DIRECTORY include/
     DESTINATION include
 )
+
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/release-1.12.1.zip
+)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+enable_testing()
+
+set(test_sources tests/quasi_static_test.cpp)
+
+add_executable(${PROJECT_NAME}_tests ${test_sources})
+target_link_libraries(${PROJECT_NAME}_tests
+    PRIVATE ${PROJECT_NAME}
+    PRIVATE GTest::gtest
+    PRIVATE GTest::gtest_main
+)
+
+include(GoogleTest)
+gtest_discover_tests(${PROJECT_NAME}_tests)

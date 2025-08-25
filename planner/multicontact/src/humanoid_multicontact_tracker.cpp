@@ -35,25 +35,116 @@
 
 #include "util/pkl_utils.hpp"
 
+#include <crocoddyl/core/solver-base.hpp>
+#include <fstream>
+#include <iomanip>
+
 class CostRecorderCallback : public crocoddyl::CallbackAbstract {
- public:
-  explicit CostRecorderCallback() = default;
-  virtual ~CostRecorderCallback() = default;
+public:
+    CostRecorderCallback(
+        const std::vector<std::shared_ptr<crocoddyl::CostModelSum>>& running_cost_models,
+        std::shared_ptr<crocoddyl::CostModelSum> terminal_cost_model,
+        std::function<double(const std::string&, int)> fetch_value,
+        const std::string& stats_csv = "ddp_stats.csv",
+        const std::string& terms_csv = "ddp_terms.csv",
+        bool include_terminal = false)
+        : running_cost_models_(running_cost_models),
+          terminal_cost_model_(std::move(terminal_cost_model)),
+          fetch_value_(std::move(fetch_value)),
+          include_terminal_(include_terminal),
+          stats_csv_(stats_csv),
+          terms_csv_(terms_csv)
+    {
+        stats_buffer_ << "iter,cost,step,stop,dV_exp,dV\n";
 
-  // The operator() is called by the solver at each iteration
-  void operator()(crocoddyl::SolverAbstract& solver) override {
-    // Store the iteration number and cost in the map
-    iteration_costs_[solver.get_iter()].push_back(solver.get_cost());
+        std::set<std::string> names_set;
+        node_has_term_.resize(running_cost_models_.size());
+        for (std::size_t k = 0; k < running_cost_models_.size(); ++k) {
+            const auto& cmap = running_cost_models_[k]->get_costs();
+            for (const auto& kv : cmap) {
+                names_set.insert(kv.first);
+                node_has_term_[k][kv.first] = (kv.second && kv.second->active);
+            }
+        }
+        if (include_terminal_ && terminal_cost_model_) {
+            for (const auto& kv : terminal_cost_model_->get_costs()) names_set.insert(kv.first);
+        }
+        cost_names_.assign(names_set.begin(), names_set.end());
 
-  }
+        terms_buffer_ << "iter,phase,k";
+        for (const auto& name : cost_names_) terms_buffer_ << "," << name;
+        terms_buffer_ << "\n";
+    }
 
-  const std::map<int, std::vector<double>>& get_costs() const {
-    return iteration_costs_;
-  }
+    void operator()(crocoddyl::SolverAbstract& solver) override {
+        int it = solver.get_iter();
 
- private:
-  std::map<int, std::vector<double>> iteration_costs_;
+        // Console output
+        std::cout << "[CostRecorder] Iteration " << it << " cost=" << solver.get_cost() << std::endl;
+
+        // Global stats
+        stats_buffer_ << it << "," << solver.get_cost()
+                      << "," << solver.get_steplength()
+                      << "," << solver.get_stop()
+                      << "," << solver.get_dVexp()
+                      << "," << solver.get_dV() << "\n";
+
+        // Per-node running costs
+        for (std::size_t k = 0; k < running_cost_models_.size(); ++k) {
+            terms_buffer_ << it << ",run," << k;
+            for (const auto& name : cost_names_) {
+                double v = 0.0;
+                auto itp = node_has_term_[k].find(name);
+                if (itp != node_has_term_[k].end() && itp->second) {
+                    try { v = fetch_value_(name, static_cast<int>(k)); } catch (...) {}
+                }
+                terms_buffer_ << "," << v;
+            }
+            terms_buffer_ << "\n";
+        }
+
+        // Terminal cost
+        if (include_terminal_ && terminal_cost_model_) {
+            const int kterm = static_cast<int>(running_cost_models_.size());
+            terms_buffer_ << it << ",term," << kterm;
+            for (const auto& name : cost_names_) {
+                double v = 0.0;
+                const auto& cmap = terminal_cost_model_->get_costs();
+                auto itc = cmap.find(name);
+                if (itc != cmap.end() && itc->second && itc->second->active) {
+                    try { v = fetch_value_(name, kterm); } catch (...) {}
+                }
+                terms_buffer_ << "," << v;
+            }
+            terms_buffer_ << "\n";
+        }
+
+        // Flush every iteration
+        flushToFiles();
+    }
+
+private:
+    void flushToFiles() {
+        stats_.open(stats_csv_, std::ios::out | std::ios::trunc);
+        stats_ << stats_buffer_.str();
+        stats_.close();
+
+        terms_.open(terms_csv_, std::ios::out | std::ios::trunc);
+        terms_ << terms_buffer_.str();
+        terms_.close();
+    }
+
+    std::vector<std::shared_ptr<crocoddyl::CostModelSum>> running_cost_models_;
+    std::shared_ptr<crocoddyl::CostModelSum> terminal_cost_model_;
+    std::function<double(const std::string&, int)> fetch_value_;
+    bool include_terminal_;
+    std::vector<std::string> cost_names_;
+    std::vector<std::unordered_map<std::string, bool>> node_has_term_;
+    std::stringstream stats_buffer_, terms_buffer_;
+    std::string stats_csv_, terms_csv_;
+    std::ofstream stats_, terms_;
 };
+
 
 HumanoidMulticontactTracker::HumanoidMulticontactTracker(const std::string& robot_path, const std::unordered_map<std::string, mpc_utils::Weights>& cost_weights, const std::vector<int>& locked_joints_list, const bool croc_callbacks) : locked_joints_list_(locked_joints_list), enable_callbacks_(croc_callbacks) {
 
@@ -464,8 +555,8 @@ void HumanoidMulticontactTracker::add3DComPolytopeVariantCost(const double com_p
     cost_model->addCost("com_polytope_8", std::make_shared<crocoddyl::CostModelResidual>(state_, activation8, residual8), com_poly_weight);
     cost_model->changeCostStatus("com_polytope_8", false);
 
-    std::cout << "Size of A for polytope8: " << A8.rows() << " x " << A8.cols() << std::endl;
-    std::cout << "Size of b for polytope8: " << b8.size() << std::endl;
+    // std::cout << "Size of A for polytope8: " << A8.rows() << " x " << A8.cols() << std::endl;
+    // std::cout << "Size of b for polytope8: " << b8.size() << std::endl;
 
     std::vector<Eigen::Vector3d> dummy_poly5 = {
         {0.0, 0.0, 0.0},   
@@ -485,8 +576,8 @@ void HumanoidMulticontactTracker::add3DComPolytopeVariantCost(const double com_p
     cost_model->addCost("com_polytope_5", std::make_shared<crocoddyl::CostModelResidual>(state_, activation5, residual5), com_poly_weight);
     cost_model->changeCostStatus("com_polytope_5", false);
 
-    std::cout << "Size of A for polytope5: " << A5.rows() << " x " << A5.cols() << std::endl;
-    std::cout << "Size of b for polytope5: " << b5.size() << std::endl;
+    // std::cout << "Size of A for polytope5: " << A5.rows() << " x " << A5.cols() << std::endl;
+    // std::cout << "Size of b for polytope5: " << b5.size() << std::endl;
 
     std::vector<Eigen::Vector3d> dummy_poly6 = {
         {0.11, 0.14, 0}, 
@@ -507,8 +598,8 @@ void HumanoidMulticontactTracker::add3DComPolytopeVariantCost(const double com_p
     cost_model->addCost("com_polytope_6", std::make_shared<crocoddyl::CostModelResidual>(state_, activation6, residual6), com_poly_weight);
     cost_model->changeCostStatus("com_polytope_6", false);
 
-    std::cout << "Size of A for polytope6: " << A6.rows() << " x " << A6.cols() << std::endl;
-    std::cout << "Size of b for polytope6: " << b6.size() << std::endl;
+    // std::cout << "Size of A for polytope6: " << A6.rows() << " x " << A6.cols() << std::endl;
+    // std::cout << "Size of b for polytope6: " << b6.size() << std::endl;
 
 }
 
@@ -997,7 +1088,7 @@ void HumanoidMulticontactTracker::switchContacts(const std::vector<std::string>&
             u_prev_[i] = us_guess[0];
         }
 
-        // updateRunningWeights(0.1, 1.0, contact_mask);
+        // updateRunningWeights(0.1, 0.1, contact_mask);
         // updateTerminalWeights(0.0, contact_mask);
     }
 
@@ -1155,11 +1246,11 @@ void HumanoidMulticontactTracker::update2DPolytope(){
 
 void HumanoidMulticontactTracker::update3DPolytope(){
     auto cp = get3DContactPoints(0); //FIXME: we can do it for all the knots, but rn we dont have mixed contacts in the horizon
-    std::cout << "Contact Points: ";
-    for (const auto& point : cp) {
-        std::cout << "[" << point.x() << ", " << point.y() << ", " << point.z() << "] ";
-    }
-    std::cout << std::endl;
+    // std::cout << "Contact Points: ";
+    // for (const auto& point : cp) {
+    //     std::cout << "[" << point.x() << ", " << point.y() << ", " << point.z() << "] ";
+    // }
+    // std::cout << std::endl;
     
     for (size_t i = 0; i < N_horizon_; ++i) {        
         if (cp.size() == 4 || cp.size() == 8) {
@@ -1198,9 +1289,8 @@ void HumanoidMulticontactTracker::update3DPolytope(){
         } else {
             std::cout << "[Crocoddyl] Warning: Unsupported number of contact points for polytope cost. Expected 4-5-6, got " << cp.size() << ". Skipping polytope cost." << std::endl;
         }
-
-        std::cout << "New A size is: " << A_.rows() << "x" << A_.cols() << std::endl;
-        std::cout << "New b size is: " << b_.size() << std::endl;
+        // std::cout << "New A size is: " << A_.rows() << "x" << A_.cols() << std::endl;
+        // std::cout << "New b size is: " << b_.size() << std::endl;
     }
 }
 
@@ -1214,7 +1304,7 @@ void HumanoidMulticontactTracker::initializeSolver(){
     std::shared_ptr<crocoddyl::DifferentialActionModelContactFwdDynamics> terminal_DAM = createMultiFrameTerminalActionModel(frame_names_);
 
     if (cost_mask_[7]) {
-        std::cout << "Updating 3D polytope for the fist time \n\n\n";
+        // std::cout << "Updating 3D polytope for the fist time \n\n\n";
         update3DPolytope();
     }
     
@@ -1246,7 +1336,23 @@ void HumanoidMulticontactTracker::initializeSolver(){
 
     problem_ = std::make_shared<crocoddyl::ShootingProblem>(x0_, integrated_action_models_, integrated_terminal_action_model_);
     fddp_ = std::make_shared<crocoddyl::SolverFDDP>(problem_);
-    if(enable_callbacks_) fddp_->setCallbacks({std::make_shared<crocoddyl::CallbackVerbose>()});
+    auto running_datas = problem_->get_runningDatas();
+    auto terminal_data = problem_->get_terminalData();
+    auto cb = std::make_shared<CostRecorderCallback>(
+        running_cost_model_,
+        terminal_cost_model_,
+        [this](const std::string& name, int k) {
+        return this->getCostValue(name, k);
+        },
+        "ddp_stats.csv",
+        "ddp_terms.csv",
+        false
+    );
+    if(enable_callbacks_){
+        fddp_->setCallbacks({
+            cb
+        });
+    }
 
     // fddp_->set_reg_incfactor(fddp_->get_reg_incfactor()*10);
     problem_->set_nthreads(8);
@@ -1318,16 +1424,19 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
 
     const std::size_t N = fddp_->get_problem()->get_T();
     long solve_duration = 0.;
+    static int transient = 0;
 
     if(first_iteration_){
-        fddp_->set_th_stop(1e-3);
+        fddp_->set_th_stop(1e-2);
         // std::vector<Eigen::VectorXd> xs(N, x0_);
         // us_static = problem_->quasiStatic_xs(xs);
         // xs.push_back(x0_);
         std::cout << "First iteration \n";
         std::vector<Eigen::VectorXd> xs(N+1, xs_out[0]);
         std::vector<Eigen::VectorXd> us_static(N, us_out[0]);
-        
+
+        pinocchio::forwardKinematics(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
+        pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
         first_iteration_ = false;
 
         if(cost_mask_[0]) {
@@ -1372,8 +1481,6 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
 
         problem_->set_x0(xs_out[0]);
 
-        pinocchio::forwardKinematics(model_full_, *pinocchio_data_, x0_.head(state_->get_nq()));
-        pinocchio::updateFramePlacements(model_full_, *pinocchio_data_);
         auto start_time = std::chrono::high_resolution_clock::now();
         try {
             fddp_->solve(xs, us_static, max_iter_);
@@ -1390,7 +1497,7 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         //     }
         // }
 
-    }else{
+    } else {
 
         // shiftSolution(u_prev_, 1);
         // shiftSolution(x_prev_, 1);
@@ -1413,7 +1520,7 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             switchContacts(to_add, to_remove, contact_mask_, xs_out[0], current_com, quasi_static_trigger_);
             quasi_static_trigger_ = false; // reset the first contact change flag
             if(cost_mask_[7]){
-                std::cout<<"Updating polytope on contact change \n";
+                // std::cout<<"Updating polytope on contact change \n";
                 update3DPolytope();
             }
         }
@@ -1456,13 +1563,6 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
             }
         }
 
-        // shiftSolution(u_prev_, 5); // I'm using 5 under the assumption that MPC dt=0.025, MuJoCo dt=0.0125, MPC call is each ten steps of MuJoCo
-        // shiftSolution(x_prev_, 5);
-
-        // for (auto& x : xs_out) {
-        //     x.tail(state_->get_nv()).setZero();
-        // }
-
         // // set the joint reference to the previous solution
         double oblivion_factor = 0.9; //0.8
         auto xReg_res = std::dynamic_pointer_cast<crocoddyl::ResidualModelState>(running_cost_model_[0]->get_costs().at("xReg")->cost->get_residual());
@@ -1475,7 +1575,8 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         auto xReg_res_term = std::dynamic_pointer_cast<crocoddyl::ResidualModelState>(terminal_cost_model_->get_costs().at("xReg")->cost->get_residual());
         Eigen::VectorXd adjusted_reference_term = oblivion_factor * xs_out[N_horizon_] + (1.0 - oblivion_factor) * xs_out[0];
         xReg_res_term->set_reference(adjusted_reference_term);
-
+        
+        // x_prev_[0] = xs_out[0];
         // for (size_t i = 0; i < N_horizon_; i++) {
         //     auto xReg_res = std::dynamic_pointer_cast<crocoddyl::ResidualModelState>(running_cost_model_[i]->get_costs().at("xReg")->cost->get_residual());
         //     xReg_res->set_reference(x_prev_[i]);
@@ -1499,6 +1600,11 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
 
         auto start_time = std::chrono::high_resolution_clock::now();
         try {
+            // fddp_->set_reg_min(1e-3);
+            // fddp_->set_reg_max(1e8);
+            fddp_->set_th_acceptstep(0.02);  // default is stricter accept more often
+            // fddp_->set_th_stepdec(0.5);
+            // fddp_->set_th_stepinc(1.0);
             fddp_->solve(x_prev_, u_prev_, max_iter_);
             // printCosts();
 
@@ -1546,8 +1652,6 @@ void HumanoidMulticontactTracker::solveOneStep(std::vector<Eigen::VectorXd>& xs_
         if(cost_mask_[3]) data_out.left_foot_contact_costs.push_back(getCostValue("l_foot_contact_friction_cone", i));
         if(cost_mask_[3]) data_out.right_foot_contact_costs.push_back(getCostValue("r_foot_contact_friction_cone", i));
     }
-
-    data_out.com_curr_pos =  pinocchio::centerOfMass(model_full_, *pinocchio_data_, xs_out[0].head(state_->get_nq()));
 
     if(cost_mask_[3]) {
         for(size_t i = 0; i < N + 1; i++){
@@ -1776,17 +1880,27 @@ void HumanoidMulticontactTracker::quasiStaticMultiContactSolution(
                 << f_guess.segment<3>(3*i).transpose() << "\n";
     }
 
-    // Build fext for Pinocchio
     PINOCCHIO_ALIGNED_STD_VECTOR(pinocchio::Force) fext(model_full_.joints.size(), pinocchio::Force::Zero());
     for (int i = 0; i < n_contacts; ++i) {
         auto fid = model_full_.getFrameId(active_contacts[i]);
         auto jid = model_full_.frames[fid].parent;
-        Vector3d force = f_guess.segment<3>(3*i);
-        fext[jid] = pinocchio::Force(force, Vector3d::Zero());
+        Vector3d f_world = f_guess.segment<3>(3*i);
+
+        // Transform world force to joint-local frame
+        Eigen::Matrix3d R_world_to_joint = pinocchio_data_->oMi[jid].rotation().transpose();
+        Vector3d f_joint = R_world_to_joint * f_world;
+
+        fext[jid] = pinocchio::Force(f_joint, Vector3d::Zero());
     }
 
     Eigen::VectorXd tau = rnea(model_full_, *pinocchio_data_, q_current, v, a, fext);
     tau_guess[0] = tau.tail(u_prev_[0].size());
+
+    // Print current joint configuration and velocities (quasi-static assumes zero velocities)
+    std::cout << "[QuasiStatic] Current joint configuration (q): "
+              << q_current.transpose() << std::endl;
+    
+    std::cout << "[QuasiStatic] Tau guess: " << tau_guess[0].transpose() << std::endl;
 }
 
 void HumanoidMulticontactTracker::quasiStaticFootHandSolution(const VectorXd& q_current,
@@ -1861,7 +1975,7 @@ void HumanoidMulticontactTracker::quasiStaticSolution(const VectorXd& x_prev, co
     }
 }
 
-void HumanoidMulticontactTracker::shiftSolution(std::vector<Eigen::VectorXd>& x, const int shift){
+void HumanoidMulticontactTracker::shiftSolutionX(std::vector<Eigen::VectorXd>& x, const int shift){
     if(shift < 0 || shift >= N_horizon_){
         std::cerr << "Shift value out of bounds. Must be between 0 and " << N_horizon_ - 1 << "." << std::endl;
         return;
@@ -1871,6 +1985,19 @@ void HumanoidMulticontactTracker::shiftSolution(std::vector<Eigen::VectorXd>& x,
     }
     for(int i = N_horizon_ - shift; i < N_horizon_; ++i){
         x[i] = x[N_horizon_ - 1]; // fill the rest with the last element
+    }
+}
+
+void HumanoidMulticontactTracker::shiftSolutionU(std::vector<Eigen::VectorXd>& u, const int shift){
+    if(shift < 0 || shift >= N_horizon_ -1){
+        std::cerr << "Shift value out of bounds. Must be between 0 and " << N_horizon_ - 1 << "." << std::endl;
+        return;
+    }
+    for(int i = 0; i < N_horizon_ - shift; ++i){
+        u[i] = u[i + shift];
+    }
+    for(int i = N_horizon_ - 1 - shift; i < N_horizon_ -1; ++i){
+        u[i] = u[N_horizon_ - 2]; // fill the rest with the last element
     }
 }
 
